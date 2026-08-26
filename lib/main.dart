@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 
 import 'services/chat_service.dart';
+import 'services/swap_service.dart';
 
 import 'view/dashboard_screen.dart';
 import 'view/add_skill_screen.dart';
@@ -18,6 +19,10 @@ Future<void> main() async {
       .ensureInitialized();
 
   await ChatService
+      .instance
+      .initialize();
+
+  await SwapService
       .instance
       .initialize();
 
@@ -37,8 +42,7 @@ class TubiLearnApp
       BuildContext context,
       ) {
     return MaterialApp(
-      title:
-      'TubiLearn',
+      title: 'TubiLearn',
 
       debugShowCheckedModeBanner:
       false,
@@ -69,53 +73,35 @@ class TubiLearnApp
 
       onGenerateRoute:
           (settings) {
-        // ======================================================
-        // SKILL DETAILS
-        // ======================================================
-
         if (settings.name ==
             '/skill-details') {
           final skill =
           settings.arguments
-          as Map<
-              String,
-              dynamic>;
+          as Map<String, dynamic>;
 
           return MaterialPageRoute(
             builder:
                 (context) =>
                 SkillDetailsScreen(
-                  skill:
-                  skill,
+                  skill: skill,
                 ),
           );
         }
-
-        // ======================================================
-        // USER PROFILE
-        // ======================================================
 
         if (settings.name ==
             '/user-profile') {
           final user =
           settings.arguments
-          as Map<
-              String,
-              dynamic>;
+          as Map<String, dynamic>;
 
           return MaterialPageRoute(
             builder:
                 (context) =>
                 UserProfileScreen(
-                  user:
-                  user,
+                  user: user,
                 ),
           );
         }
-
-        // ======================================================
-        // CONVERSATION
-        // ======================================================
 
         if (settings.name ==
             '/conversation') {

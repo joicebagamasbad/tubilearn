@@ -4,10 +4,14 @@ import 'package:sqflite/sqflite.dart';
 class AppDatabase {
   AppDatabase._();
 
-  static final AppDatabase instance = AppDatabase._();
+  static final AppDatabase instance =
+  AppDatabase._();
 
-  static const String _databaseName = 'tubilearn.db';
-  static const int _databaseVersion = 1;
+  static const String _databaseName =
+      'tubilearn.db';
+
+  static const int _databaseVersion =
+  2;
 
   Database? _database;
 
@@ -16,7 +20,9 @@ class AppDatabase {
       return _database!;
     }
 
-    _database = await _openDatabase();
+    _database =
+    await _openDatabase();
+
     return _database!;
   }
 
@@ -33,19 +39,43 @@ class AppDatabase {
       path,
       version: _databaseVersion,
 
-      onConfigure: (db) async {
+      onConfigure: (
+          db,
+          ) async {
         await db.execute(
           'PRAGMA foreign_keys = ON',
         );
       },
 
-      onCreate: (db, version) async {
-        await _createTables(db);
+      onCreate: (
+          db,
+          version,
+          ) async {
+        await _createConversationTables(
+          db,
+        );
+
+        await _createSwapTables(
+          db,
+        );
+      },
+
+      onUpgrade: (
+          db,
+          oldVersion,
+          newVersion,
+          ) async {
+        if (oldVersion < 2) {
+          await _createSwapTables(
+            db,
+          );
+        }
       },
     );
   }
 
-  Future<void> _createTables(
+  Future<void>
+  _createConversationTables(
       Database db,
       ) async {
     await db.execute(
@@ -93,8 +123,55 @@ class AppDatabase {
     );
   }
 
+  Future<void> _createSwapTables(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE TABLE swap_requests (
+        id TEXT PRIMARY KEY,
+
+        provider_name TEXT NOT NULL,
+        provider_initials TEXT NOT NULL,
+        provider_city TEXT NOT NULL,
+
+        skill_to_learn TEXT NOT NULL,
+        skill_to_offer TEXT NOT NULL,
+
+        proposed_at INTEGER NOT NULL,
+
+        mode TEXT NOT NULL,
+
+        meeting_details TEXT,
+
+        note TEXT,
+
+        status TEXT NOT NULL,
+
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX idx_swap_requests_status
+      ON swap_requests(status)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX idx_swap_requests_created_at
+      ON swap_requests(created_at)
+      ''',
+    );
+  }
+
   Future<void> close() async {
-    final db = _database;
+    final Database? db =
+        _database;
 
     if (db != null) {
       await db.close();

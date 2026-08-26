@@ -107,18 +107,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         child: Container(
                           constraints:
                           const BoxConstraints(
-                            maxWidth: 280,
+                            maxWidth: 290,
                           ),
                           margin:
                           const EdgeInsets.only(
-                            bottom: 10,
+                            bottom: 11,
                           ),
                           padding:
                           const EdgeInsets.fromLTRB(
-                            12,
+                            14,
+                            11,
+                            14,
                             9,
-                            12,
-                            8,
                           ),
                           decoration: BoxDecoration(
                             color: message.isMe
@@ -128,23 +128,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             BorderRadius.only(
                               topLeft:
                               const Radius.circular(
-                                15,
+                                16,
                               ),
                               topRight:
                               const Radius.circular(
-                                15,
+                                16,
                               ),
                               bottomLeft:
                               Radius.circular(
                                 message.isMe
-                                    ? 15
+                                    ? 16
                                     : 4,
                               ),
                               bottomRight:
                               Radius.circular(
                                 message.isMe
                                     ? 4
-                                    : 15,
+                                    : 16,
                               ),
                             ),
                             border: message.isMe
@@ -162,15 +162,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
                               Text(
                                 message.text,
                                 style: TextStyle(
-                                  fontSize: 10.5,
-                                  height: 1.45,
+                                  fontSize: 14,
+                                  height: 1.4,
                                   color: message.isMe
                                       ? Colors.white
                                       : darkText,
                                 ),
                               ),
 
-                              const SizedBox(height: 5),
+                              const SizedBox(height: 6),
 
                               Row(
                                 mainAxisSize:
@@ -181,7 +181,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                       message.sentAt,
                                     ),
                                     style: TextStyle(
-                                      fontSize: 9,
+                                      fontSize: 10.5,
                                       fontWeight:
                                       FontWeight.w500,
                                       color: message.isMe
@@ -196,7 +196,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                     ),
                                     const Icon(
                                       Icons.done_rounded,
-                                      size: 11,
+                                      size: 12,
                                       color:
                                       Colors.white70,
                                     ),
@@ -225,7 +225,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       String initials,
       ) {
     return Container(
-      height: 64,
+      height: 66,
       padding: const EdgeInsets.symmetric(
         horizontal: 8,
       ),
@@ -251,8 +251,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
 
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: const BoxDecoration(
               color: Color(0xFFFFB45E),
               shape: BoxShape.circle,
@@ -261,14 +261,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
             child: Text(
               initials,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
               ),
             ),
           ),
 
-          const SizedBox(width: 9),
+          const SizedBox(width: 10),
 
           Expanded(
             child: Column(
@@ -280,7 +280,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 Text(
                   name,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: darkText,
                   ),
@@ -291,7 +291,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 const Text(
                   'Skill swap conversation',
                   style: TextStyle(
-                    fontSize: 8.5,
+                    fontSize: 11,
                     color: mutedText,
                   ),
                 ),
@@ -320,7 +320,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
-        vertical: 11,
+        vertical: 12,
       ),
       decoration: const BoxDecoration(
         color: Color(0xFFF3F1FF),
@@ -335,10 +335,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
           const Icon(
             Icons.swap_horiz_rounded,
             color: primary,
-            size: 18,
+            size: 19,
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
 
           Expanded(
             child: Column(
@@ -348,17 +348,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 const Text(
                   'Skill swap discussion',
                   style: TextStyle(
-                    fontSize: 8.5,
+                    fontSize: 11,
                     color: mutedText,
                   ),
                 ),
 
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
 
                 Text(
                   '$wanted ↔ $offered',
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: darkText,
                   ),
@@ -395,7 +395,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             child: Text(
               _formatDateSeparator(date),
               style: const TextStyle(
-                fontSize: 9,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
                 color: mutedText,
               ),
@@ -435,19 +435,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
             const Text(
               'Start the conversation',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: darkText,
               ),
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
 
             const Text(
               'Introduce yourself, ask about the skill, and discuss what you can offer in exchange.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 12,
                 height: 1.5,
                 color: mutedText,
               ),
@@ -487,7 +487,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               textCapitalization:
               TextCapitalization.sentences,
               style: const TextStyle(
-                fontSize: 10.5,
+                fontSize: 14,
                 color: darkText,
               ),
               decoration: InputDecoration(
@@ -495,7 +495,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 'Type a message...',
                 hintStyle:
                 const TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 13,
                   color: mutedText,
                 ),
                 filled: true,
@@ -503,7 +503,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 contentPadding:
                 const EdgeInsets.symmetric(
                   horizontal: 14,
-                  vertical: 10,
+                  vertical: 11,
                 ),
                 border:
                 OutlineInputBorder(
@@ -524,8 +524,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           const SizedBox(width: 8),
 
           Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration:
             const BoxDecoration(
               color: primary,
@@ -537,7 +537,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               icon: const Icon(
                 Icons.send_rounded,
                 color: Colors.white,
-                size: 18,
+                size: 19,
               ),
             ),
           ),
