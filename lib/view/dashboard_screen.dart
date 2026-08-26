@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'add_skill_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() =>
+      _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
@@ -49,13 +49,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  18,
+                  20,
+                  24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(),
+
                     const SizedBox(height: 20),
+
                     _buildSearchBar(),
+
                     const SizedBox(height: 24),
 
                     _buildSectionHeader(
@@ -64,6 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
 
                     const SizedBox(height: 12),
+
                     _buildMatchCard(),
 
                     const SizedBox(height: 28),
@@ -74,6 +83,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
 
                     const SizedBox(height: 14),
+
                     _buildPopularSkills(),
 
                     const SizedBox(height: 28),
@@ -83,6 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
 
                     const SizedBox(height: 12),
+
                     _buildUpcomingSession(),
                   ],
                 ),
@@ -111,7 +122,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: darkText,
                 ),
               ),
+
               SizedBox(height: 4),
+
               Text(
                 'Ready to share and learn?',
                 style: TextStyle(
@@ -152,45 +165,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE9E9F3),
-        ),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(width: 14),
-
-          Icon(
-            Icons.search,
-            color: mutedText,
-            size: 20,
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          '/explore',
+        );
+      },
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFE9E9F3),
           ),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(width: 14),
 
-          SizedBox(width: 10),
+            Icon(
+              Icons.search,
+              color: mutedText,
+              size: 20,
+            ),
 
-          Expanded(
-            child: Text(
-              'Search skills or people',
-              style: TextStyle(
-                color: mutedText,
-                fontSize: 12,
+            SizedBox(width: 10),
+
+            Expanded(
+              child: Text(
+                'Search skills or people',
+                style: TextStyle(
+                  color: mutedText,
+                  fontSize: 12,
+                ),
               ),
             ),
-          ),
 
-          Icon(
-            Icons.filter_list_rounded,
-            color: primary,
-            size: 20,
-          ),
+            Icon(
+              Icons.filter_list_rounded,
+              color: primary,
+              size: 20,
+            ),
 
-          SizedBox(width: 14),
-        ],
+            SizedBox(width: 14),
+          ],
+        ),
       ),
     );
   }
@@ -213,12 +235,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
 
         if (action != null)
-          Text(
-            action,
-            style: const TextStyle(
-              color: primary,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
+          InkWell(
+            onTap: () {
+              if (action == 'Explore') {
+                Navigator.pushNamed(
+                  context,
+                  '/explore',
+                );
+              }
+            },
+            child: Text(
+              action,
+              style: const TextStyle(
+                color: primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
       ],
@@ -235,18 +267,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         border: Border.all(
           color: const Color(0xFFEAEAF4),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 48,
@@ -271,7 +295,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: darkText,
                       ),
                     ),
+
                     SizedBox(height: 3),
+
                     Text(
                       'Video Editing • Advanced',
                       style: TextStyle(
@@ -312,7 +338,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 'assets/images/mascot/tubi_happy.png',
                 width: 52,
                 height: 52,
-                fit: BoxFit.contain,
               ),
 
               const SizedBox(width: 10),
@@ -351,7 +376,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.4,
                 ),
               ),
             ),
@@ -368,53 +392,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: skills.length,
-        separatorBuilder: (context, index) {
+        separatorBuilder: (_, __) {
           return const SizedBox(width: 12);
         },
         itemBuilder: (context, index) {
           final skill = skills[index];
 
-          return Container(
-            width: 125,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F2FF),
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(
-                color: const Color(0xFFE5E1FF),
+          return InkWell(
+            borderRadius: BorderRadius.circular(17),
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                '/explore',
+              );
+            },
+            child: Container(
+              width: 125,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F2FF),
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(
+                  color: const Color(0xFFE5E1FF),
+                ),
               ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      skill['icon'] as IconData,
+                      color: primary,
+                      size: 25,
+                    ),
                   ),
-                  child: Icon(
-                    skill['icon'] as IconData,
-                    color: primary,
-                    size: 25,
-                  ),
-                ),
 
-                const SizedBox(height: 11),
+                  const SizedBox(height: 11),
 
-                Text(
-                  skill['title'] as String,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: darkText,
+                  Text(
+                    skill['title'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: darkText,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -487,8 +519,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 elevation: 0,
                 backgroundColor: primary,
                 foregroundColor: Colors.white,
-                minimumSize: const Size(92, 34),
-                maximumSize: const Size(92, 34),
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -546,36 +576,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: Color(0xFFEEEEF5),
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
       ),
       child: Row(
         children: List.generate(
           items.length,
               (index) {
-            final bool selected = _selectedNav == index;
+            final bool selected =
+                _selectedNav == index;
 
             return Expanded(
               child: InkWell(
                 onTap: () {
+                  if (index == 0) {
+                    setState(() {
+                      _selectedNav = 0;
+                    });
+                    return;
+                  }
+
                   if (index == 1) {
-                    Navigator.pushNamed(context, '/add-skill');
+                    Navigator.pushNamed(
+                      context,
+                      '/explore',
+                    );
+                    return;
+                  }
+
+                  if (index == 2) {
+                    setState(() {
+                      _selectedNav = 2;
+                    });
+                    return;
+                  }
+
+                  if (index == 3) {
+                    Navigator.pushNamed(
+                      context,
+                      '/chat',
+                    );
                     return;
                   }
 
                   if (index == 4) {
-                    Navigator.pushNamed(context, '/my-skills');
+                    Navigator.pushNamed(
+                      context,
+                      '/my-skills',
+                    );
                     return;
                   }
-
-                  setState(() {
-                    _selectedNav = index;
-                  });
                 },
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -587,7 +635,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: 34,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: selected
+                        color:
+                        selected
                             ? const Color(0xFFF0EFFF)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
@@ -597,7 +646,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ? items[index]['selected'] as IconData
                             : items[index]['icon'] as IconData,
                         size: 19,
-                        color: selected
+                        color:
+                        selected
                             ? primary
                             : const Color(0xFF777C8F),
                       ),
@@ -609,10 +659,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       items[index]['label'] as String,
                       style: TextStyle(
                         fontSize: 8,
-                        fontWeight: selected
+                        fontWeight:
+                        selected
                             ? FontWeight.w700
                             : FontWeight.w500,
-                        color: selected
+                        color:
+                        selected
                             ? primary
                             : const Color(0xFF777C8F),
                       ),

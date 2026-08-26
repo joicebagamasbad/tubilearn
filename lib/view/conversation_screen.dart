@@ -1,0 +1,692 @@
+import 'package:flutter/material.dart';
+
+import '../services/chat_service.dart';
+
+class ConversationScreen extends StatefulWidget {
+  final String conversationId;
+
+  const ConversationScreen({
+    super.key,
+    required this.conversationId,
+  });
+
+  @override
+  State<ConversationScreen> createState() =>
+      _ConversationScreenState();
+}
+
+class _ConversationScreenState extends State<ConversationScreen> {
+  static const Color primary = Color(0xFF5B5FEF);
+  static const Color darkText = Color(0xFF171A2B);
+  static const Color mutedText = Color(0xFF8A8FA3);
+  static const Color background = Color(0xFFF9F9FF);
+  static const Color border = Color(0xFFE8E8F2);
+
+  final TextEditingController _messageController =
+  TextEditingController();
+
+  final ScrollController _scrollController =
+  ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversation =
+    ChatService.instance.conversations.firstWhere(
+          (conversation) =>
+      conversation.id == widget.conversationId,
+    );
+
+    return Scaffold(
+      backgroundColor: background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(
+              conversation.userName,
+              conversation.initials,
+            ),
+
+            _buildContextBar(
+              conversation.skillWanted,
+              conversation.skillOffered,
+            ),
+
+            Expanded(
+              child: conversation.messages.isEmpty
+                  ? _buildNoMessages()
+                  : ListView.builder(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  18,
+                ),
+                itemCount: conversation.messages.length,
+                itemBuilder: (context, index) {
+                  final message =
+                  conversation.messages[index];
+
+                  final bool showDateSeparator =
+                      index == 0 ||
+                          !_isSameDay(
+                            conversation
+                                .messages[index - 1]
+                                .sentAt,
+                            message.sentAt,
+                          );
+
+                  return Column(
+                    children: [
+                      if (showDateSeparator)
+                        _buildDateSeparator(
+                          message.sentAt,
+                        ),
+
+                      Align(
+                        alignment: message.isMe
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          constraints:
+                          const BoxConstraints(
+                            maxWidth: 280,
+                          ),
+                          margin:
+                          const EdgeInsets.only(
+                            bottom: 10,
+                          ),
+                          padding:
+                          const EdgeInsets.fromLTRB(
+                            12,
+                            9,
+                            12,
+                            8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: message.isMe
+                                ? primary
+                                : Colors.white,
+                            borderRadius:
+                            BorderRadius.only(
+                              topLeft:
+                              const Radius.circular(
+                                15,
+                              ),
+                              topRight:
+                              const Radius.circular(
+                                15,
+                              ),
+                              bottomLeft:
+                              Radius.circular(
+                                message.isMe
+                                    ? 15
+                                    : 4,
+                              ),
+                              bottomRight:
+                              Radius.circular(
+                                message.isMe
+                                    ? 4
+                                    : 15,
+                              ),
+                            ),
+                            border: message.isMe
+                                ? null
+                                : Border.all(
+                              color: border,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                            message.isMe
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                message.text,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  height: 1.45,
+                                  color: message.isMe
+                                      ? Colors.white
+                                      : darkText,
+                                ),
+                              ),
+
+                              const SizedBox(height: 5),
+
+                              Row(
+                                mainAxisSize:
+                                MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _formatMessageTime(
+                                      message.sentAt,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight:
+                                      FontWeight.w500,
+                                      color: message.isMe
+                                          ? Colors.white70
+                                          : mutedText,
+                                    ),
+                                  ),
+
+                                  if (message.isMe) ...[
+                                    const SizedBox(
+                                      width: 4,
+                                    ),
+                                    const Icon(
+                                      Icons.done_rounded,
+                                      size: 11,
+                                      color:
+                                      Colors.white70,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+
+            _buildComposer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(
+      String name,
+      String initials,
+      ) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: border,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: primary,
+            ),
+          ),
+
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFB45E),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 9),
+
+          Expanded(
+            child: Column(
+              mainAxisAlignment:
+              MainAxisAlignment.center,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: darkText,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                const Text(
+                  'Skill swap conversation',
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    color: mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              size: 20,
+              color: mutedText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextBar(
+      String wanted,
+      String offered,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 11,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF3F1FF),
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0xFFE4E0FF),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.swap_horiz_rounded,
+            color: primary,
+            size: 18,
+          ),
+
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Skill swap discussion',
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    color: mutedText,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  '$wanted ↔ $offered',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: darkText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateSeparator(
+      DateTime date,
+      ) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 4,
+        bottom: 14,
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Divider(
+              color: border,
+            ),
+          ),
+
+          Padding(
+            padding:
+            const EdgeInsets.symmetric(
+              horizontal: 10,
+            ),
+            child: Text(
+              _formatDateSeparator(date),
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: mutedText,
+              ),
+            ),
+          ),
+
+          const Expanded(
+            child: Divider(
+              color: border,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoMessages() {
+    return Center(
+      child: Padding(
+        padding:
+        const EdgeInsets.symmetric(
+          horizontal: 40,
+        ),
+        child: Column(
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/mascot/tubi_typing.png',
+              width: 100,
+              height: 100,
+              fit: BoxFit.contain,
+            ),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              'Start the conversation',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: darkText,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            const Text(
+              'Introduce yourself, ask about the skill, and discuss what you can offer in exchange.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.5,
+                color: mutedText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComposer() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        12,
+        9,
+        12,
+        10,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: border,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller:
+              _messageController,
+              minLines: 1,
+              maxLines: 4,
+              textCapitalization:
+              TextCapitalization.sentences,
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: darkText,
+              ),
+              decoration: InputDecoration(
+                hintText:
+                'Type a message...',
+                hintStyle:
+                const TextStyle(
+                  fontSize: 10.5,
+                  color: mutedText,
+                ),
+                filled: true,
+                fillColor: background,
+                contentPadding:
+                const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                border:
+                OutlineInputBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    18,
+                  ),
+                  borderSide:
+                  BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) {
+                _sendMessage();
+              },
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Container(
+            width: 42,
+            height: 42,
+            decoration:
+            const BoxDecoration(
+              color: primary,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed:
+              _sendMessage,
+              icon: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendMessage() {
+    final String text =
+    _messageController.text.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    ChatService.instance.sendMessage(
+      conversationId:
+      widget.conversationId,
+      text: text,
+    );
+
+    _messageController.clear();
+
+    setState(() {});
+
+    Future.delayed(
+      const Duration(
+        milliseconds: 100,
+      ),
+          () {
+        if (!mounted) {
+          return;
+        }
+
+        _scrollToBottom();
+      },
+    );
+  }
+
+  void _scrollToBottom() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    _scrollController.animateTo(
+      _scrollController
+          .position
+          .maxScrollExtent,
+      duration: const Duration(
+        milliseconds: 220,
+      ),
+      curve: Curves.easeOut,
+    );
+  }
+
+  String _formatMessageTime(
+      DateTime dateTime,
+      ) {
+    int hour = dateTime.hour;
+    final int minute =
+        dateTime.minute;
+
+    final String period =
+    hour >= 12 ? 'PM' : 'AM';
+
+    if (hour == 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
+    }
+
+    final String formattedMinute =
+    minute
+        .toString()
+        .padLeft(
+      2,
+      '0',
+    );
+
+    return '$hour:$formattedMinute $period';
+  }
+
+  String _formatDateSeparator(
+      DateTime date,
+      ) {
+    final DateTime now =
+    DateTime.now();
+
+    final DateTime today =
+    DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    final DateTime messageDate =
+    DateTime(
+      date.year,
+      date.month,
+      date.day,
+    );
+
+    final int difference =
+        today
+            .difference(
+          messageDate,
+        )
+            .inDays;
+
+    if (difference == 0) {
+      return 'Today';
+    }
+
+    if (difference == 1) {
+      return 'Yesterday';
+    }
+
+    final List<String> months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    if (date.year == now.year) {
+      return '${months[date.month - 1]} ${date.day}';
+    }
+
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  bool _isSameDay(
+      DateTime first,
+      DateTime second,
+      ) {
+    return first.year ==
+        second.year &&
+        first.month ==
+            second.month &&
+        first.day ==
+            second.day;
+  }
+}
