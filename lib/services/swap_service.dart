@@ -49,14 +49,6 @@ class SwapService {
 
   // ============================================================
   // CREATE REQUEST
-  //
-  // Identity fields are temporarily optional at the method
-  // boundary so the current UI can still compile during the
-  // migration.
-  //
-  // Once one identity field is supplied, ALL four are required.
-  // The CreateSwapRequestScreen will be updated next so every
-  // newly created request uses stable IDs.
   // ============================================================
 
   Future<SwapRequest> createRequest({
@@ -249,12 +241,6 @@ class SwapService {
       now,
     );
 
-    // ----------------------------------------------------------
-    // Database first.
-    //
-    // Memory is changed only after successful persistence.
-    // ----------------------------------------------------------
-
     await _repository.saveSwapRequest(
       request,
     );
@@ -268,111 +254,225 @@ class SwapService {
   }
 
   // ============================================================
-  // UPDATE STATUS
+  // ACCEPT REQUEST
   // ============================================================
 
-  Future<void> updateStatus({
+  Future<void> acceptRequest({
     required String requestId,
-    required SwapRequestStatus status,
+    required String actorUserId,
   }) async {
-    final String cleanRequestId =
-    requestId.trim();
-
-    if (cleanRequestId.isEmpty) {
-      throw const SwapServiceException(
-        'Swap request ID is required.',
-      );
-    }
-
-    final SwapRequest? request =
-    findById(
-      cleanRequestId,
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
     );
 
-    if (request == null) {
-      throw const SwapServiceException(
-        'Swap request not found.',
-      );
-    }
-
-    if (request.status == status) {
-      return;
-    }
-
-    if (!request.status
-        .canTransitionTo(status)) {
-      throw SwapServiceException(
-        'Cannot change request status from '
-            '${request.status.label} to '
-            '${status.label}.',
-      );
-    }
-
-    final DateTime updatedAt =
-    DateTime.now();
-
-    // Database first.
-    await _repository.updateStatus(
-      requestId:
-      request.id,
-      status:
-      status,
-      updatedAt:
-      updatedAt,
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
     );
 
-    // Memory only changes after DB success.
-    request.status = status;
-    request.updatedAt = updatedAt;
+    if (!request.canAccept(
+      cleanActorUserId,
+    )) {
+      throw const SwapServiceException(
+        'You are not allowed to accept this swap request.',
+      );
+    }
+
+    await _changeStatus(
+      request: request,
+      nextStatus:
+      SwapRequestStatus.accepted,
+    );
+  }
+
+  // ============================================================
+  // DECLINE REQUEST
+  // ============================================================
+
+  Future<void> declineRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
+
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
+    );
+
+    if (!request.canDecline(
+      cleanActorUserId,
+    )) {
+      throw const SwapServiceException(
+        'You are not allowed to decline this swap request.',
+      );
+    }
+
+    await _changeStatus(
+      request: request,
+      nextStatus:
+      SwapRequestStatus.declined,
+    );
   }
 
   // ============================================================
   // CANCEL REQUEST
   // ============================================================
 
-  Future<void> cancelRequest(
-      String requestId,
-      ) async {
-    final String cleanRequestId =
-    requestId.trim();
-
-    if (cleanRequestId.isEmpty) {
-      throw const SwapServiceException(
-        'Swap request ID is required.',
-      );
-    }
-
-    final SwapRequest? request =
-    findById(
-      cleanRequestId,
+  Future<void> cancelRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
     );
 
-    if (request == null) {
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
+    );
+
+    if (!request.canCancel(
+      cleanActorUserId,
+    )) {
       throw const SwapServiceException(
-        'Swap request not found.',
+        'You are not allowed to cancel this swap request.',
       );
     }
 
-    if (!request.status
-        .canBeCancelled) {
-      throw SwapServiceException(
-        'This ${request.status.label.toLowerCase()} '
-            'request can no longer be cancelled.',
-      );
-    }
-
-    await updateStatus(
-      requestId:
-      request.id,
-      status:
+    await _changeStatus(
+      request: request,
+      nextStatus:
       SwapRequestStatus.cancelled,
     );
   }
 
   // ============================================================
+  // SCHEDULE REQUEST
+  // ============================================================
+
+  Future<void> scheduleRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
+
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
+    );
+
+    if (!request.involvesUser(
+      cleanActorUserId,
+    )) {
+      throw const SwapServiceException(
+        'You are not allowed to update this swap request.',
+      );
+    }
+
+    if (request.status !=
+        SwapRequestStatus.accepted) {
+      throw const SwapServiceException(
+        'Only an accepted request can be scheduled.',
+      );
+    }
+
+    await _changeStatus(
+      request: request,
+      nextStatus:
+      SwapRequestStatus.scheduled,
+    );
+  }
+
+  // ============================================================
+  // COMPLETE REQUEST
+  // ============================================================
+
+  Future<void> completeRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
+
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
+    );
+
+    if (!request.involvesUser(
+      cleanActorUserId,
+    )) {
+      throw const SwapServiceException(
+        'You are not allowed to update this swap request.',
+      );
+    }
+
+    if (request.status !=
+        SwapRequestStatus.scheduled) {
+      throw const SwapServiceException(
+        'Only a scheduled request can be completed.',
+      );
+    }
+
+    await _changeStatus(
+      request: request,
+      nextStatus:
+      SwapRequestStatus.completed,
+    );
+  }
+
+  // ============================================================
+  // INTERNAL STATUS CHANGE
+  // ============================================================
+
+  Future<void> _changeStatus({
+    required SwapRequest request,
+    required SwapRequestStatus nextStatus,
+  }) async {
+    if (request.status ==
+        nextStatus) {
+      return;
+    }
+
+    if (!request.status.canTransitionTo(
+      nextStatus,
+    )) {
+      throw SwapServiceException(
+        'Cannot change request status from '
+            '${request.status.label} to '
+            '${nextStatus.label}.',
+      );
+    }
+
+    final DateTime updatedAt =
+    DateTime.now();
+
+    await _repository.updateStatus(
+      requestId: request.id,
+      status: nextStatus,
+      updatedAt: updatedAt,
+    );
+
+    request.status =
+        nextStatus;
+
+    request.updatedAt =
+        updatedAt;
+  }
+
+  // ============================================================
   // DELETE REQUEST
-  //
-  // Hard delete is NOT normal cancellation behavior.
   // ============================================================
 
   Future<void> deleteRequest(
@@ -398,12 +498,10 @@ class SwapService {
       );
     }
 
-    // Database first.
     await _repository.deleteSwapRequest(
       cleanRequestId,
     );
 
-    // Memory only changes after DB success.
     _requests.removeWhere(
           (item) =>
       item.id ==
@@ -437,6 +535,55 @@ class SwapService {
   }
 
   // ============================================================
+  // REQUIRE REQUEST
+  // ============================================================
+
+  SwapRequest _requireRequest(
+      String requestId,
+      ) {
+    final String cleanRequestId =
+    requestId.trim();
+
+    if (cleanRequestId.isEmpty) {
+      throw const SwapServiceException(
+        'Swap request ID is required.',
+      );
+    }
+
+    final SwapRequest? request =
+    findById(
+      cleanRequestId,
+    );
+
+    if (request == null) {
+      throw const SwapServiceException(
+        'Swap request not found.',
+      );
+    }
+
+    return request;
+  }
+
+  // ============================================================
+  // REQUIRE ACTOR
+  // ============================================================
+
+  String _requireActorUserId(
+      String actorUserId,
+      ) {
+    final String cleanActorUserId =
+    actorUserId.trim();
+
+    if (cleanActorUserId.isEmpty) {
+      throw const SwapServiceException(
+        'Current user identity is required.',
+      );
+    }
+
+    return cleanActorUserId;
+  }
+
+  // ============================================================
   // IDENTITY VALIDATION
   // ============================================================
 
@@ -453,12 +600,6 @@ class SwapService {
             skillToOfferId != null;
 
     if (!hasAnyIdentity) {
-      // --------------------------------------------------------
-      // Transitional legacy mode.
-      //
-      // Existing UI callers may still reach this path until the
-      // next refactor step.
-      // --------------------------------------------------------
       return;
     }
 
@@ -591,11 +732,6 @@ class SwapService {
       );
     }
 
-    // ----------------------------------------------------------
-    // If stable identity is supplied, make sure no field became
-    // empty after normalization.
-    // ----------------------------------------------------------
-
     final bool hasStableIdentity =
         requesterUserId != null &&
             providerUserId != null &&
@@ -616,12 +752,6 @@ class SwapService {
 
   // ============================================================
   // DUPLICATE PREVENTION
-  //
-  // New ID-based requests use stable identity.
-  //
-  // Legacy requests that do not yet have IDs are compared using
-  // their old display snapshots so existing protection is not
-  // lost during migration.
   // ============================================================
 
   void _preventDuplicateActiveRequest({
@@ -661,11 +791,6 @@ class SwapService {
         continue;
       }
 
-      // --------------------------------------------------------
-      // Preferred comparison:
-      // stable IDs on both requests.
-      // --------------------------------------------------------
-
       if (incomingHasStableIdentity &&
           request.hasStableIdentity) {
         final bool sameRequester =
@@ -696,12 +821,6 @@ class SwapService {
 
         continue;
       }
-
-      // --------------------------------------------------------
-      // Legacy fallback:
-      // required only while old v3 rows or old UI-created rows
-      // without stable IDs may still exist.
-      // --------------------------------------------------------
 
       final bool sameProvider =
           request.providerName

@@ -7,7 +7,40 @@ enum SwapRequestStatus {
   cancelled,
 }
 
-extension SwapRequestStatusExtension on SwapRequestStatus {
+// ============================================================
+// REQUEST DIRECTION
+//
+// Direction is always relative to the currently signed-in user.
+// ============================================================
+
+enum SwapRequestDirection {
+  outgoing,
+  incoming,
+  unrelated,
+}
+
+extension SwapRequestDirectionExtension
+on SwapRequestDirection {
+  String get label {
+    switch (this) {
+      case SwapRequestDirection.outgoing:
+        return 'Outgoing';
+
+      case SwapRequestDirection.incoming:
+        return 'Incoming';
+
+      case SwapRequestDirection.unrelated:
+        return 'Unrelated';
+    }
+  }
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+
+extension SwapRequestStatusExtension
+on SwapRequestStatus {
   String get databaseValue => name;
 
   String get label {
@@ -49,9 +82,12 @@ extension SwapRequestStatusExtension on SwapRequestStatus {
   bool get isTerminal => !isActive;
 
   bool get canBeCancelled {
-    return this == SwapRequestStatus.pending ||
-        this == SwapRequestStatus.accepted ||
-        this == SwapRequestStatus.scheduled;
+    return this ==
+        SwapRequestStatus.pending ||
+        this ==
+            SwapRequestStatus.accepted ||
+        this ==
+            SwapRequestStatus.scheduled;
   }
 
   bool canTransitionTo(
@@ -59,17 +95,24 @@ extension SwapRequestStatusExtension on SwapRequestStatus {
       ) {
     switch (this) {
       case SwapRequestStatus.pending:
-        return next == SwapRequestStatus.accepted ||
-            next == SwapRequestStatus.declined ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.accepted ||
+            next ==
+                SwapRequestStatus.declined ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.accepted:
-        return next == SwapRequestStatus.scheduled ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.scheduled ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.scheduled:
-        return next == SwapRequestStatus.completed ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.completed ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.declined:
       case SwapRequestStatus.completed:
@@ -81,9 +124,12 @@ extension SwapRequestStatusExtension on SwapRequestStatus {
   static SwapRequestStatus fromDatabase(
       String value,
       ) {
+    final String cleanValue =
+    value.trim();
+
     for (final status
     in SwapRequestStatus.values) {
-      if (status.name == value) {
+      if (status.name == cleanValue) {
         return status;
       }
     }
@@ -94,18 +140,21 @@ extension SwapRequestStatusExtension on SwapRequestStatus {
   }
 }
 
+// ============================================================
+// SWAP REQUEST
+// ============================================================
+
 class SwapRequest {
   final String id;
 
-  // ============================================================
+  // ==========================================================
   // STABLE IDENTITY
   //
-  // Nullable temporarily so existing database v3 rows can still
-  // be loaded before the v4 migration is performed.
+  // These remain nullable because migrated legacy rows may not
+  // always have enough information to safely recover every ID.
   //
-  // New requests will later be required by SwapService to provide
-  // all four IDs.
-  // ============================================================
+  // New requests are expected to contain all four IDs.
+  // ==========================================================
 
   final String? requesterUserId;
 
@@ -115,13 +164,12 @@ class SwapRequest {
 
   final String? skillToOfferId;
 
-  // ============================================================
+  // ==========================================================
   // DISPLAY SNAPSHOTS
   //
-  // These are NOT the primary identity of the request.
-  // They are kept as readable snapshots for the UI and for
-  // preserving historical information if a profile changes later.
-  // ============================================================
+  // These are readable historical snapshots.
+  // They are not used as authorization identity.
+  // ==========================================================
 
   final String providerName;
 
@@ -133,9 +181,9 @@ class SwapRequest {
 
   final String skillToOffer;
 
-  // ============================================================
+  // ==========================================================
   // REQUEST DETAILS
-  // ============================================================
+  // ==========================================================
 
   final DateTime proposedAt;
 
@@ -181,16 +229,49 @@ class SwapRequest {
     required this.updatedAt,
   });
 
-  // ============================================================
-  // IDENTITY HELPERS
-  // ============================================================
+  // ==========================================================
+  // STABLE IDENTITY
+  // ==========================================================
 
   bool get hasStableIdentity {
-    return _hasValue(requesterUserId) &&
-        _hasValue(providerUserId) &&
-        _hasValue(skillToLearnId) &&
-        _hasValue(skillToOfferId);
+    return _hasValue(
+      requesterUserId,
+    ) &&
+        _hasValue(
+          providerUserId,
+        ) &&
+        _hasValue(
+          skillToLearnId,
+        ) &&
+        _hasValue(
+          skillToOfferId,
+        );
   }
+
+  bool get hasRequesterIdentity {
+    return _hasValue(
+      requesterUserId,
+    );
+  }
+
+  bool get hasProviderIdentity {
+    return _hasValue(
+      providerUserId,
+    );
+  }
+
+  bool get hasSkillIdentity {
+    return _hasValue(
+      skillToLearnId,
+    ) &&
+        _hasValue(
+          skillToOfferId,
+        );
+  }
+
+  // ==========================================================
+  // USER RELATIONSHIP
+  // ==========================================================
 
   bool isRequester(
       String userId,
@@ -198,9 +279,12 @@ class SwapRequest {
     final String normalizedUserId =
     userId.trim();
 
-    return normalizedUserId.isNotEmpty &&
-        requesterUserId ==
-            normalizedUserId;
+    if (normalizedUserId.isEmpty) {
+      return false;
+    }
+
+    return requesterUserId ==
+        normalizedUserId;
   }
 
   bool isProvider(
@@ -209,9 +293,12 @@ class SwapRequest {
     final String normalizedUserId =
     userId.trim();
 
-    return normalizedUserId.isNotEmpty &&
-        providerUserId ==
-            normalizedUserId;
+    if (normalizedUserId.isEmpty) {
+      return false;
+    }
+
+    return providerUserId ==
+        normalizedUserId;
   }
 
   bool involvesUser(
@@ -220,6 +307,120 @@ class SwapRequest {
     return isRequester(userId) ||
         isProvider(userId);
   }
+
+  // ==========================================================
+  // REQUEST DIRECTION
+  //
+  // Outgoing:
+  // current user created the request.
+  //
+  // Incoming:
+  // another user sent the request to current user.
+  //
+  // Unrelated:
+  // current user is neither side.
+  // ==========================================================
+
+  SwapRequestDirection directionFor(
+      String userId,
+      ) {
+    if (isRequester(userId)) {
+      return SwapRequestDirection.outgoing;
+    }
+
+    if (isProvider(userId)) {
+      return SwapRequestDirection.incoming;
+    }
+
+    return SwapRequestDirection.unrelated;
+  }
+
+  bool isOutgoingFor(
+      String userId,
+      ) {
+    return directionFor(userId) ==
+        SwapRequestDirection.outgoing;
+  }
+
+  bool isIncomingFor(
+      String userId,
+      ) {
+    return directionFor(userId) ==
+        SwapRequestDirection.incoming;
+  }
+
+  // ==========================================================
+  // PERMISSIONS
+  //
+  // IMPORTANT:
+  // These are domain-level permission helpers.
+  //
+  // UI should use these to decide which buttons are visible.
+  //
+  // SwapService will ALSO enforce these rules before changing
+  // persisted state. UI checks alone are never sufficient.
+  // ==========================================================
+
+  bool canCancel(
+      String userId,
+      ) {
+    // Only the requester can cancel their own
+    // active outgoing request.
+
+    return isRequester(userId) &&
+        status.canBeCancelled;
+  }
+
+  bool canAccept(
+      String userId,
+      ) {
+    // Only the provider receiving a pending request
+    // may accept it.
+
+    return isProvider(userId) &&
+        status ==
+            SwapRequestStatus.pending;
+  }
+
+  bool canDecline(
+      String userId,
+      ) {
+    // Only the provider receiving a pending request
+    // may decline it.
+
+    return isProvider(userId) &&
+        status ==
+            SwapRequestStatus.pending;
+  }
+
+  bool canRespond(
+      String userId,
+      ) {
+    return canAccept(userId) ||
+        canDecline(userId);
+  }
+
+  // ==========================================================
+  // SECURITY / ACCESS HELPERS
+  // ==========================================================
+
+  bool canViewAsParticipant(
+      String userId,
+      ) {
+    return involvesUser(userId);
+  }
+
+  bool canModify(
+      String userId,
+      ) {
+    return canCancel(userId) ||
+        canAccept(userId) ||
+        canDecline(userId);
+  }
+
+  // ==========================================================
+  // HELPERS
+  // ==========================================================
 
   static bool _hasValue(
       String? value,

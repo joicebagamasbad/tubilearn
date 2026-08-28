@@ -67,7 +67,8 @@ class TubiLearnApp extends StatelessWidget {
         // SKILL DETAILS
         // ======================================================
 
-        if (settings.name == '/skill-details') {
+        if (settings.name ==
+            '/skill-details') {
           final Skill skill =
           settings.arguments as Skill;
 
@@ -83,7 +84,8 @@ class TubiLearnApp extends StatelessWidget {
         // USER PROFILE
         // ======================================================
 
-        if (settings.name == '/user-profile') {
+        if (settings.name ==
+            '/user-profile') {
           final User user =
           settings.arguments as User;
 
@@ -99,7 +101,8 @@ class TubiLearnApp extends StatelessWidget {
         // CONVERSATION
         // ======================================================
 
-        if (settings.name == '/conversation') {
+        if (settings.name ==
+            '/conversation') {
           final String conversationId =
           settings.arguments as String;
 
