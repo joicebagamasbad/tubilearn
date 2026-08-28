@@ -1,28 +1,38 @@
 import 'package:flutter/material.dart';
 
+import '../model/repositories/explore_repository.dart';
+import '../model/skill.dart';
+import '../model/user.dart';
 import '../services/chat_service.dart';
+import '../theme/app_theme.dart';
+import 'create_swap_request_screen.dart';
 
 class UserProfileScreen extends StatelessWidget {
-  final Map<String, dynamic> user;
+  final User user;
 
   const UserProfileScreen({
     super.key,
     required this.user,
   });
 
-  static const Color primary = Color(0xFF5B5FEF);
-  static const Color darkText = Color(0xFF171A2B);
-  static const Color mutedText = Color(0xFF8A8FA3);
-  static const Color background = Color(0xFFF9F9FF);
-  static const Color border = Color(0xFFE8E8F2);
+  static const Color primary = AppTheme.primary;
+  static const Color darkText = AppTheme.darkText;
+  static const Color mutedText = AppTheme.mutedText;
+  static const Color background = AppTheme.background;
+  static const Color border = AppTheme.border;
+
+  static final ExploreRepository _repository =
+  ExploreRepository();
 
   @override
-  Widget build(BuildContext context) {
-    final List<String> offeredSkills =
-    List<String>.from(user['offeredSkills'] ?? []);
+  Widget build(
+      BuildContext context,
+      ) {
+    final List<Skill> offeredSkills =
+    _getOfferedSkills();
 
-    final List<String> wantedSkills =
-    List<String>.from(user['wantedSkills'] ?? []);
+    final List<Skill> wantedSkills =
+    _getWantedSkills();
 
     return Scaffold(
       backgroundColor: background,
@@ -33,15 +43,18 @@ class UserProfileScreen extends StatelessWidget {
 
             Expanded(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
+                physics:
+                const BouncingScrollPhysics(),
+                padding:
+                const EdgeInsets.fromLTRB(
                   20,
                   18,
                   20,
                   30,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     _buildProfileHeader(),
 
@@ -53,22 +66,16 @@ class UserProfileScreen extends StatelessWidget {
 
                     const Text(
                       'About',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: darkText,
-                      ),
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 8),
 
                     Text(
-                      user['bio'] as String,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        height: 1.55,
-                        color: mutedText,
-                      ),
+                      user.bio,
+                      style:
+                      AppTextStyles.bodyMuted,
                     ),
 
                     const SizedBox(height: 24),
@@ -79,51 +86,71 @@ class UserProfileScreen extends StatelessWidget {
 
                     const Text(
                       'Skills offered',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: darkText,
-                      ),
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 10),
 
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: offeredSkills.map((skill) {
-                        return _skillChip(
-                          skill,
-                          const Color(0xFFF0EFFF),
-                          primary,
-                        );
-                      }).toList(),
-                    ),
+                    if (offeredSkills.isEmpty)
+                      const Text(
+                        'No offered skills yet.',
+                        style:
+                        AppTextStyles.bodyMuted,
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                        offeredSkills.map(
+                              (skill) {
+                            return _skillChip(
+                              skill.title,
+                              const Color(
+                                0xFFF0EFFF,
+                              ),
+                              primary,
+                            );
+                          },
+                        ).toList(),
+                      ),
 
                     const SizedBox(height: 24),
 
                     const Text(
                       'Wants to learn',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: darkText,
-                      ),
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 10),
 
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: wantedSkills.map((skill) {
-                        return _skillChip(
-                          skill,
-                          const Color(0xFFFFF4E8),
-                          const Color(0xFFCA7A1B),
-                        );
-                      }).toList(),
-                    ),
+                    if (wantedSkills.isEmpty)
+                      const Text(
+                        'No learning interests yet.',
+                        style:
+                        AppTextStyles.bodyMuted,
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                        wantedSkills.map(
+                              (skill) {
+                            return _skillChip(
+                              skill.title,
+                              const Color(
+                                0xFFFFF4E8,
+                              ),
+                              const Color(
+                                0xFFCA7A1B,
+                              ),
+                            );
+                          },
+                        ).toList(),
+                      ),
 
                     const SizedBox(height: 24),
 
@@ -146,11 +173,21 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
+  // ============================================================
+  // TOP BAR
+  // ============================================================
+
+  Widget _buildTopBar(
+      BuildContext context,
+      ) {
     return Container(
       height: 62,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: const BoxDecoration(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 10,
+      ),
+      decoration:
+      const BoxDecoration(
         color: Colors.white,
         border: Border(
           bottom: BorderSide(
@@ -175,11 +212,8 @@ class UserProfileScreen extends StatelessWidget {
             child: Center(
               child: Text(
                 'Profile',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: darkText,
-                ),
+                style:
+                AppTextStyles.cardTitle,
               ),
             ),
           ),
@@ -196,23 +230,36 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // PROFILE HEADER
+  // ============================================================
+
   Widget _buildProfileHeader() {
     return Row(
       children: [
         Container(
           width: 78,
           height: 78,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFB45E),
-            shape: BoxShape.circle,
+          decoration:
+          const BoxDecoration(
+            color:
+            Color(
+              0xFFFFB45E,
+            ),
+            shape:
+            BoxShape.circle,
           ),
-          alignment: Alignment.center,
+          alignment:
+          Alignment.center,
           child: Text(
-            user['initials'] as String,
-            style: const TextStyle(
+            user.initials,
+            style:
+            const TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+              fontWeight:
+              FontWeight.w800,
+              color:
+              Colors.white,
             ),
           ),
         ),
@@ -221,15 +268,13 @@ class UserProfileScreen extends StatelessWidget {
 
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               Text(
-                user['name'] as String,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: darkText,
-                ),
+                user.name,
+                style:
+                AppTextStyles.pageTitle,
               ),
 
               const SizedBox(height: 4),
@@ -237,16 +282,19 @@ class UserProfileScreen extends StatelessWidget {
               Row(
                 children: [
                   const Icon(
-                    Icons.location_on_outlined,
-                    size: 14,
+                    Icons
+                        .location_on_outlined,
+                    size: 15,
                     color: mutedText,
                   ),
+
                   const SizedBox(width: 4),
-                  Text(
-                    user['city'] as String,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: mutedText,
+
+                  Expanded(
+                    child: Text(
+                      user.city,
+                      style:
+                      AppTextStyles.secondary,
                     ),
                   ),
                 ],
@@ -258,25 +306,35 @@ class UserProfileScreen extends StatelessWidget {
                 children: [
                   const Icon(
                     Icons.star_rounded,
-                    size: 16,
-                    color: Color(0xFFFFB547),
+                    size: 17,
+                    color:
+                    Color(
+                      0xFFFFB547,
+                    ),
                   ),
+
                   const SizedBox(width: 3),
+
                   Text(
-                    '${user['rating']}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                    user.rating
+                        .toStringAsFixed(
+                      1,
+                    ),
+                    style:
+                    AppTextStyles.secondary
+                        .copyWith(
                       color: darkText,
+                      fontWeight:
+                      FontWeight.w700,
                     ),
                   ),
+
                   const SizedBox(width: 5),
+
                   Text(
-                    '(${user['reviewCount']} reviews)',
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: mutedText,
-                    ),
+                    '(${user.reviewCount} reviews)',
+                    style:
+                    AppTextStyles.caption,
                   ),
                 ],
               ),
@@ -293,26 +351,34 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // STATS
+  // ============================================================
+
   Widget _buildStatsRow() {
     return Row(
       children: [
         Expanded(
           child: _statBox(
-            '${user['completedSwaps']}',
+            '${user.completedSwaps}',
             'Completed swaps',
           ),
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: _statBox(
-            '${user['responseRate']}%',
+            '${user.responseRate}%',
             'Response rate',
           ),
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: _statBox(
-            user['memberSince'] as String,
+            user.memberSince,
             'Member since',
           ),
         ),
@@ -320,73 +386,101 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _statBox(String value, String label) {
+  Widget _statBox(
+      String value,
+      String label,
+      ) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         vertical: 14,
         horizontal: 8,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color: border,
+        ),
       ),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: darkText,
-            ),
+            style:
+            AppTextStyles.cardTitle,
           ),
+
           const SizedBox(height: 4),
+
           Text(
             label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 8,
-              color: mutedText,
-            ),
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.caption,
           ),
         ],
       ),
     );
   }
 
+  // ============================================================
+  // INFO CARD
+  // ============================================================
+
   Widget _buildInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding:
+      const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
+        borderRadius:
+        BorderRadius.circular(16),
+        border: Border.all(
+          color: border,
+        ),
       ),
       child: Column(
         children: [
           _infoRow(
             Icons.language_rounded,
             'Languages',
-            user['language'] as String,
+            user.language,
           ),
-          const Divider(height: 22, color: border),
+
+          const Divider(
+            height: 22,
+            color: border,
+          ),
+
           _infoRow(
             Icons.schedule_rounded,
             'Availability',
-            user['availability'] as String,
+            user.availability,
           ),
-          const Divider(height: 22, color: border),
+
+          const Divider(
+            height: 22,
+            color: border,
+          ),
+
           _infoRow(
             Icons.devices_rounded,
             'Preferred mode',
-            user['preferredMode'] as String,
+            user.preferredMode,
           ),
-          const Divider(height: 22, color: border),
+
+          const Divider(
+            height: 22,
+            color: border,
+          ),
+
           _infoRow(
             Icons.school_outlined,
             'Teaching style',
-            user['teachingStyle'] as String,
+            user.teachingStyle,
           ),
         ],
       ),
@@ -399,7 +493,8 @@ class UserProfileScreen extends StatelessWidget {
       String value,
       ) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
@@ -411,23 +506,25 @@ class UserProfileScreen extends StatelessWidget {
 
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  color: mutedText,
-                ),
+                style:
+                AppTextStyles.caption,
               ),
+
               const SizedBox(height: 3),
+
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 10,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
+                style:
+                AppTextStyles.secondary
+                    .copyWith(
                   color: darkText,
+                  fontWeight:
+                  FontWeight.w600,
                 ),
               ),
             ],
@@ -437,137 +534,221 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // SKILL CHIP
+  // ============================================================
+
   Widget _skillChip(
       String skill,
       Color backgroundColor,
       Color textColor,
       ) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 11,
         vertical: 7,
       ),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
+      decoration:
+      BoxDecoration(
+        color:
+        backgroundColor,
+        borderRadius:
+        BorderRadius.circular(20),
       ),
       child: Text(
         skill,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: textColor,
+        style:
+        AppTextStyles.secondary
+            .copyWith(
+          color:
+          textColor,
+          fontWeight:
+          FontWeight.w600,
         ),
       ),
     );
   }
 
+  // ============================================================
+  // TRUST CARD
+  // ============================================================
+
   Widget _buildTrustCard() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3FBF6),
-        borderRadius: BorderRadius.circular(15),
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(14),
+      decoration:
+      BoxDecoration(
+        color:
+        const Color(
+          0xFFF3FBF6,
+        ),
+        borderRadius:
+        BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFD9F0E0),
+          color:
+          const Color(
+            0xFFD9F0E0,
+          ),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Profile & trust',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: darkText,
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              fontSize:
+              14,
             ),
           ),
 
           const SizedBox(height: 10),
 
-          _trustRow('Email verified'),
-          const SizedBox(height: 7),
-          _trustRow('Profile completed'),
-          const SizedBox(height: 7),
+          if (user.emailVerified)
+            _trustRow(
+              'Email verified',
+            ),
+
+          if (user.emailVerified)
+            const SizedBox(height: 7),
+
+          if (user.profileCompleted)
+            _trustRow(
+              'Profile completed',
+            ),
+
+          if (user.profileCompleted)
+            const SizedBox(height: 7),
+
           _trustRow(
-            '${user['completedSwaps']} completed exchanges',
+            '${user.completedSwaps} completed exchanges',
           ),
         ],
       ),
     );
   }
 
-  Widget _trustRow(String text) {
+  Widget _trustRow(
+      String text,
+      ) {
     return Row(
       children: [
         const Icon(
           Icons.check_circle_rounded,
           size: 16,
-          color: Color(0xFF47A568),
+          color:
+          Color(
+            0xFF47A568,
+          ),
         ),
+
         const SizedBox(width: 7),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 9.5,
-            color: darkText,
+
+        Expanded(
+          child: Text(
+            text,
+            style:
+            AppTextStyles.secondary
+                .copyWith(
+              color:
+              darkText,
+            ),
           ),
         ),
       ],
     );
   }
 
+  // ============================================================
+  // SKILL RELATIONSHIPS
+  // ============================================================
+
+  List<Skill> _getOfferedSkills() {
+    return _repository
+        .getOfferedSkillsForUser(
+      user.id,
+    )
+        .map(
+          (relationship) =>
+          _repository.findSkillById(
+            relationship.skillId,
+          ),
+    )
+        .whereType<Skill>()
+        .toList();
+  }
+
+  List<Skill> _getWantedSkills() {
+    return _repository
+        .getWantedSkillsForUser(
+      user.id,
+    )
+        .map(
+          (relationship) =>
+          _repository.findSkillById(
+            relationship.skillId,
+          ),
+    )
+        .whereType<Skill>()
+        .toList();
+  }
+
+  // ============================================================
+  // ACTION BUTTONS
+  // ============================================================
+
   Widget _buildActionButtons(
       BuildContext context,
-      List<String> offeredSkills,
-      List<String> wantedSkills,
+      List<Skill> offeredSkills,
+      List<Skill> wantedSkills,
       ) {
     return Row(
       children: [
         Expanded(
           child: SizedBox(
             height: 46,
-            child: OutlinedButton.icon(
+            child:
+            OutlinedButton.icon(
               onPressed: () {
-                final conversation =
-                ChatService.instance.getOrCreateConversation(
-                  userName: user['name'] as String,
-                  initials: user['initials'] as String,
-                  city: user['city'] as String,
-                  skillWanted: offeredSkills.isEmpty
-                      ? 'Skill'
-                      : offeredSkills.first,
-                  skillOffered: wantedSkills.isEmpty
-                      ? 'Skill'
-                      : wantedSkills.first,
-                );
-
-                Navigator.pushNamed(
+                _openConversation(
                   context,
-                  '/conversation',
-                  arguments: conversation.id,
+                  offeredSkills,
+                  wantedSkills,
                 );
               },
               icon: const Icon(
-                Icons.chat_bubble_outline_rounded,
+                Icons
+                    .chat_bubble_outline_rounded,
                 size: 16,
               ),
-              label: const Text(
+              label:
+              const Text(
                 'MESSAGE',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
+                style:
+                AppTextStyles.button,
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: primary,
-                side: const BorderSide(
-                  color: primary,
+              style:
+              OutlinedButton.styleFrom(
+                foregroundColor:
+                primary,
+                side:
+                const BorderSide(
+                  color:
+                  primary,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    12,
+                  ),
                 ),
               ),
             ),
@@ -579,28 +760,43 @@ class UserProfileScreen extends StatelessWidget {
         Expanded(
           child: SizedBox(
             height: 46,
-            child: ElevatedButton.icon(
+            child:
+            ElevatedButton.icon(
               onPressed: () {
-                _showSwapDialog(context);
+                _openSwapRequest(
+                  context,
+                  offeredSkills,
+                );
               },
               icon: const Icon(
-                Icons.swap_horiz_rounded,
+                Icons
+                    .swap_horiz_rounded,
                 size: 17,
               ),
-              label: const Text(
+              label:
+              const Text(
                 'REQUEST SWAP',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
+                style:
+                AppTextStyles.button,
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: Colors.white,
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                primary,
+                foregroundColor:
+                Colors.white,
                 elevation: 0,
-                minimumSize: const Size(0, 46),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                minimumSize:
+                const Size(
+                  0,
+                  46,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    12,
+                  ),
                 ),
               ),
             ),
@@ -610,71 +806,112 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showSwapDialog(BuildContext context) {
-    final List<String> wantedSkills =
-    List<String>.from(
-      user['wantedSkills'] ?? [],
+  // ============================================================
+  // MESSAGE
+  // ============================================================
+
+  void _openConversation(
+      BuildContext context,
+      List<Skill> offeredSkills,
+      List<Skill> wantedSkills,
+      ) {
+    final conversation =
+    ChatService.instance
+        .getOrCreateConversation(
+      userName:
+      user.name,
+      initials:
+      user.initials,
+      city:
+      user.city,
+      skillWanted:
+      offeredSkills.isEmpty
+          ? 'Skill'
+          : offeredSkills.first.title,
+      skillOffered:
+      wantedSkills.isEmpty
+          ? 'Skill'
+          : wantedSkills.first.title,
     );
 
-    final String wantedText =
-    wantedSkills.isEmpty
-        ? 'another skill'
-        : wantedSkills.first;
+    Navigator.pushNamed(
+      context,
+      '/conversation',
+      arguments:
+      conversation.id,
+    );
+  }
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Request a Skill Swap?',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: darkText,
-            ),
-          ),
+  // ============================================================
+  // CREATE SWAP REQUEST
+  // ============================================================
+
+  Future<void> _openSwapRequest(
+      BuildContext context,
+      List<Skill> offeredSkills,
+      ) async {
+    if (offeredSkills.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
           content: Text(
-            '${user['name']} is interested in learning $wantedText.\n\nYou can finalize the skill, schedule, and session mode through chat.',
-            style: const TextStyle(
-              fontSize: 10.5,
-              height: 1.5,
-              color: mutedText,
-            ),
+            'This user has no offered skill available for swap.',
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Swap request sent!',
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text(
-                'SEND REQUEST',
-              ),
+      return;
+    }
+
+    final Skill skillToLearn =
+        offeredSkills.first;
+
+    final bool? requestCreated =
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            CreateSwapRequestScreen(
+              providerUserId:
+              user.id,
+
+              skillToLearnId:
+              skillToLearn.id,
+
+              providerName:
+              user.name,
+
+              providerInitials:
+              user.initials,
+
+              providerCity:
+              user.city,
+
+              skillToLearn:
+              skillToLearn.title,
             ),
-          ],
-        );
-      },
+      ),
     );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (requestCreated == true) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Your request to ${user.name} is now Pending.',
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

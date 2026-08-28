@@ -244,6 +244,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   '/explore',
                 );
               }
+
+              if (action == 'See all') {
+                Navigator.pushNamed(
+                  context,
+                  '/swap-requests',
+                );
+              }
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(

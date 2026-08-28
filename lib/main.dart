@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'model/skill.dart';
+import 'model/user.dart';
+
 import 'theme/app_theme.dart';
 
 import 'services/chat_service.dart';
@@ -13,26 +16,21 @@ import 'view/skill_details_screen.dart';
 import 'view/user_profile_screen.dart';
 import 'view/chat_screen.dart';
 import 'view/conversation_screen.dart';
+import 'view/swap_requests_screen.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding
-      .ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-  await ChatService
-      .instance
-      .initialize();
+  await ChatService.instance.initialize();
 
-  await SwapService
-      .instance
-      .initialize();
+  await SwapService.instance.initialize();
 
   runApp(
     const TubiLearnApp(),
   );
 }
 
-class TubiLearnApp
-    extends StatelessWidget {
+class TubiLearnApp extends StatelessWidget {
   const TubiLearnApp({
     super.key,
   });
@@ -43,75 +41,70 @@ class TubiLearnApp
       ) {
     return MaterialApp(
       title: 'TubiLearn',
-
-      debugShowCheckedModeBanner:
-      false,
-
-      theme:
-      AppTheme.lightTheme,
-
-      home:
-      const DashboardScreen(),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const DashboardScreen(),
 
       routes: {
-        '/add-skill':
-            (context) =>
+        '/add-skill': (context) =>
         const AddSkillScreen(),
 
-        '/my-skills':
-            (context) =>
+        '/my-skills': (context) =>
         const MySkillsScreen(),
 
-        '/explore':
-            (context) =>
+        '/explore': (context) =>
         const ExploreScreen(),
 
-        '/chat':
-            (context) =>
+        '/chat': (context) =>
         const ChatScreen(),
+
+        '/swap-requests': (context) =>
+        const SwapRequestsScreen(),
       },
 
-      onGenerateRoute:
-          (settings) {
-        if (settings.name ==
-            '/skill-details') {
-          final skill =
-          settings.arguments
-          as Map<String, dynamic>;
+      onGenerateRoute: (settings) {
+        // ======================================================
+        // SKILL DETAILS
+        // ======================================================
+
+        if (settings.name == '/skill-details') {
+          final Skill skill =
+          settings.arguments as Skill;
 
           return MaterialPageRoute(
-            builder:
-                (context) =>
+            builder: (context) =>
                 SkillDetailsScreen(
                   skill: skill,
                 ),
           );
         }
 
-        if (settings.name ==
-            '/user-profile') {
-          final user =
-          settings.arguments
-          as Map<String, dynamic>;
+        // ======================================================
+        // USER PROFILE
+        // ======================================================
+
+        if (settings.name == '/user-profile') {
+          final User user =
+          settings.arguments as User;
 
           return MaterialPageRoute(
-            builder:
-                (context) =>
+            builder: (context) =>
                 UserProfileScreen(
                   user: user,
                 ),
           );
         }
 
-        if (settings.name ==
-            '/conversation') {
-          final conversationId =
-          settings.arguments
-          as String;
+        // ======================================================
+        // CONVERSATION
+        // ======================================================
+
+        if (settings.name == '/conversation') {
+          final String conversationId =
+          settings.arguments as String;
 
           return MaterialPageRoute(
-            builder:
-                (context) =>
+            builder: (context) =>
                 ConversationScreen(
                   conversationId:
                   conversationId,

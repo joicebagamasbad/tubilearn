@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
 
+import '../model/repositories/explore_repository.dart';
+import '../model/skill.dart';
+import '../model/user.dart';
+import '../model/user_skill.dart';
+import '../theme/app_theme.dart';
+import 'create_swap_request_screen.dart';
+
 class SkillDetailsScreen extends StatelessWidget {
-  final Map<String, dynamic> skill;
+  final Skill skill;
 
   const SkillDetailsScreen({
     super.key,
     required this.skill,
   });
 
-  static const Color primary = Color(0xFF5B5FEF);
-  static const Color darkText = Color(0xFF171A2B);
-  static const Color mutedText = Color(0xFF8A8FA3);
-  static const Color background = Color(0xFFF9F9FF);
-  static const Color border = Color(0xFFE8E8F2);
+  static const Color primary = AppTheme.primary;
+  static const Color darkText = AppTheme.darkText;
+  static const Color mutedText = AppTheme.mutedText;
+  static const Color background = AppTheme.background;
+  static const Color border = AppTheme.border;
+
+  static final ExploreRepository _repository =
+  ExploreRepository();
 
   @override
-  Widget build(BuildContext context) {
-    final List<String> learnings =
-    List<String>.from(
-      skill['learnings'] ?? [],
-    );
-
-    final List<Map<String, dynamic>> providers =
-    List<Map<String, dynamic>>.from(
-      (skill['providers'] ?? []).map(
-            (provider) =>
-        Map<String, dynamic>.from(
-          provider,
-        ),
-      ),
+  Widget build(
+      BuildContext context,
+      ) {
+    final List<User> providers =
+    _repository.getProvidersForSkill(
+      skill.id,
     );
 
     return Scaffold(
@@ -63,41 +65,29 @@ class SkillDetailsScreen extends StatelessWidget {
 
                     const Text(
                       'About this skill',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                        FontWeight.w800,
-                        color: darkText,
-                      ),
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 8),
 
                     Text(
-                      skill['description']
-                      as String,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.55,
-                        color: mutedText,
-                      ),
+                      skill.description,
+                      style:
+                      AppTextStyles.bodyMuted,
                     ),
 
                     const SizedBox(height: 24),
 
                     const Text(
                       'What you can learn',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                        FontWeight.w800,
-                        color: darkText,
-                      ),
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 10),
 
-                    ...learnings.map(
+                    ...skill.learnings.map(
                           (item) => Padding(
                         padding:
                         const EdgeInsets.only(
@@ -110,13 +100,14 @@ class SkillDetailsScreen extends StatelessWidget {
                             Container(
                               margin:
                               const EdgeInsets.only(
-                                top: 3,
+                                top: 2,
                               ),
                               width: 20,
                               height: 20,
                               decoration:
                               BoxDecoration(
-                                color: const Color(
+                                color:
+                                const Color(
                                   0xFFF0EFFF,
                                 ),
                                 borderRadius:
@@ -124,24 +115,22 @@ class SkillDetailsScreen extends StatelessWidget {
                                   7,
                                 ),
                               ),
-                              child: const Icon(
+                              child:
+                              const Icon(
                                 Icons.check_rounded,
                                 size: 13,
                                 color: primary,
                               ),
                             ),
 
-                            const SizedBox(
-                              width: 9,
-                            ),
+                            const SizedBox(width: 9),
 
                             Expanded(
                               child: Text(
                                 item,
                                 style:
-                                const TextStyle(
-                                  fontSize: 10.5,
-                                  height: 1.45,
+                                AppTextStyles.secondary
+                                    .copyWith(
                                   color: darkText,
                                 ),
                               ),
@@ -162,21 +151,15 @@ class SkillDetailsScreen extends StatelessWidget {
                         const Expanded(
                           child: Text(
                             'People offering this skill',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight:
-                              FontWeight.w800,
-                              color: darkText,
-                            ),
+                            style:
+                            AppTextStyles.cardTitle,
                           ),
                         ),
 
                         Text(
                           '${providers.length} available',
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            color: mutedText,
-                          ),
+                          style:
+                          AppTextStyles.caption,
                         ),
                       ],
                     ),
@@ -185,28 +168,28 @@ class SkillDetailsScreen extends StatelessWidget {
 
                     const Text(
                       'Choose someone based on availability, experience, and what they want to learn in exchange.',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        height: 1.45,
-                        color: mutedText,
-                      ),
+                      style:
+                      AppTextStyles.secondary,
                     ),
 
                     const SizedBox(height: 14),
 
-                    ...providers.map(
-                          (provider) => Padding(
-                        padding:
-                        const EdgeInsets.only(
-                          bottom: 14,
-                        ),
-                        child:
-                        _buildProviderCard(
-                          context,
-                          provider,
+                    if (providers.isEmpty)
+                      _buildNoProviders()
+                    else
+                      ...providers.map(
+                            (provider) => Padding(
+                          padding:
+                          const EdgeInsets.only(
+                            bottom: 14,
+                          ),
+                          child:
+                          _buildProviderCard(
+                            context,
+                            provider,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -217,15 +200,21 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // TOP BAR
+  // ============================================================
+
   Widget _buildTopBar(
       BuildContext context,
       ) {
     return Container(
       height: 62,
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration: const BoxDecoration(
+      decoration:
+      const BoxDecoration(
         color: Colors.white,
         border: Border(
           bottom: BorderSide(
@@ -250,12 +239,8 @@ class SkillDetailsScreen extends StatelessWidget {
             child: Center(
               child: Text(
                 'Skill Details',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight:
-                  FontWeight.w800,
-                  color: darkText,
-                ),
+                style:
+                AppTextStyles.cardTitle,
               ),
             ),
           ),
@@ -273,21 +258,30 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // SKILL HEADER
+  // ============================================================
+
   Widget _buildSkillHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
+      padding:
+      const EdgeInsets.fromLTRB(
         16,
         16,
         10,
         16,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1EFFF),
+        color:
+        const Color(0xFFF1EFFF),
         borderRadius:
-        BorderRadius.circular(18),
+        BorderRadius.circular(
+          18,
+        ),
         border: Border.all(
-          color: const Color(
+          color:
+          const Color(
             0xFFE4E0FF,
           ),
         ),
@@ -297,13 +291,16 @@ class SkillDetailsScreen extends StatelessWidget {
           Container(
             width: 62,
             height: 62,
-            decoration: BoxDecoration(
+            decoration:
+            BoxDecoration(
               color: Colors.white,
               borderRadius:
-              BorderRadius.circular(16),
+              BorderRadius.circular(
+                16,
+              ),
             ),
             child: Icon(
-              skill['icon'] as IconData,
+              skill.icon,
               color: primary,
               size: 30,
             ),
@@ -317,23 +314,17 @@ class SkillDetailsScreen extends StatelessWidget {
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  skill['title'] as String,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight:
-                    FontWeight.w800,
-                    color: darkText,
-                  ),
+                  skill.title,
+                  style:
+                  AppTextStyles.sectionTitle,
                 ),
 
                 const SizedBox(height: 4),
 
                 Text(
-                  skill['category'] as String,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: mutedText,
-                  ),
+                  skill.category,
+                  style:
+                  AppTextStyles.secondary,
                 ),
 
                 const SizedBox(height: 8),
@@ -344,7 +335,8 @@ class SkillDetailsScreen extends StatelessWidget {
                     horizontal: 9,
                     vertical: 5,
                   ),
-                  decoration: BoxDecoration(
+                  decoration:
+                  BoxDecoration(
                     color: Colors.white,
                     borderRadius:
                     BorderRadius.circular(
@@ -352,13 +344,13 @@ class SkillDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    skill['level'] as String,
+                    skill.level,
                     style:
-                    const TextStyle(
-                      fontSize: 8.5,
+                    AppTextStyles.caption
+                        .copyWith(
+                      color: primary,
                       fontWeight:
                       FontWeight.w700,
-                      color: primary,
                     ),
                   ),
                 ),
@@ -377,6 +369,10 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // QUICK INFO
+  // ============================================================
+
   Widget _buildQuickInfo() {
     return Row(
       children: [
@@ -386,8 +382,7 @@ class SkillDetailsScreen extends StatelessWidget {
             Icons.schedule_outlined,
             label: 'Session',
             value:
-            skill['sessionLength']
-            as String,
+            skill.sessionLength,
           ),
         ),
 
@@ -399,8 +394,7 @@ class SkillDetailsScreen extends StatelessWidget {
             Icons.language_rounded,
             label: 'Language',
             value:
-            skill['language']
-            as String,
+            skill.language,
           ),
         ),
 
@@ -411,8 +405,8 @@ class SkillDetailsScreen extends StatelessWidget {
             icon:
             Icons.laptop_mac_rounded,
             label: 'Mode',
-            value: skill['mode']
-            as String,
+            value:
+            skill.mode,
           ),
         ),
       ],
@@ -433,7 +427,9 @@ class SkillDetailsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(14),
+        BorderRadius.circular(
+          14,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -450,10 +446,8 @@ class SkillDetailsScreen extends StatelessWidget {
 
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 8,
-              color: mutedText,
-            ),
+            style:
+            AppTextStyles.caption,
           ),
 
           const SizedBox(height: 3),
@@ -465,11 +459,12 @@ class SkillDetailsScreen extends StatelessWidget {
             TextAlign.center,
             overflow:
             TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 8.5,
+            style:
+            AppTextStyles.caption
+                .copyWith(
+              color: darkText,
               fontWeight:
               FontWeight.w700,
-              color: darkText,
             ),
           ),
         ],
@@ -477,19 +472,31 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // PREREQUISITE
+  // ============================================================
+
   Widget _buildPrerequisiteCard() {
     return Container(
       width: double.infinity,
       padding:
-      const EdgeInsets.all(14),
+      const EdgeInsets.all(
+        14,
+      ),
       decoration: BoxDecoration(
         color:
-        const Color(0xFFFFFAEE),
+        const Color(
+          0xFFFFFAEE,
+        ),
         borderRadius:
-        BorderRadius.circular(14),
+        BorderRadius.circular(
+          14,
+        ),
         border: Border.all(
           color:
-          const Color(0xFFFFE8AF),
+          const Color(
+            0xFFFFE8AF,
+          ),
         ),
       ),
       child: Row(
@@ -499,7 +506,9 @@ class SkillDetailsScreen extends StatelessWidget {
           const Icon(
             Icons.info_outline_rounded,
             color:
-            Color(0xFFE5A72C),
+            Color(
+              0xFFE5A72C,
+            ),
             size: 19,
           ),
 
@@ -510,26 +519,23 @@ class SkillDetailsScreen extends StatelessWidget {
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'What you need',
-                  style: TextStyle(
-                    fontSize: 10.5,
+                  style:
+                  AppTextStyles.secondary
+                      .copyWith(
+                    color: darkText,
                     fontWeight:
                     FontWeight.w800,
-                    color: darkText,
                   ),
                 ),
 
                 const SizedBox(height: 4),
 
                 Text(
-                  skill['prerequisite']
-                  as String,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    height: 1.45,
-                    color: mutedText,
-                  ),
+                  skill.prerequisite,
+                  style:
+                  AppTextStyles.secondary,
                 ),
               ],
             ),
@@ -539,18 +545,43 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // PROVIDER CARD
+  // ============================================================
+
   Widget _buildProviderCard(
       BuildContext context,
-      Map<String, dynamic> provider,
+      User provider,
       ) {
+    final UserSkill? offeredRelationship =
+    _repository.findUserSkill(
+      userId: provider.id,
+      skillId: skill.id,
+      type: UserSkillType.offered,
+    );
+
+    final List<String> wantedSkillTitles =
+    _getWantedSkillTitles(
+      provider.id,
+    );
+
+    final String wantsToLearn =
+    wantedSkillTitles.isEmpty
+        ? 'Open to learning'
+        : wantedSkillTitles.first;
+
     return Container(
       width: double.infinity,
       padding:
-      const EdgeInsets.all(14),
+      const EdgeInsets.all(
+        14,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(17),
+        BorderRadius.circular(
+          17,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -565,15 +596,16 @@ class SkillDetailsScreen extends StatelessWidget {
                 decoration:
                 const BoxDecoration(
                   color:
-                  Color(0xFFFFB45E),
+                  Color(
+                    0xFFFFB45E,
+                  ),
                   shape:
                   BoxShape.circle,
                 ),
                 alignment:
                 Alignment.center,
                 child: Text(
-                  provider['initials']
-                  as String,
+                  provider.initials,
                   style:
                   const TextStyle(
                     fontSize: 12,
@@ -593,27 +625,17 @@ class SkillDetailsScreen extends StatelessWidget {
                   CrossAxisAlignment.start,
                   children: [
                     Text(
-                      provider['name']
-                      as String,
+                      provider.name,
                       style:
-                      const TextStyle(
-                        fontSize: 13,
-                        fontWeight:
-                        FontWeight.w800,
-                        color: darkText,
-                      ),
+                      AppTextStyles.cardTitle,
                     ),
 
                     const SizedBox(height: 3),
 
                     Text(
-                      '${provider['city']} • ${provider['level']}',
+                      '${provider.city} • ${offeredRelationship?.level ?? skill.level}',
                       style:
-                      const TextStyle(
-                        fontSize: 9.5,
-                        color:
-                        mutedText,
-                      ),
+                      AppTextStyles.caption,
                     ),
                   ],
                 ),
@@ -624,7 +646,8 @@ class SkillDetailsScreen extends StatelessWidget {
                   const Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: Color(
+                    color:
+                    Color(
                       0xFFFFB547,
                     ),
                   ),
@@ -632,14 +655,16 @@ class SkillDetailsScreen extends StatelessWidget {
                   const SizedBox(width: 3),
 
                   Text(
-                    provider['rating']
-                        .toString(),
+                    provider.rating
+                        .toStringAsFixed(
+                      1,
+                    ),
                     style:
-                    const TextStyle(
-                      fontSize: 10,
+                    AppTextStyles.caption
+                        .copyWith(
+                      color: darkText,
                       fontWeight:
                       FontWeight.w700,
-                      color: darkText,
                     ),
                   ),
                 ],
@@ -656,13 +681,15 @@ class SkillDetailsScreen extends StatelessWidget {
                 size: 15,
                 color: primary,
               ),
+
               const SizedBox(width: 6),
+
               Expanded(
                 child: Text(
-                  '${provider['completedSwaps']} completed skill swaps',
+                  '${provider.completedSwaps} completed skill swaps',
                   style:
-                  const TextStyle(
-                    fontSize: 9.5,
+                  AppTextStyles.secondary
+                      .copyWith(
                     color: darkText,
                   ),
                 ),
@@ -679,13 +706,15 @@ class SkillDetailsScreen extends StatelessWidget {
                 size: 15,
                 color: primary,
               ),
+
               const SizedBox(width: 6),
+
               Expanded(
                 child: Text(
-                  'Wants to learn: ${provider['wantsToLearn']}',
+                  'Wants to learn: $wantsToLearn',
                   style:
-                  const TextStyle(
-                    fontSize: 9.5,
+                  AppTextStyles.secondary
+                      .copyWith(
                     color: darkText,
                   ),
                 ),
@@ -703,61 +732,14 @@ class SkillDetailsScreen extends StatelessWidget {
                   child:
                   OutlinedButton(
                     onPressed: () {
-                      final profileData =
-                      <String, dynamic>{
-                        ...provider,
-                        'reviewCount':
-                        provider[
-                        'reviewCount'] ??
-                            8,
-                        'responseRate':
-                        provider[
-                        'responseRate'] ??
-                            92,
-                        'memberSince':
-                        provider[
-                        'memberSince'] ??
-                            '2026',
-                        'preferredMode':
-                        provider[
-                        'preferredMode'] ??
-                            skill[
-                            'mode'],
-                        'teachingStyle':
-                        provider[
-                        'teachingStyle'] ??
-                            'Practical, beginner-friendly, and hands-on.',
-                        'bio': provider[
-                        'bio'] ??
-                            'I enjoy sharing practical skills and learning from other people through skill exchange.',
-                        'offeredSkills':
-                        provider[
-                        'offeredSkills'] ??
-                            [
-                              skill[
-                              'title']
-                            ],
-                        'wantedSkills':
-                        provider[
-                        'wantedSkills'] ??
-                            [
-                              provider[
-                              'wantsToLearn']
-                            ],
-                      };
-
-                      Navigator.pushNamed(
+                      _openProfile(
                         context,
-                        '/user-profile',
-                        arguments:
-                        profileData,
+                        provider,
                       );
                     },
                     style:
-                    OutlinedButton
-                        .styleFrom(
-                      foregroundColor:
-                      primary,
+                    OutlinedButton.styleFrom(
+                      foregroundColor: primary,
                       side:
                       const BorderSide(
                         color: primary,
@@ -765,8 +747,7 @@ class SkillDetailsScreen extends StatelessWidget {
                       shape:
                       RoundedRectangleBorder(
                         borderRadius:
-                        BorderRadius
-                            .circular(
+                        BorderRadius.circular(
                           11,
                         ),
                       ),
@@ -775,12 +756,7 @@ class SkillDetailsScreen extends StatelessWidget {
                     const Text(
                       'VIEW PROFILE',
                       style:
-                      TextStyle(
-                        fontSize: 8.5,
-                        fontWeight:
-                        FontWeight
-                            .w800,
-                      ),
+                      AppTextStyles.button,
                     ),
                   ),
                 ),
@@ -794,14 +770,13 @@ class SkillDetailsScreen extends StatelessWidget {
                   child:
                   ElevatedButton(
                     onPressed: () {
-                      _showSwapRequestDialog(
+                      _openSwapRequest(
                         context,
                         provider,
                       );
                     },
                     style:
-                    ElevatedButton
-                        .styleFrom(
+                    ElevatedButton.styleFrom(
                       elevation: 0,
                       backgroundColor:
                       primary,
@@ -815,8 +790,7 @@ class SkillDetailsScreen extends StatelessWidget {
                       shape:
                       RoundedRectangleBorder(
                         borderRadius:
-                        BorderRadius
-                            .circular(
+                        BorderRadius.circular(
                           11,
                         ),
                       ),
@@ -825,12 +799,7 @@ class SkillDetailsScreen extends StatelessWidget {
                     const Text(
                       'REQUEST SWAP',
                       style:
-                      TextStyle(
-                        fontSize: 8.5,
-                        fontWeight:
-                        FontWeight
-                            .w800,
-                      ),
+                      AppTextStyles.button,
                     ),
                   ),
                 ),
@@ -842,87 +811,129 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
-  void _showSwapRequestDialog(
-      BuildContext context,
-      Map<String, dynamic> provider,
+  // ============================================================
+  // WANTED SKILL TITLES
+  // ============================================================
+
+  List<String> _getWantedSkillTitles(
+      String userId,
       ) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor:
-          Colors.white,
-          shape:
-          RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(
-              20,
+    return _repository
+        .getWantedSkillsForUser(
+      userId,
+    )
+        .map(
+          (relationship) =>
+      _repository.findSkillById(
+        relationship.skillId,
+      )?.title,
+    )
+        .whereType<String>()
+        .toList();
+  }
+
+  // ============================================================
+  // OPEN PROFILE
+  // ============================================================
+
+  void _openProfile(
+      BuildContext context,
+      User provider,
+      ) {
+    Navigator.pushNamed(
+      context,
+      '/user-profile',
+      arguments: provider,
+    );
+  }
+
+  // ============================================================
+  // OPEN SWAP REQUEST
+  // ============================================================
+
+  Future<void> _openSwapRequest(
+      BuildContext context,
+      User provider,
+      ) async {
+    final bool? requestCreated =
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            CreateSwapRequestScreen(
+              providerUserId:
+              provider.id,
+
+              skillToLearnId:
+              skill.id,
+
+              providerName:
+              provider.name,
+
+              providerInitials:
+              provider.initials,
+
+              providerCity:
+              provider.city,
+
+              skillToLearn:
+              skill.title,
             ),
-          ),
-          title: const Text(
-            'Request a Skill Swap?',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight:
-              FontWeight.w800,
-              color: darkText,
-            ),
-          ),
+      ),
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (requestCreated == true) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
           content: Text(
-            'You’re requesting to learn ${skill['title']} from ${provider['name']}.\n\nThey are currently interested in learning ${provider['wantsToLearn']} in exchange.',
-            style: const TextStyle(
-              fontSize: 10.5,
-              height: 1.5,
-              color: mutedText,
-            ),
+            'Your request to ${provider.name} is now Pending.',
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                );
-              },
-              child:
-              const Text('CANCEL'),
-            ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                );
+  // ============================================================
+  // NO PROVIDERS
+  // ============================================================
 
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Swap request sent!',
-                    ),
-                  ),
-                );
-              },
-              style:
-              ElevatedButton
-                  .styleFrom(
-                backgroundColor:
-                primary,
-                foregroundColor:
-                Colors.white,
-                minimumSize:
-                const Size(
-                  90,
-                  40,
-                ),
-              ),
-              child: const Text(
-                'SEND REQUEST',
-              ),
-            ),
-          ],
-        );
-      },
+  Widget _buildNoProviders() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        18,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.white,
+        borderRadius:
+        BorderRadius.circular(
+          14,
+        ),
+        border:
+        Border.all(
+          color:
+          border,
+        ),
+      ),
+      child: const Text(
+        'No providers are currently available for this skill.',
+        textAlign:
+        TextAlign.center,
+        style:
+        AppTextStyles.bodyMuted,
+      ),
     );
   }
 }
