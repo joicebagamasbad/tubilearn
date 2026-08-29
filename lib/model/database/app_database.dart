@@ -12,7 +12,7 @@ class AppDatabase {
   static const String _databaseName =
       'tubilearn.db';
 
-  static const int _databaseVersion = 8;
+  static const int _databaseVersion = 9;
 
   Database? _database;
 
@@ -129,6 +129,12 @@ class AppDatabase {
 
         if (oldVersion < 8) {
           await _migrateToVersion8(
+            db,
+          );
+        }
+
+        if (oldVersion < 9) {
+          await _migrateToVersion9(
             db,
           );
         }
@@ -458,7 +464,7 @@ class AppDatabase {
   //
   // Originally introduced in v3.
   //
-  // Fresh v8 installs also include participant_user_id.
+  // Fresh v9 installs use stable participant and sender IDs.
   // ============================================================
 
   Future<void> _createConversationTablesV3(
@@ -513,20 +519,31 @@ class AppDatabase {
         text TEXT NOT NULL
           CHECK(length(trim(text)) > 0),
 
-        is_me INTEGER NOT NULL
-          CHECK(is_me IN (0, 1)),
+        sender_user_id TEXT
+          CHECK(
+            sender_user_id IS NULL
+            OR length(trim(sender_user_id)) > 0
+          ),
 
         sent_at INTEGER NOT NULL
           CHECK(sent_at > 0),
 
         FOREIGN KEY (conversation_id)
         REFERENCES conversations(id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+        FOREIGN KEY (sender_user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL
       )
       ''',
     );
 
     await _createMessageIndexes(
+      db,
+    );
+
+    await _createMessageSenderIndexV9(
       db,
     );
   }
@@ -705,6 +722,10 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATE MESSAGES TO V3
+  //
+  // Historical migration. Keep is_me here because databases
+  // upgrading from old versions still need to pass through
+  // the original v3 structure before reaching v9.
   // ============================================================
 
   Future<void> _migrateMessagesToV3(
@@ -1390,7 +1411,153 @@ class AppDatabase {
   }
 
   // ============================================================
+  // MIGRATION TO VERSION 9
+  //
+  // Replaces legacy is_me with stable sender_user_id.
+  //
+  // Existing messages are preserved.
+  //
+  // Legacy mapping:
+  // - is_me = 1 -> current local user
+  // - is_me = 0 -> conversation participant
+  // - unknown participant -> NULL instead of guessing
+  // ============================================================
+
+  Future<void> _migrateToVersion9(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> columns =
+    await db.rawQuery(
+      '''
+      PRAGMA table_info(messages)
+      ''',
+    );
+
+    final bool alreadyHasSenderUserId =
+    columns.any(
+          (column) =>
+      column['name'] ==
+          'sender_user_id',
+    );
+
+    if (alreadyHasSenderUserId) {
+      await _createMessageSenderIndexV9(
+        db,
+      );
+
+      return;
+    }
+
+    final bool hasLegacyIsMe =
+    columns.any(
+          (column) =>
+      column['name'] ==
+          'is_me',
+    );
+
+    if (!hasLegacyIsMe) {
+      throw StateError(
+        'Cannot migrate messages to version 9 because '
+            'neither sender_user_id nor legacy is_me exists.',
+      );
+    }
+
+    await db.transaction(
+          (txn) async {
+        await txn.execute(
+          '''
+          ALTER TABLE messages
+          RENAME TO messages_v8_backup
+          ''',
+        );
+
+        await txn.execute(
+          '''
+          CREATE TABLE messages (
+            id TEXT PRIMARY KEY
+              CHECK(length(trim(id)) > 0),
+
+            conversation_id TEXT NOT NULL
+              CHECK(length(trim(conversation_id)) > 0),
+
+            text TEXT NOT NULL
+              CHECK(length(trim(text)) > 0),
+
+            sender_user_id TEXT
+              CHECK(
+                sender_user_id IS NULL
+                OR length(trim(sender_user_id)) > 0
+              ),
+
+            sent_at INTEGER NOT NULL
+              CHECK(sent_at > 0),
+
+            FOREIGN KEY (conversation_id)
+            REFERENCES conversations(id)
+            ON DELETE CASCADE,
+
+            FOREIGN KEY (sender_user_id)
+            REFERENCES users(id)
+            ON DELETE SET NULL
+          )
+          ''',
+        );
+
+        await txn.execute(
+          '''
+          INSERT INTO messages (
+            id,
+            conversation_id,
+            text,
+            sender_user_id,
+            sent_at
+          )
+          SELECT
+            legacy.id,
+            legacy.conversation_id,
+            legacy.text,
+
+            CASE
+              WHEN legacy.is_me = 1
+                THEN 'user_joice_local'
+
+              WHEN legacy.is_me = 0
+                THEN conversations.participant_user_id
+
+              ELSE NULL
+            END,
+
+            legacy.sent_at
+
+          FROM messages_v8_backup AS legacy
+
+          LEFT JOIN conversations
+            ON conversations.id =
+               legacy.conversation_id
+          ''',
+        );
+
+        await txn.execute(
+          '''
+          DROP TABLE messages_v8_backup
+          ''',
+        );
+      },
+    );
+
+    await _createMessageIndexes(
+      db,
+    );
+
+    await _createMessageSenderIndexV9(
+      db,
+    );
+  }
+
+  // ============================================================
   // MESSAGE INDEXES
+  //
+  // These indexes are safe for legacy message schemas too.
   // ============================================================
 
   Future<void> _createMessageIndexes(
@@ -1409,6 +1576,25 @@ class AppDatabase {
       CREATE INDEX IF NOT EXISTS
       idx_messages_sent_at
       ON messages(sent_at)
+      ''',
+    );
+  }
+
+  // ============================================================
+  // VERSION 9 MESSAGE SENDER INDEX
+  //
+  // Kept separate from legacy indexes because old message
+  // schemas do not have sender_user_id yet.
+  // ============================================================
+
+  Future<void> _createMessageSenderIndexV9(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_messages_sender_user
+      ON messages(sender_user_id)
       ''',
     );
   }

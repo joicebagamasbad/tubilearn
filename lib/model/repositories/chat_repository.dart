@@ -45,8 +45,7 @@ class ChatRepository {
       final List<Message> messages =
       messageRows.map(
             (
-            Map<String, Object?>
-            messageRow,
+            Map<String, Object?> messageRow,
             ) {
           return Message(
             id:
@@ -55,10 +54,9 @@ class ChatRepository {
             text:
             messageRow['text']
             as String,
-            isMe:
-            (messageRow['is_me']
-            as int) ==
-                1,
+            senderUserId:
+            messageRow['sender_user_id']
+            as String?,
             sentAt:
             DateTime
                 .fromMillisecondsSinceEpoch(
@@ -159,10 +157,8 @@ class ChatRepository {
         conversationId,
         'text':
         message.text,
-        'is_me':
-        message.isMe
-            ? 1
-            : 0,
+        'sender_user_id':
+        message.senderUserId,
         'sent_at':
         message.sentAt
             .millisecondsSinceEpoch,

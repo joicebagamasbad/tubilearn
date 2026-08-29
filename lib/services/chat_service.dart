@@ -5,6 +5,7 @@ import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
 import '../model/repositories/explore_repository.dart';
 import '../model/user.dart';
+import 'current_user_service.dart';
 
 class ChatServiceException implements Exception {
   final String message;
@@ -29,6 +30,10 @@ class ChatService {
   final ExploreRepository
   _exploreRepository =
       ExploreRepository.instance;
+
+  final CurrentUserService
+  _currentUserService =
+      CurrentUserService.instance;
 
   final List<Conversation>
   _conversations = [];
@@ -101,8 +106,8 @@ class ChatService {
           'alex-initial-1',
           text:
           'Hi! I saw that you offer Photography. I’m interested in learning the basics.',
-          isMe:
-          true,
+          senderUserId:
+          _currentUserService.userId,
           sentAt:
           now.subtract(
             const Duration(
@@ -115,8 +120,8 @@ class ChatService {
           'alex-initial-2',
           text:
           'Sure! I usually start with the practical basics first before going into more advanced topics.',
-          isMe:
-          false,
+          senderUserId:
+          'user_alex_rivera',
           sentAt:
           now.subtract(
             const Duration(
@@ -148,12 +153,6 @@ class ChatService {
 
   // ============================================================
   // GET OR CREATE CONVERSATION
-  //
-  // userId is optional temporarily so older call sites continue
-  // compiling while we migrate them.
-  //
-  // When userId is absent, we only accept a unique exact match
-  // against the normalized Explore users. We do not invent IDs.
   // ============================================================
 
   Conversation getOrCreateConversation({
@@ -202,10 +201,6 @@ class ChatService {
       cleanUserName,
     );
 
-    // ----------------------------------------------------------
-    // Stable identity path
-    // ----------------------------------------------------------
-
     if (stableUserId != null) {
       for (final Conversation conversation
       in _conversations) {
@@ -216,13 +211,8 @@ class ChatService {
       }
     }
 
-    // ----------------------------------------------------------
-    // Legacy fallback
-    //
-    // If an old conversation exists without participant_user_id,
-    // reuse it instead of creating a duplicate.
-    // ----------------------------------------------------------
-
+    // Legacy fallback:
+    // reuse old conversation instead of creating duplicate.
     for (final Conversation conversation
     in _conversations) {
       if (conversation.participantUserId !=
@@ -324,8 +314,8 @@ class ChatService {
           .toString(),
       text:
       cleanText,
-      isMe:
-      true,
+      senderUserId:
+      _currentUserService.userId,
       sentAt:
       now,
     );
@@ -468,8 +458,7 @@ class ChatService {
       }
 
       if (matchedUser != null) {
-        // Two users with same display name:
-        // never guess identity.
+        // Never guess between duplicate display names.
         return null;
       }
 
