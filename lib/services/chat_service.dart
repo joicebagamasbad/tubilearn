@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
@@ -150,12 +148,6 @@ class ChatService {
 
   // ============================================================
   // GET OR CREATE CONVERSATION
-  //
-  // Existing conversations return immediately.
-  //
-  // New conversations are persisted BEFORE being added to the
-  // in-memory list. This prevents ghost conversations when the
-  // database write fails.
   // ============================================================
 
   Future<Conversation> getOrCreateConversation({
@@ -214,8 +206,6 @@ class ChatService {
       }
     }
 
-    // Legacy fallback:
-    // reuse old conversation instead of creating duplicate.
     for (final Conversation conversation
     in _conversations) {
       if (conversation.participantUserId !=
@@ -405,31 +395,49 @@ class ChatService {
   // ============================================================
   // DELETE CONVERSATION
   //
-  // Delete hardening is our NEXT small step.
+  // Database deletion is awaited BEFORE removing the conversation
+  // from memory.
+  //
+  // If persistence fails, the conversation remains visible and
+  // the caller receives an error instead of silently losing sync.
   // ============================================================
 
-  void deleteConversation(
+  Future<void> deleteConversation(
       String conversationId,
-      ) {
+      ) async {
     final String cleanConversationId =
-    conversationId.trim();
+    _requireText(
+      conversationId,
+      'Conversation ID',
+    );
 
-    if (cleanConversationId.isEmpty) {
-      return;
+    final Conversation? conversation =
+    findConversation(
+      cleanConversationId,
+    );
+
+    if (conversation == null) {
+      throw const ChatServiceException(
+        'Conversation not found.',
+      );
+    }
+
+    try {
+      await _repository.deleteConversation(
+        cleanConversationId,
+      );
+    } catch (_) {
+      throw const ChatServiceException(
+        'Conversation could not be deleted. Please try again.',
+      );
     }
 
     _conversations.removeWhere(
           (
-          Conversation conversation,
+          Conversation existingConversation,
           ) =>
-      conversation.id ==
+      existingConversation.id ==
           cleanConversationId,
-    );
-
-    unawaited(
-      _repository.deleteConversation(
-        cleanConversationId,
-      ),
     );
   }
 
