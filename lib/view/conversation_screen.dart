@@ -45,6 +45,8 @@ class _ConversationScreenState
   _currentUserService =
       CurrentUserService.instance;
 
+  bool _isSending = false;
+
   @override
   void initState() {
     super.initState();
@@ -103,8 +105,7 @@ class _ConversationScreenState
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
-                const EdgeInsets
-                    .fromLTRB(
+                const EdgeInsets.fromLTRB(
                   16,
                   16,
                   16,
@@ -120,9 +121,7 @@ class _ConversationScreenState
                     ) {
                   final message =
                   conversation
-                      .messages[
-                  index
-                  ];
+                      .messages[index];
 
                   final bool isMe =
                   message.isSentBy(
@@ -137,8 +136,7 @@ class _ConversationScreenState
                             conversation
                                 .messages[
                             index -
-                                1
-                            ]
+                                1]
                                 .sentAt,
                             message
                                 .sentAt,
@@ -167,14 +165,12 @@ class _ConversationScreenState
                             290,
                           ),
                           margin:
-                          const EdgeInsets
-                              .only(
+                          const EdgeInsets.only(
                             bottom:
                             11,
                           ),
                           padding:
-                          const EdgeInsets
-                              .fromLTRB(
+                          const EdgeInsets.fromLTRB(
                             14,
                             11,
                             14,
@@ -188,28 +184,23 @@ class _ConversationScreenState
                                 : Colors
                                 .white,
                             borderRadius:
-                            BorderRadius
-                                .only(
+                            BorderRadius.only(
                               topLeft:
-                              const Radius
-                                  .circular(
+                              const Radius.circular(
                                 16,
                               ),
                               topRight:
-                              const Radius
-                                  .circular(
+                              const Radius.circular(
                                 16,
                               ),
                               bottomLeft:
-                              Radius
-                                  .circular(
+                              Radius.circular(
                                 isMe
                                     ? 16
                                     : 4,
                               ),
                               bottomRight:
-                              Radius
-                                  .circular(
+                              Radius.circular(
                                 isMe
                                     ? 4
                                     : 16,
@@ -218,8 +209,7 @@ class _ConversationScreenState
                             border:
                             isMe
                                 ? null
-                                : Border
-                                .all(
+                                : Border.all(
                               color:
                               border,
                             ),
@@ -313,10 +303,6 @@ class _ConversationScreenState
       ),
     );
   }
-
-  // ============================================================
-  // TOP BAR
-  // ============================================================
 
   Widget _buildTopBar(
       String name,
@@ -457,10 +443,6 @@ class _ConversationScreenState
     );
   }
 
-  // ============================================================
-  // CONTEXT BAR
-  // ============================================================
-
   Widget _buildContextBar(
       String wanted,
       String offered,
@@ -551,10 +533,6 @@ class _ConversationScreenState
     );
   }
 
-  // ============================================================
-  // DATE SEPARATOR
-  // ============================================================
-
   Widget _buildDateSeparator(
       DateTime date,
       ) {
@@ -611,10 +589,6 @@ class _ConversationScreenState
       ),
     );
   }
-
-  // ============================================================
-  // EMPTY CHAT
-  // ============================================================
 
   Widget _buildNoMessages() {
     return Center(
@@ -683,10 +657,6 @@ class _ConversationScreenState
     );
   }
 
-  // ============================================================
-  // COMPOSER
-  // ============================================================
-
   Widget _buildComposer() {
     return Container(
       padding:
@@ -719,6 +689,8 @@ class _ConversationScreenState
             TextField(
               controller:
               _messageController,
+              enabled:
+              !_isSending,
               minLines:
               1,
               maxLines:
@@ -736,7 +708,9 @@ class _ConversationScreenState
               decoration:
               InputDecoration(
                 hintText:
-                'Type a message...',
+                _isSending
+                    ? 'Sending...'
+                    : 'Type a message...',
                 hintStyle:
                 const TextStyle(
                   fontSize:
@@ -749,8 +723,7 @@ class _ConversationScreenState
                 fillColor:
                 background,
                 contentPadding:
-                const EdgeInsets
-                    .symmetric(
+                const EdgeInsets.symmetric(
                   horizontal:
                   14,
                   vertical:
@@ -784,19 +757,41 @@ class _ConversationScreenState
             height:
             44,
             decoration:
-            const BoxDecoration(
+            BoxDecoration(
               color:
-              primary,
+              _isSending
+                  ? primary.withValues(
+                alpha:
+                0.55,
+              )
+                  : primary,
               shape:
               BoxShape.circle,
             ),
             child:
             IconButton(
               onPressed:
-              _sendMessage,
+              _isSending
+                  ? null
+                  : _sendMessage,
               icon:
-              const Icon(
-                Icons.send_rounded,
+              _isSending
+                  ? const SizedBox(
+                width:
+                17,
+                height:
+                17,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth:
+                  2,
+                  color:
+                  Colors.white,
+                ),
+              )
+                  : const Icon(
+                Icons
+                    .send_rounded,
                 color:
                 Colors.white,
                 size:
@@ -809,11 +804,11 @@ class _ConversationScreenState
     );
   }
 
-  // ============================================================
-  // SEND MESSAGE
-  // ============================================================
+  Future<void> _sendMessage() async {
+    if (_isSending) {
+      return;
+    }
 
-  void _sendMessage() {
     final String text =
     _messageController.text.trim();
 
@@ -821,37 +816,96 @@ class _ConversationScreenState
       return;
     }
 
-    ChatService.instance.sendMessage(
-      conversationId:
-      widget.conversationId,
-      text:
-      text,
-    );
-
-    _messageController.clear();
-
     setState(
-          () {},
-    );
-
-    Future.delayed(
-      const Duration(
-        milliseconds:
-        100,
-      ),
           () {
-        if (!mounted) {
-          return;
-        }
-
-        _scrollToBottom();
+        _isSending =
+        true;
       },
     );
-  }
 
-  // ============================================================
-  // SCROLL
-  // ============================================================
+    try {
+      await ChatService.instance.sendMessage(
+        conversationId:
+        widget.conversationId,
+        text:
+        text,
+      );
+
+      _messageController.clear();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+            () {},
+      );
+
+      await Future.delayed(
+        const Duration(
+          milliseconds:
+          100,
+        ),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _scrollToBottom();
+    } on ChatServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+            () {},
+      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            error.message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+            () {},
+      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content:
+          Text(
+            'Message could not be sent. Please try again.',
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(
+              () {
+            _isSending =
+            false;
+          },
+        );
+      }
+    }
+  }
 
   void _scrollToBottom() {
     if (!_scrollController.hasClients) {
@@ -871,10 +925,6 @@ class _ConversationScreenState
       Curves.easeOut,
     );
   }
-
-  // ============================================================
-  // TIME FORMAT
-  // ============================================================
 
   String _formatMessageTime(
       DateTime dateTime,
@@ -904,10 +954,6 @@ class _ConversationScreenState
 
     return '$hour:$formattedMinute $period';
   }
-
-  // ============================================================
-  // DATE FORMAT
-  // ============================================================
 
   String _formatDateSeparator(
       DateTime date,
@@ -966,10 +1012,6 @@ class _ConversationScreenState
 
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
-
-  // ============================================================
-  // SAME DAY
-  // ============================================================
 
   bool _isSameDay(
       DateTime first,

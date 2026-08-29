@@ -111,7 +111,8 @@ class ChatService {
           sentAt:
           now.subtract(
             const Duration(
-              minutes: 20,
+              minutes:
+              20,
             ),
           ),
         ),
@@ -125,7 +126,8 @@ class ChatService {
           sentAt:
           now.subtract(
             const Duration(
-              minutes: 17,
+              minutes:
+              17,
             ),
           ),
         ),
@@ -223,8 +225,7 @@ class ChatService {
       if (conversation.userName
           .trim()
           .toLowerCase() ==
-          cleanUserName
-              .toLowerCase()) {
+          cleanUserName.toLowerCase()) {
         return conversation;
       }
     }
@@ -275,12 +276,18 @@ class ChatService {
 
   // ============================================================
   // SEND MESSAGE
+  //
+  // Message is added optimistically so the UI feels immediate.
+  //
+  // Unlike the previous implementation, persistence is awaited.
+  // If saving fails, the optimistic message is rolled back so
+  // the UI never claims a message was saved when it was not.
   // ============================================================
 
-  void sendMessage({
+  Future<void> sendMessage({
     required String conversationId,
     required String text,
-  }) {
+  }) async {
     final String cleanConversationId =
     _requireText(
       conversationId,
@@ -324,14 +331,26 @@ class ChatService {
       message,
     );
 
-    unawaited(
-      _repository.saveMessage(
+    try {
+      await _repository.saveMessage(
         conversationId:
         cleanConversationId,
         message:
         message,
-      ),
-    );
+      );
+    } catch (_) {
+      conversation.messages.removeWhere(
+            (
+            Message existingMessage,
+            ) =>
+        existingMessage.id ==
+            message.id,
+      );
+
+      throw const ChatServiceException(
+        'Message could not be saved. Please try again.',
+      );
+    }
   }
 
   // ============================================================
@@ -462,7 +481,8 @@ class ChatService {
         return null;
       }
 
-      matchedUser = user;
+      matchedUser =
+          user;
     }
 
     return matchedUser?.id;
