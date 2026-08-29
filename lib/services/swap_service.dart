@@ -42,7 +42,9 @@ class SwapService {
 
     _requests
       ..clear()
-      ..addAll(savedRequests);
+      ..addAll(
+        savedRequests,
+      );
 
     _initialized = true;
   }
@@ -188,8 +190,7 @@ class SwapService {
 
     final SwapRequest request =
     SwapRequest(
-      id:
-      now.microsecondsSinceEpoch
+      id: now.microsecondsSinceEpoch
           .toString(),
 
       requesterUserId:
@@ -241,9 +242,15 @@ class SwapService {
       now,
     );
 
-    await _repository.saveSwapRequest(
-      request,
-    );
+    try {
+      await _repository.saveSwapRequest(
+        request,
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not save the swap request. Please try again.',
+      );
+    }
 
     _requests.insert(
       0,
@@ -370,18 +377,11 @@ class SwapService {
       actorUserId,
     );
 
-    if (!request.involvesUser(
+    if (!request.canSchedule(
       cleanActorUserId,
     )) {
       throw const SwapServiceException(
-        'You are not allowed to update this swap request.',
-      );
-    }
-
-    if (request.status !=
-        SwapRequestStatus.accepted) {
-      throw const SwapServiceException(
-        'Only an accepted request can be scheduled.',
+        'You are not allowed to schedule this swap request.',
       );
     }
 
@@ -410,18 +410,11 @@ class SwapService {
       actorUserId,
     );
 
-    if (!request.involvesUser(
+    if (!request.canComplete(
       cleanActorUserId,
     )) {
       throw const SwapServiceException(
-        'You are not allowed to update this swap request.',
-      );
-    }
-
-    if (request.status !=
-        SwapRequestStatus.scheduled) {
-      throw const SwapServiceException(
-        'Only a scheduled request can be completed.',
+        'You are not allowed to complete this swap request.',
       );
     }
 
@@ -458,11 +451,17 @@ class SwapService {
     final DateTime updatedAt =
     DateTime.now();
 
-    await _repository.updateStatus(
-      requestId: request.id,
-      status: nextStatus,
-      updatedAt: updatedAt,
-    );
+    try {
+      await _repository.updateStatus(
+        requestId: request.id,
+        status: nextStatus,
+        updatedAt: updatedAt,
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not update the swap request. Please try again.',
+      );
+    }
 
     request.status =
         nextStatus;
@@ -473,6 +472,9 @@ class SwapService {
 
   // ============================================================
   // DELETE REQUEST
+  //
+  // Internal/local cleanup only.
+  // Do not expose this as a normal participant action.
   // ============================================================
 
   Future<void> deleteRequest(
@@ -498,9 +500,15 @@ class SwapService {
       );
     }
 
-    await _repository.deleteSwapRequest(
-      cleanRequestId,
-    );
+    try {
+      await _repository.deleteSwapRequest(
+        cleanRequestId,
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not delete the swap request.',
+      );
+    }
 
     _requests.removeWhere(
           (item) =>

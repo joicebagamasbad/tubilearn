@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'model/skill.dart';
 import 'model/user.dart';
 
+import 'model/repositories/explore_repository.dart';
+
 import 'theme/app_theme.dart';
 
 import 'services/chat_service.dart';
@@ -20,6 +22,12 @@ import 'view/swap_requests_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ============================================================
+  // STARTUP INITIALIZATION
+  // ============================================================
+
+  await ExploreRepository.instance.initialize();
 
   await ChatService.instance.initialize();
 

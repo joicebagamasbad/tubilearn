@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../model/repositories/explore_repository.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
+
+import '../services/current_user_service.dart';
 import '../services/swap_service.dart';
+
 import '../theme/app_theme.dart';
 
 class CreateSwapRequestScreen extends StatefulWidget {
@@ -38,15 +41,8 @@ class _CreateSwapRequestScreenState
   static const Color border = AppTheme.border;
   static const Color background = AppTheme.background;
 
-  // ============================================================
-  // CURRENT LOCAL USER
-  //
-  // Temporary stable identity for the local/demo prototype.
-  // Later this must come from the authenticated signed-in user.
-  // ============================================================
-
-  static const String _currentRequesterUserId =
-      'user_joice_local';
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
 
   final ExploreRepository _repository =
   ExploreRepository();
@@ -68,11 +64,10 @@ class _CreateSwapRequestScreenState
   bool _isSending = false;
 
   // ============================================================
-  // TEMPORARY CURRENT-USER SKILLS
+  // CURRENT USER SKILLS
   //
-  // These use real Skill objects and stable IDs.
-  // Later they will come from the authenticated user's saved
-  // UserSkill records instead of this local list.
+  // Temporary list for the local prototype.
+  // Later this will come from persistent UserSkill records.
   // ============================================================
 
   List<Skill> get _mySkills {
@@ -104,8 +99,7 @@ class _CreateSwapRequestScreenState
       return supplied;
     }
 
-    for (final User user
-    in _repository.users) {
+    for (final User user in _repository.users) {
       if (user.name.trim().toLowerCase() ==
           widget.providerName
               .trim()
@@ -138,8 +132,7 @@ class _CreateSwapRequestScreenState
       }
     }
 
-    for (final Skill skill
-    in _repository.skills) {
+    for (final Skill skill in _repository.skills) {
       if (skill.title
           .trim()
           .toLowerCase() ==
@@ -155,8 +148,6 @@ class _CreateSwapRequestScreenState
 
   // ============================================================
   // OFFERABLE SKILLS
-  //
-  // Prevent offering the exact same skill being requested.
   // ============================================================
 
   List<Skill> get _availableSkillsToOffer {
@@ -1017,6 +1008,9 @@ class _CreateSwapRequestScreenState
       return;
     }
 
+    final String requesterUserId =
+        _currentUserService.userId;
+
     final String? providerUserId =
         _resolvedProviderUserId;
 
@@ -1026,9 +1020,24 @@ class _CreateSwapRequestScreenState
     final Skill? skillToOffer =
         _selectedSkillToOffer;
 
+    if (requesterUserId.trim().isEmpty) {
+      _showError(
+        'We could not identify the current user. Please sign in again.',
+      );
+      return;
+    }
+
     if (providerUserId == null) {
       _showError(
         'We could not identify this provider. Please go back and try again.',
+      );
+      return;
+    }
+
+    if (requesterUserId ==
+        providerUserId) {
+      _showError(
+        'You cannot send a swap request to yourself.',
       );
       return;
     }
@@ -1120,7 +1129,7 @@ class _CreateSwapRequestScreenState
       await SwapService.instance
           .createRequest(
         requesterUserId:
-        _currentRequesterUserId,
+        requesterUserId,
 
         providerUserId:
         providerUserId,
@@ -1183,7 +1192,7 @@ class _CreateSwapRequestScreenState
       _showError(
         error.message,
       );
-    } catch (error) {
+    } catch (_) {
       if (!mounted) {
         return;
       }

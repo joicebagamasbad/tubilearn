@@ -9,8 +9,6 @@ enum SwapRequestStatus {
 
 // ============================================================
 // REQUEST DIRECTION
-//
-// Direction is always relative to the currently signed-in user.
 // ============================================================
 
 enum SwapRequestDirection {
@@ -82,12 +80,9 @@ on SwapRequestStatus {
   bool get isTerminal => !isActive;
 
   bool get canBeCancelled {
-    return this ==
-        SwapRequestStatus.pending ||
-        this ==
-            SwapRequestStatus.accepted ||
-        this ==
-            SwapRequestStatus.scheduled;
+    return this == SwapRequestStatus.pending ||
+        this == SwapRequestStatus.accepted ||
+        this == SwapRequestStatus.scheduled;
   }
 
   bool canTransitionTo(
@@ -147,50 +142,24 @@ on SwapRequestStatus {
 class SwapRequest {
   final String id;
 
-  // ==========================================================
-  // STABLE IDENTITY
-  //
-  // These remain nullable because migrated legacy rows may not
-  // always have enough information to safely recover every ID.
-  //
-  // New requests are expected to contain all four IDs.
-  // ==========================================================
-
   final String? requesterUserId;
-
   final String? providerUserId;
 
   final String? skillToLearnId;
-
   final String? skillToOfferId;
 
-  // ==========================================================
-  // DISPLAY SNAPSHOTS
-  //
-  // These are readable historical snapshots.
-  // They are not used as authorization identity.
-  // ==========================================================
-
   final String providerName;
-
   final String providerInitials;
-
   final String providerCity;
 
   final String skillToLearn;
-
   final String skillToOffer;
-
-  // ==========================================================
-  // REQUEST DETAILS
-  // ==========================================================
 
   final DateTime proposedAt;
 
   final String mode;
 
   final String? meetingDetails;
-
   final String? note;
 
   SwapRequestStatus status;
@@ -219,13 +188,11 @@ class SwapRequest {
     required this.mode,
 
     this.meetingDetails,
-
     this.note,
 
     required this.status,
 
     required this.createdAt,
-
     required this.updatedAt,
   });
 
@@ -309,16 +276,7 @@ class SwapRequest {
   }
 
   // ==========================================================
-  // REQUEST DIRECTION
-  //
-  // Outgoing:
-  // current user created the request.
-  //
-  // Incoming:
-  // another user sent the request to current user.
-  //
-  // Unrelated:
-  // current user is neither side.
+  // DIRECTION
   // ==========================================================
 
   SwapRequestDirection directionFor(
@@ -351,22 +309,11 @@ class SwapRequest {
 
   // ==========================================================
   // PERMISSIONS
-  //
-  // IMPORTANT:
-  // These are domain-level permission helpers.
-  //
-  // UI should use these to decide which buttons are visible.
-  //
-  // SwapService will ALSO enforce these rules before changing
-  // persisted state. UI checks alone are never sufficient.
   // ==========================================================
 
   bool canCancel(
       String userId,
       ) {
-    // Only the requester can cancel their own
-    // active outgoing request.
-
     return isRequester(userId) &&
         status.canBeCancelled;
   }
@@ -374,9 +321,6 @@ class SwapRequest {
   bool canAccept(
       String userId,
       ) {
-    // Only the provider receiving a pending request
-    // may accept it.
-
     return isProvider(userId) &&
         status ==
             SwapRequestStatus.pending;
@@ -385,9 +329,6 @@ class SwapRequest {
   bool canDecline(
       String userId,
       ) {
-    // Only the provider receiving a pending request
-    // may decline it.
-
     return isProvider(userId) &&
         status ==
             SwapRequestStatus.pending;
@@ -400,8 +341,41 @@ class SwapRequest {
         canDecline(userId);
   }
 
+  // ----------------------------------------------------------
+  // Scheduling
+  //
+  // For the current local product rule, either participant may
+  // confirm an accepted swap as scheduled.
+  // ----------------------------------------------------------
+
+  bool canSchedule(
+      String userId,
+      ) {
+    return involvesUser(userId) &&
+        status ==
+            SwapRequestStatus.accepted;
+  }
+
+  // ----------------------------------------------------------
+  // Completion
+  //
+  // Either participant may mark a scheduled swap completed.
+  //
+  // This keeps the existing behavior but moves the permission
+  // rule into the domain model instead of duplicating it inside
+  // SwapService.
+  // ----------------------------------------------------------
+
+  bool canComplete(
+      String userId,
+      ) {
+    return involvesUser(userId) &&
+        status ==
+            SwapRequestStatus.scheduled;
+  }
+
   // ==========================================================
-  // SECURITY / ACCESS HELPERS
+  // SECURITY / ACCESS
   // ==========================================================
 
   bool canViewAsParticipant(
@@ -415,7 +389,9 @@ class SwapRequest {
       ) {
     return canCancel(userId) ||
         canAccept(userId) ||
-        canDecline(userId);
+        canDecline(userId) ||
+        canSchedule(userId) ||
+        canComplete(userId);
   }
 
   // ==========================================================

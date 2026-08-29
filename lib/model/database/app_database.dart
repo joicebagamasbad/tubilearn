@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'reference_seed_data.dart';
+
 class AppDatabase {
   AppDatabase._();
 
@@ -10,7 +12,7 @@ class AppDatabase {
   static const String _databaseName =
       'tubilearn.db';
 
-  static const int _databaseVersion = 4;
+  static const int _databaseVersion = 6;
 
   Database? _database;
 
@@ -51,11 +53,23 @@ class AppDatabase {
           db,
           version,
           ) async {
+        await _createReferenceTablesV5(
+          db,
+        );
+
+        await _seedReferenceDataV5(
+          db,
+        );
+
         await _createConversationTablesV3(
           db,
         );
 
         await _createSwapTablesV4(
+          db,
+        );
+
+        await _createSwapIndexesV6(
           db,
         );
       },
@@ -86,14 +100,351 @@ class AppDatabase {
             db,
           );
         }
+
+        if (oldVersion < 5) {
+          await _migrateToVersion5(
+            db,
+          );
+        }
+
+        if (oldVersion < 6) {
+          await _migrateToVersion6(
+            db,
+          );
+        }
       },
     );
   }
 
   // ============================================================
+  // VERSION 5 - REFERENCE / PROFILE TABLES
+  // ============================================================
+
+  Future<void> _createReferenceTablesV5(
+      Database db,
+      ) async {
+    // ----------------------------------------------------------
+    // USERS
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY
+          CHECK(length(trim(id)) > 0),
+
+        name TEXT NOT NULL
+          CHECK(length(trim(name)) > 0),
+
+        initials TEXT NOT NULL
+          CHECK(length(trim(initials)) > 0),
+
+        city TEXT NOT NULL
+          CHECK(length(trim(city)) > 0),
+
+        bio TEXT NOT NULL,
+
+        rating REAL NOT NULL DEFAULT 0
+          CHECK(rating >= 0 AND rating <= 5),
+
+        review_count INTEGER NOT NULL DEFAULT 0
+          CHECK(review_count >= 0),
+
+        completed_swaps INTEGER NOT NULL DEFAULT 0
+          CHECK(completed_swaps >= 0),
+
+        response_rate INTEGER NOT NULL DEFAULT 0
+          CHECK(
+            response_rate >= 0
+            AND response_rate <= 100
+          ),
+
+        member_since TEXT NOT NULL
+          CHECK(length(trim(member_since)) > 0),
+
+        availability TEXT NOT NULL
+          CHECK(length(trim(availability)) > 0),
+
+        language TEXT NOT NULL
+          CHECK(length(trim(language)) > 0),
+
+        preferred_mode TEXT NOT NULL
+          CHECK(length(trim(preferred_mode)) > 0),
+
+        teaching_style TEXT NOT NULL
+          CHECK(length(trim(teaching_style)) > 0),
+
+        email_verified INTEGER NOT NULL DEFAULT 0
+          CHECK(email_verified IN (0, 1)),
+
+        profile_completed INTEGER NOT NULL DEFAULT 0
+          CHECK(profile_completed IN (0, 1))
+      )
+      ''',
+    );
+
+    // ----------------------------------------------------------
+    // SKILLS
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE skills (
+        id TEXT PRIMARY KEY
+          CHECK(length(trim(id)) > 0),
+
+        title TEXT NOT NULL
+          CHECK(length(trim(title)) > 0),
+
+        category TEXT NOT NULL
+          CHECK(length(trim(category)) > 0),
+
+        level TEXT NOT NULL
+          CHECK(length(trim(level)) > 0),
+
+        icon_code_point INTEGER NOT NULL
+          CHECK(icon_code_point > 0),
+
+        session_length TEXT NOT NULL
+          CHECK(length(trim(session_length)) > 0),
+
+        mode TEXT NOT NULL
+          CHECK(length(trim(mode)) > 0),
+
+        language TEXT NOT NULL
+          CHECK(length(trim(language)) > 0),
+
+        prerequisite TEXT NOT NULL,
+
+        description TEXT NOT NULL
+          CHECK(length(trim(description)) > 0),
+
+        UNIQUE(title)
+      )
+      ''',
+    );
+
+    // ----------------------------------------------------------
+    // SKILL LEARNINGS
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE skill_learnings (
+        skill_id TEXT NOT NULL
+          CHECK(length(trim(skill_id)) > 0),
+
+        position INTEGER NOT NULL
+          CHECK(position >= 0),
+
+        text TEXT NOT NULL
+          CHECK(length(trim(text)) > 0),
+
+        PRIMARY KEY (
+          skill_id,
+          position
+        ),
+
+        FOREIGN KEY (skill_id)
+        REFERENCES skills(id)
+        ON DELETE CASCADE
+      )
+      ''',
+    );
+
+    // ----------------------------------------------------------
+    // USER SKILLS
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE user_skills (
+        id TEXT PRIMARY KEY
+          CHECK(length(trim(id)) > 0),
+
+        user_id TEXT NOT NULL
+          CHECK(length(trim(user_id)) > 0),
+
+        skill_id TEXT NOT NULL
+          CHECK(length(trim(skill_id)) > 0),
+
+        type TEXT NOT NULL
+          CHECK(
+            type IN (
+              'offered',
+              'wanted'
+            )
+          ),
+
+        level TEXT NOT NULL
+          CHECK(length(trim(level)) > 0),
+
+        availability TEXT NOT NULL
+          CHECK(length(trim(availability)) > 0),
+
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY (skill_id)
+        REFERENCES skills(id)
+        ON DELETE CASCADE,
+
+        UNIQUE(
+          user_id,
+          skill_id,
+          type
+        )
+      )
+      ''',
+    );
+
+    await _createReferenceIndexesV5(
+      db,
+    );
+  }
+
+  // ============================================================
+  // VERSION 5 - INITIAL REFERENCE DATA
+  // ============================================================
+
+  Future<void> _seedReferenceDataV5(
+      Database db,
+      ) async {
+    for (final Map<String, Object?> user
+    in ReferenceSeedData.users) {
+      await db.insert(
+        'users',
+        user,
+        conflictAlgorithm:
+        ConflictAlgorithm.ignore,
+      );
+    }
+
+    for (final Map<String, Object?> skill
+    in ReferenceSeedData.skills) {
+      await db.insert(
+        'skills',
+        skill,
+        conflictAlgorithm:
+        ConflictAlgorithm.ignore,
+      );
+    }
+
+    for (final Map<String, Object?> learning
+    in ReferenceSeedData.skillLearnings) {
+      await db.insert(
+        'skill_learnings',
+        learning,
+        conflictAlgorithm:
+        ConflictAlgorithm.ignore,
+      );
+    }
+
+    for (final Map<String, Object?> userSkill
+    in ReferenceSeedData.userSkills) {
+      await db.insert(
+        'user_skills',
+        userSkill,
+        conflictAlgorithm:
+        ConflictAlgorithm.ignore,
+      );
+    }
+  }
+
+  // ============================================================
+  // MIGRATION TO VERSION 5
+  // ============================================================
+
+  Future<void> _migrateToVersion5(
+      Database db,
+      ) async {
+    await _createReferenceTablesV5(
+      db,
+    );
+
+    await _seedReferenceDataV5(
+      db,
+    );
+  }
+
+  // ============================================================
+  // VERSION 5 INDEXES
+  // ============================================================
+
+  Future<void> _createReferenceIndexesV5(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_users_name
+      ON users(name)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_users_city
+      ON users(city)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_skills_category
+      ON skills(category)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_skill_learnings_skill
+      ON skill_learnings(skill_id)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_user_skills_user
+      ON user_skills(user_id)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_user_skills_skill
+      ON user_skills(skill_id)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_user_skills_type
+      ON user_skills(type)
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_user_skills_skill_type
+      ON user_skills(
+        skill_id,
+        type
+      )
+      ''',
+    );
+  }
+
+  // ============================================================
   // VERSION 3 - CONVERSATION TABLES
-  //
-  // No conversation schema change is required in v4.
   // ============================================================
 
   Future<void> _createConversationTablesV3(
@@ -158,8 +509,6 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 2 - LEGACY SWAP TABLE
-  //
-  // Used only when upgrading directly from v1.
   // ============================================================
 
   Future<void> _createSwapTablesV2(
@@ -280,16 +629,6 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 4 - ID-BASED SWAP TABLE
-  //
-  // Stable IDs become the relationship identity.
-  //
-  // Display names/titles remain stored as snapshots so historical
-  // requests remain readable even if profiles or skill names
-  // change later.
-  //
-  // Identity columns remain nullable specifically for legacy rows
-  // that cannot be safely mapped during migration.
-  // New requests are required by SwapService to provide all IDs.
   // ============================================================
 
   Future<void> _createSwapTablesV4(
@@ -639,28 +978,9 @@ class AppDatabase {
       ''',
     );
 
-    // ----------------------------------------------------------
-    // Create v4 without indexes first.
-    //
-    // The old indexes are still attached to the renamed backup
-    // table until that table is dropped.
-    // ----------------------------------------------------------
-
     await _createSwapTablesV4WithoutIndexes(
       db,
     );
-
-    // ----------------------------------------------------------
-    // Backfill legacy identity.
-    //
-    // All swap requests created before v4 came from the current
-    // local TubiLearn prototype user, so requester identity is
-    // safely backfilled to user_joice_local.
-    //
-    // Provider and skill IDs are mapped only when the existing
-    // display value matches one of our known normalized records.
-    // Unknown legacy values remain NULL rather than losing data.
-    // ----------------------------------------------------------
 
     await db.execute(
       '''
@@ -832,9 +1152,6 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 4 TABLE WITHOUT INDEXES
-  //
-  // Used during migration while legacy indexes still belong to
-  // the backup table.
   // ============================================================
 
   Future<void> _createSwapTablesV4WithoutIndexes(
@@ -946,6 +1263,73 @@ class AppDatabase {
   }
 
   // ============================================================
+  // MIGRATION TO VERSION 6
+  //
+  // Adds DB-level duplicate protection for ACTIVE stable-ID swap
+  // requests.
+  //
+  // We do NOT silently delete or rewrite existing requests.
+  // ============================================================
+
+  Future<void> _migrateToVersion6(
+      Database db,
+      ) async {
+    await _assertNoDuplicateActiveSwaps(
+      db,
+    );
+
+    await _createSwapIndexesV6(
+      db,
+    );
+  }
+
+  // ============================================================
+  // VERSION 6 DUPLICATE PREFLIGHT
+  // ============================================================
+
+  Future<void> _assertNoDuplicateActiveSwaps(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> duplicates =
+    await db.rawQuery(
+      '''
+      SELECT
+        requester_user_id,
+        provider_user_id,
+        skill_to_learn_id,
+        skill_to_offer_id,
+        COUNT(*) AS duplicate_count
+      FROM swap_requests
+      WHERE
+        requester_user_id IS NOT NULL
+        AND provider_user_id IS NOT NULL
+        AND skill_to_learn_id IS NOT NULL
+        AND skill_to_offer_id IS NOT NULL
+        AND status IN (
+          'pending',
+          'accepted',
+          'scheduled'
+        )
+      GROUP BY
+        requester_user_id,
+        provider_user_id,
+        skill_to_learn_id,
+        skill_to_offer_id
+      HAVING COUNT(*) > 1
+      ''',
+    );
+
+    if (duplicates.isNotEmpty) {
+      throw StateError(
+        'Cannot migrate database to version 6 because '
+            'duplicate active swap requests already exist. '
+            'No records were deleted. Resolve the duplicates '
+            'before retrying the migration.',
+      );
+    }
+  }
+
+  // ============================================================
   // MESSAGE INDEXES
   // ============================================================
 
@@ -1045,6 +1429,43 @@ class AppDatabase {
       CREATE INDEX IF NOT EXISTS
       idx_swap_requests_offer_skill
       ON swap_requests(skill_to_offer_id)
+      ''',
+    );
+  }
+
+  // ============================================================
+  // VERSION 6 SWAP INDEXES
+  //
+  // Blocks duplicate ACTIVE requests with the same:
+  //
+  // requester + provider + learn skill + offer skill
+  //
+  // Terminal historical requests remain allowed.
+  // ============================================================
+
+  Future<void> _createSwapIndexesV6(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE UNIQUE INDEX IF NOT EXISTS
+      idx_swap_requests_unique_active_exchange
+      ON swap_requests (
+        requester_user_id,
+        provider_user_id,
+        skill_to_learn_id,
+        skill_to_offer_id
+      )
+      WHERE
+        requester_user_id IS NOT NULL
+        AND provider_user_id IS NOT NULL
+        AND skill_to_learn_id IS NOT NULL
+        AND skill_to_offer_id IS NOT NULL
+        AND status IN (
+          'pending',
+          'accepted',
+          'scheduled'
+        )
       ''',
     );
   }

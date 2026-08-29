@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../model/repositories/explore_repository.dart';
 import '../model/swap_request.dart';
+import '../model/user.dart';
+
+import '../services/current_user_service.dart';
 import '../services/swap_service.dart';
+
 import '../theme/app_theme.dart';
 
 class SwapRequestsScreen extends StatefulWidget {
@@ -16,8 +21,11 @@ class SwapRequestsScreen extends StatefulWidget {
 
 class _SwapRequestsScreenState
     extends State<SwapRequestsScreen> {
-  static const String _currentUserId =
-      'user_joice_local';
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
+  final ExploreRepository _exploreRepository =
+      ExploreRepository.instance;
 
   String _selectedFilter = 'All';
   bool _isProcessing = false;
@@ -29,6 +37,9 @@ class _SwapRequestsScreenState
     'Scheduled',
     'Completed',
   ];
+
+  String get _currentUserId =>
+      _currentUserService.userId;
 
   // ============================================================
   // FILTERED REQUESTS
@@ -116,10 +127,6 @@ class _SwapRequestsScreenState
       body: SafeArea(
         child: Column(
           children: [
-            // ==================================================
-            // HEADER
-            // ==================================================
-
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 20,
@@ -132,9 +139,8 @@ class _SwapRequestsScreenState
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(
-                    20,
-                  ),
+                  borderRadius:
+                  BorderRadius.circular(20),
                   border: Border.all(
                     color: AppTheme.border,
                   ),
@@ -186,10 +192,6 @@ class _SwapRequestsScreenState
                 ),
               ),
             ),
-
-            // ==================================================
-            // FILTERS
-            // ==================================================
 
             SizedBox(
               height: 42,
@@ -256,10 +258,6 @@ class _SwapRequestsScreenState
               height: 12,
             ),
 
-            // ==================================================
-            // REQUEST LIST
-            // ==================================================
-
             Expanded(
               child: requests.isEmpty
                   ? _buildEmptyState()
@@ -315,13 +313,43 @@ class _SwapRequestsScreenState
         direction ==
             SwapRequestDirection.outgoing;
 
+    User? requesterUser;
+
+    final String? requesterUserId =
+        request.requesterUserId;
+
+    if (isIncoming &&
+        requesterUserId != null &&
+        requesterUserId.trim().isNotEmpty) {
+      requesterUser =
+          _exploreRepository.findUserById(
+            requesterUserId,
+          );
+    }
+
+    final String displayInitials =
+    isIncoming
+        ? requesterUser?.initials ?? '?'
+        : request.providerInitials;
+
+    final String displayName =
+    isIncoming
+        ? requesterUser?.name ??
+        'Incoming skill request'
+        : request.providerName;
+
+    final String displayCity =
+    isIncoming
+        ? requesterUser?.city ??
+        'Sender profile unavailable'
+        : request.providerCity;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius:
+        BorderRadius.circular(20),
         border: Border.all(
           color: AppTheme.border,
         ),
@@ -363,13 +391,12 @@ class _SwapRequestsScreenState
               CircleAvatar(
                 radius: 23,
                 backgroundColor:
-                AppTheme.primary.withValues(
+                AppTheme.primary
+                    .withValues(
                   alpha: 0.10,
                 ),
                 child: Text(
-                  isIncoming
-                      ? '?'
-                      : request.providerInitials,
+                  displayInitials,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight:
@@ -390,9 +417,7 @@ class _SwapRequestsScreenState
                   CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isIncoming
-                          ? 'Incoming skill request'
-                          : request.providerName,
+                      displayName,
                       style:
                       const TextStyle(
                         fontSize: 15,
@@ -408,9 +433,7 @@ class _SwapRequestsScreenState
                     ),
 
                     Text(
-                      isIncoming
-                          ? 'Sent to you'
-                          : request.providerCity,
+                      displayCity,
                       style:
                       const TextStyle(
                         fontSize: 12,
@@ -430,9 +453,8 @@ class _SwapRequestsScreenState
 
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(
-              13,
-            ),
+            padding:
+            const EdgeInsets.all(13),
             decoration: BoxDecoration(
               color: AppTheme.background,
               borderRadius:
@@ -449,11 +471,9 @@ class _SwapRequestsScreenState
                   value:
                   request.skillToLearn,
                 ),
-
                 const SizedBox(
                   height: 9,
                 ),
-
                 _buildSkillRow(
                   icon:
                   Icons.handshake_outlined,
@@ -508,14 +528,14 @@ class _SwapRequestsScreenState
             const SizedBox(
               height: 12,
             ),
-
             Container(
               width: double.infinity,
               padding:
               const EdgeInsets.all(
                 12,
               ),
-              decoration: BoxDecoration(
+              decoration:
+              BoxDecoration(
                 color:
                 AppTheme.primary
                     .withValues(
@@ -539,12 +559,13 @@ class _SwapRequestsScreenState
             ),
           ],
 
-          if (isIncoming) ...[
+          if (isIncoming &&
+              requesterUser == null) ...[
             const SizedBox(
               height: 10,
             ),
             const Text(
-              'Sender profile details are not stored in the current local request schema yet.',
+              'Sender profile could not be resolved from the local user database.',
               style: TextStyle(
                 fontSize: 10.5,
                 height: 1.4,
@@ -752,9 +773,11 @@ class _SwapRequestsScreenState
         horizontal: 10,
         vertical: 6,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        AppTheme.primary.withValues(
+        AppTheme.primary
+            .withValues(
           alpha: 0.08,
         ),
         borderRadius:
@@ -832,8 +855,10 @@ class _SwapRequestsScreenState
         horizontal: 10,
         vertical: 6,
       ),
-      decoration: BoxDecoration(
-        color: color.withValues(
+      decoration:
+      BoxDecoration(
+        color:
+        color.withValues(
           alpha: 0.10,
         ),
         borderRadius:
@@ -867,7 +892,8 @@ class _SwapRequestsScreenState
         Icon(
           icon,
           size: 17,
-          color: AppTheme.primary,
+          color:
+          AppTheme.primary,
         ),
 
         const SizedBox(
@@ -1013,10 +1039,12 @@ class _SwapRequestsScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
+          title:
+          const Text(
             'Accept request?',
           ),
-          content: const Text(
+          content:
+          const Text(
             'You are agreeing to continue with this skill swap request.',
           ),
           actions: [
@@ -1027,7 +1055,8 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Cancel',
               ),
             ),
@@ -1038,7 +1067,8 @@ class _SwapRequestsScreenState
                   true,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Accept',
               ),
             ),
@@ -1055,7 +1085,8 @@ class _SwapRequestsScreenState
       action: () =>
           SwapService.instance
               .acceptRequest(
-            requestId: request.id,
+            requestId:
+            request.id,
             actorUserId:
             _currentUserId,
           ),
@@ -1076,10 +1107,12 @@ class _SwapRequestsScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
+          title:
+          const Text(
             'Decline request?',
           ),
-          content: const Text(
+          content:
+          const Text(
             'This request will be marked as declined.',
           ),
           actions: [
@@ -1090,7 +1123,8 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Back',
               ),
             ),
@@ -1101,7 +1135,8 @@ class _SwapRequestsScreenState
                   true,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Decline',
                 style: TextStyle(
                   color:
@@ -1122,7 +1157,8 @@ class _SwapRequestsScreenState
       action: () =>
           SwapService.instance
               .declineRequest(
-            requestId: request.id,
+            requestId:
+            request.id,
             actorUserId:
             _currentUserId,
           ),
@@ -1143,10 +1179,12 @@ class _SwapRequestsScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
+          title:
+          const Text(
             'Cancel request?',
           ),
-          content: const Text(
+          content:
+          const Text(
             'This outgoing request will be cancelled.',
           ),
           actions: [
@@ -1157,7 +1195,8 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Back',
               ),
             ),
@@ -1168,7 +1207,8 @@ class _SwapRequestsScreenState
                   true,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'Cancel request',
                 style: TextStyle(
                   color:
@@ -1189,7 +1229,8 @@ class _SwapRequestsScreenState
       action: () =>
           SwapService.instance
               .cancelRequest(
-            requestId: request.id,
+            requestId:
+            request.id,
             actorUserId:
             _currentUserId,
           ),
@@ -1292,7 +1333,8 @@ class _SwapRequestsScreenState
       'Dec',
     ];
 
-    final int hour = value.hour;
+    final int hour =
+        value.hour;
 
     final int displayHour =
     hour == 0
