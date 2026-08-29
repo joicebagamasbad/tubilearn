@@ -27,16 +27,13 @@ class ChatService {
   final ChatRepository _repository =
   ChatRepository();
 
-  final ExploreRepository
-  _exploreRepository =
+  final ExploreRepository _exploreRepository =
       ExploreRepository.instance;
 
-  final CurrentUserService
-  _currentUserService =
+  final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
-  final List<Conversation>
-  _conversations = [];
+  final List<Conversation> _conversations = [];
 
   bool _initialized = false;
 
@@ -54,10 +51,8 @@ class ChatService {
       return;
     }
 
-    final List<Conversation>
-    savedConversations =
-    await _repository
-        .getAllConversations();
+    final List<Conversation> savedConversations =
+    await _repository.getAllConversations();
 
     if (savedConversations.isEmpty) {
       await _createInitialData();
@@ -134,10 +129,6 @@ class ChatService {
       ],
     );
 
-    _conversations.add(
-      alexConversation,
-    );
-
     await _repository.saveConversation(
       alexConversation,
     );
@@ -151,20 +142,30 @@ class ChatService {
         message,
       );
     }
+
+    _conversations.add(
+      alexConversation,
+    );
   }
 
   // ============================================================
   // GET OR CREATE CONVERSATION
+  //
+  // Existing conversations return immediately.
+  //
+  // New conversations are persisted BEFORE being added to the
+  // in-memory list. This prevents ghost conversations when the
+  // database write fails.
   // ============================================================
 
-  Conversation getOrCreateConversation({
+  Future<Conversation> getOrCreateConversation({
     String? userId,
     required String userName,
     required String initials,
     required String city,
     required String skillWanted,
     required String skillOffered,
-  }) {
+  }) async {
     final String cleanUserName =
     _requireText(
       userName,
@@ -261,14 +262,18 @@ class ChatService {
       [],
     );
 
+    try {
+      await _repository.saveConversation(
+        newConversation,
+      );
+    } catch (_) {
+      throw const ChatServiceException(
+        'Conversation could not be created. Please try again.',
+      );
+    }
+
     _conversations.add(
       newConversation,
-    );
-
-    unawaited(
-      _repository.saveConversation(
-        newConversation,
-      ),
     );
 
     return newConversation;
@@ -276,12 +281,6 @@ class ChatService {
 
   // ============================================================
   // SEND MESSAGE
-  //
-  // Message is added optimistically so the UI feels immediate.
-  //
-  // Unlike the previous implementation, persistence is awaited.
-  // If saving fails, the optimistic message is rolled back so
-  // the UI never claims a message was saved when it was not.
   // ============================================================
 
   Future<void> sendMessage({
@@ -405,6 +404,8 @@ class ChatService {
 
   // ============================================================
   // DELETE CONVERSATION
+  //
+  // Delete hardening is our NEXT small step.
   // ============================================================
 
   void deleteConversation(
@@ -477,7 +478,6 @@ class ChatService {
       }
 
       if (matchedUser != null) {
-        // Never guess between duplicate display names.
         return null;
       }
 

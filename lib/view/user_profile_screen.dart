@@ -851,38 +851,61 @@ class UserProfileScreen extends StatelessWidget {
   // MESSAGE
   // ============================================================
 
-  void _openConversation(
+  Future<void> _openConversation(
       BuildContext context,
       List<Skill> offeredSkills,
       List<Skill> wantedSkills,
-      ) {
-    final conversation =
-    ChatService.instance
-        .getOrCreateConversation(
-      userId:
-      user.id,
-      userName:
-      user.name,
-      initials:
-      user.initials,
-      city:
-      user.city,
-      skillWanted:
-      offeredSkills.isEmpty
-          ? 'Skill'
-          : offeredSkills.first.title,
-      skillOffered:
-      wantedSkills.isEmpty
-          ? 'Skill'
-          : wantedSkills.first.title,
-    );
+      ) async {
+    try {
+      final conversation =
+      await ChatService.instance
+          .getOrCreateConversation(
+        userId:
+        user.id,
+        userName:
+        user.name,
+        initials:
+        user.initials,
+        city:
+        user.city,
+        skillWanted:
+        offeredSkills.isEmpty
+            ? 'Skill'
+            : offeredSkills.first.title,
+        skillOffered:
+        wantedSkills.isEmpty
+            ? 'Skill'
+            : wantedSkills.first.title,
+      );
 
-    Navigator.pushNamed(
-      context,
-      '/conversation',
-      arguments:
-      conversation.id,
-    );
+      if (!context.mounted) {
+        return;
+      }
+
+      Navigator.pushNamed(
+        context,
+        '/conversation',
+        arguments:
+        conversation.id,
+      );
+    } on ChatServiceException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            error.message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   // ============================================================
