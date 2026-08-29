@@ -104,47 +104,112 @@ class ChatRepository {
 
   // ============================================================
   // SAVE CONVERSATION
+  //
+  // IMPORTANT:
+  // Never use ConflictAlgorithm.replace here.
+  //
+  // SQLite REPLACE can behave like DELETE + INSERT.
+  // Since messages reference conversations with ON DELETE CASCADE,
+  // replacing a conversation could unintentionally remove messages.
+  //
+  // Instead:
+  // 1. Try UPDATE using the stable conversation ID.
+  // 2. If no row exists, INSERT a new one.
   // ============================================================
 
   Future<void> saveConversation(
       Conversation conversation,
       ) async {
+    final String conversationId =
+    conversation.id.trim();
+
+    if (conversationId.isEmpty) {
+      throw ArgumentError(
+        'Conversation ID cannot be empty.',
+      );
+    }
+
     final Database db =
     await _appDatabase.database;
 
-    await db.insert(
-      'conversations',
-      {
-        'id':
-        conversation.id,
-        'participant_user_id':
-        conversation.participantUserId,
-        'user_name':
-        conversation.userName,
-        'initials':
-        conversation.initials,
-        'city':
-        conversation.city,
-        'skill_wanted':
-        conversation.skillWanted,
-        'skill_offered':
-        conversation.skillOffered,
-        'status':
-        conversation.status,
+    final Map<String, Object?> values = {
+      'participant_user_id':
+      conversation.participantUserId,
+      'user_name':
+      conversation.userName,
+      'initials':
+      conversation.initials,
+      'city':
+      conversation.city,
+      'skill_wanted':
+      conversation.skillWanted,
+      'skill_offered':
+      conversation.skillOffered,
+      'status':
+      conversation.status,
+    };
+
+    await db.transaction(
+          (txn) async {
+        final int updatedRows =
+        await txn.update(
+          'conversations',
+          values,
+          where: 'id = ?',
+          whereArgs: [
+            conversationId,
+          ],
+        );
+
+        if (updatedRows > 0) {
+          return;
+        }
+
+        await txn.insert(
+          'conversations',
+          {
+            'id':
+            conversationId,
+            ...values,
+          },
+          conflictAlgorithm:
+          ConflictAlgorithm.abort,
+        );
       },
-      conflictAlgorithm:
-      ConflictAlgorithm.replace,
     );
   }
 
   // ============================================================
   // SAVE MESSAGE
+  //
+  // Message IDs are treated as stable/immutable identifiers.
+  //
+  // A duplicate ID should fail instead of replacing an existing
+  // message silently.
   // ============================================================
 
   Future<void> saveMessage({
     required String conversationId,
     required Message message,
   }) async {
+    final String cleanConversationId =
+    conversationId.trim();
+
+    final String cleanMessageId =
+    message.id.trim();
+
+    if (cleanConversationId.isEmpty) {
+      throw ArgumentError(
+        'Conversation ID cannot be empty.',
+      );
+    }
+
+    if (cleanMessageId.isEmpty) {
+      throw ArgumentError(
+        'Message ID cannot be empty.',
+      );
+    }
+
     final Database db =
     await _appDatabase.database;
 
@@ -152,9 +217,9 @@ class ChatRepository {
       'messages',
       {
         'id':
-        message.id,
+        cleanMessageId,
         'conversation_id':
-        conversationId,
+        cleanConversationId,
         'text':
         message.text,
         'sender_user_id':
@@ -164,7 +229,7 @@ class ChatRepository {
             .millisecondsSinceEpoch,
       },
       conflictAlgorithm:
-      ConflictAlgorithm.replace,
+      ConflictAlgorithm.abort,
     );
   }
 
