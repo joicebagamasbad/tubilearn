@@ -2,7 +2,6 @@ import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
 import '../model/repositories/explore_repository.dart';
-import '../model/user.dart';
 import 'current_user_service.dart';
 
 class ChatServiceException implements Exception {
@@ -148,16 +147,25 @@ class ChatService {
 
   // ============================================================
   // GET OR CREATE CONVERSATION
+  //
+  // Stable user identity is required.
+  // Display names are never used to identify a new participant.
   // ============================================================
 
   Future<Conversation> getOrCreateConversation({
-    String? userId,
+    required String userId,
     required String userName,
     required String initials,
     required String city,
     required String skillWanted,
     required String skillOffered,
   }) async {
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
     final String cleanUserName =
     _requireText(
       userName,
@@ -188,24 +196,31 @@ class ChatService {
       'Offered skill',
     );
 
-    final String? stableUserId =
-    _resolveStableUserId(
-      userId:
-      userId,
-      userName:
-      cleanUserName,
+    final participant =
+    _exploreRepository.findUserById(
+      cleanUserId,
     );
 
-    if (stableUserId != null) {
-      for (final Conversation conversation
-      in _conversations) {
-        if (conversation.participantUserId ==
-            stableUserId) {
-          return conversation;
-        }
+    if (participant == null) {
+      throw const ChatServiceException(
+        'Chat participant could not be found.',
+      );
+    }
+
+    // Stable ID lookup is always the primary lookup.
+    for (final Conversation conversation
+    in _conversations) {
+      if (conversation.participantUserId ==
+          cleanUserId) {
+        return conversation;
       }
     }
 
+    // Legacy compatibility only:
+    // Old conversations may not have participant_user_id.
+    //
+    // We may reuse one if its stored display name matches the
+    // verified user. We do NOT create new name-based identities.
     for (final Conversation conversation
     in _conversations) {
       if (conversation.participantUserId !=
@@ -222,12 +237,8 @@ class ChatService {
     }
 
     final String conversationId =
-    stableUserId != null
-        ? _createConversationIdForUser(
-      stableUserId,
-    )
-        : _createLegacyConversationId(
-      cleanUserName,
+    _createConversationIdForUser(
+      cleanUserId,
     );
 
     final Conversation newConversation =
@@ -235,7 +246,7 @@ class ChatService {
       id:
       conversationId,
       participantUserId:
-      stableUserId,
+      cleanUserId,
       userName:
       cleanUserName,
       initials:
@@ -394,12 +405,6 @@ class ChatService {
 
   // ============================================================
   // DELETE CONVERSATION
-  //
-  // Database deletion is awaited BEFORE removing the conversation
-  // from memory.
-  //
-  // If persistence fails, the conversation remains visible and
-  // the caller receives an error instead of silently losing sync.
   // ============================================================
 
   Future<void> deleteConversation(
@@ -442,61 +447,6 @@ class ChatService {
   }
 
   // ============================================================
-  // RESOLVE STABLE USER ID
-  // ============================================================
-
-  String? _resolveStableUserId({
-    required String? userId,
-    required String userName,
-  }) {
-    final String? cleanUserId =
-    _cleanNullableText(
-      userId,
-    );
-
-    if (cleanUserId != null) {
-      final User? user =
-      _exploreRepository.findUserById(
-        cleanUserId,
-      );
-
-      if (user == null) {
-        throw const ChatServiceException(
-          'Chat participant could not be found.',
-        );
-      }
-
-      return user.id;
-    }
-
-    final String normalizedName =
-    userName
-        .trim()
-        .toLowerCase();
-
-    User? matchedUser;
-
-    for (final User user
-    in _exploreRepository.users) {
-      if (user.name
-          .trim()
-          .toLowerCase() !=
-          normalizedName) {
-        continue;
-      }
-
-      if (matchedUser != null) {
-        return null;
-      }
-
-      matchedUser =
-          user;
-    }
-
-    return matchedUser?.id;
-  }
-
-  // ============================================================
   // CONVERSATION IDS
   // ============================================================
 
@@ -504,15 +454,6 @@ class ChatService {
       String userId,
       ) {
     return 'conversation_$userId';
-  }
-
-  String _createLegacyConversationId(
-      String name,
-      ) {
-    return 'legacy_${name.toLowerCase().trim().replaceAll(
-      RegExp(r'\s+'),
-      '-',
-    )}';
   }
 
   // ============================================================
@@ -530,23 +471,6 @@ class ChatService {
       throw ChatServiceException(
         '$fieldName is required.',
       );
-    }
-
-    return cleaned;
-  }
-
-  String? _cleanNullableText(
-      String? value,
-      ) {
-    if (value == null) {
-      return null;
-    }
-
-    final String cleaned =
-    value.trim();
-
-    if (cleaned.isEmpty) {
-      return null;
     }
 
     return cleaned;

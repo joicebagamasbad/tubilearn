@@ -10,6 +10,12 @@ class ChatRepository {
 
   // ============================================================
   // GET ALL CONVERSATIONS
+  //
+  // Two bulk queries only:
+  // 1. conversations
+  // 2. messages
+  //
+  // Messages are grouped in memory by conversation_id.
   // ============================================================
 
   Future<List<Conversation>>
@@ -23,55 +29,65 @@ class ChatRepository {
       'conversations',
     );
 
+    final List<Map<String, Object?>>
+    messageRows =
+    await db.query(
+      'messages',
+      orderBy:
+      'conversation_id ASC, sent_at ASC',
+    );
+
+    final Map<String, List<Message>>
+    messagesByConversation = {};
+
+    for (final Map<String, Object?> messageRow
+    in messageRows) {
+      final String conversationId =
+      messageRow['conversation_id']
+      as String;
+
+      final Message message =
+      Message(
+        id:
+        messageRow['id']
+        as String,
+        text:
+        messageRow['text']
+        as String,
+        senderUserId:
+        messageRow['sender_user_id']
+        as String?,
+        sentAt:
+        DateTime
+            .fromMillisecondsSinceEpoch(
+          messageRow['sent_at']
+          as int,
+        ),
+      );
+
+      messagesByConversation
+          .putIfAbsent(
+        conversationId,
+            () => <Message>[],
+      )
+          .add(
+        message,
+      );
+    }
+
     final List<Conversation>
     conversations = [];
 
     for (final Map<String, Object?> row
     in conversationRows) {
       final String conversationId =
-      row['id'] as String;
-
-      final List<Map<String, Object?>>
-      messageRows =
-      await db.query(
-        'messages',
-        where: 'conversation_id = ?',
-        whereArgs: [
-          conversationId,
-        ],
-        orderBy: 'sent_at ASC',
-      );
-
-      final List<Message> messages =
-      messageRows.map(
-            (
-            Map<String, Object?> messageRow,
-            ) {
-          return Message(
-            id:
-            messageRow['id']
-            as String,
-            text:
-            messageRow['text']
-            as String,
-            senderUserId:
-            messageRow['sender_user_id']
-            as String?,
-            sentAt:
-            DateTime
-                .fromMillisecondsSinceEpoch(
-              messageRow['sent_at']
-              as int,
-            ),
-          );
-        },
-      ).toList();
+      row['id']
+      as String;
 
       conversations.add(
         Conversation(
           id:
-          row['id']
-          as String,
+          conversationId,
           participantUserId:
           row['participant_user_id']
           as String?,
@@ -94,7 +110,9 @@ class ChatRepository {
           row['status']
           as String,
           messages:
-          messages,
+          messagesByConversation[
+          conversationId] ??
+              <Message>[],
         ),
       );
     }
@@ -105,16 +123,11 @@ class ChatRepository {
   // ============================================================
   // SAVE CONVERSATION
   //
-  // IMPORTANT:
-  // Never use ConflictAlgorithm.replace here.
+  // Do not use ConflictAlgorithm.replace.
   //
-  // SQLite REPLACE can behave like DELETE + INSERT.
-  // Since messages reference conversations with ON DELETE CASCADE,
-  // replacing a conversation could unintentionally remove messages.
-  //
-  // Instead:
-  // 1. Try UPDATE using the stable conversation ID.
-  // 2. If no row exists, INSERT a new one.
+  // SQLite REPLACE may perform DELETE + INSERT.
+  // Because messages use ON DELETE CASCADE, that could remove
+  // existing child messages.
   // ============================================================
 
   Future<void> saveConversation(
@@ -155,7 +168,8 @@ class ChatRepository {
         await txn.update(
           'conversations',
           values,
-          where: 'id = ?',
+          where:
+          'id = ?',
           whereArgs: [
             conversationId,
           ],
@@ -182,10 +196,8 @@ class ChatRepository {
   // ============================================================
   // SAVE MESSAGE
   //
-  // Message IDs are treated as stable/immutable identifiers.
-  //
-  // A duplicate ID should fail instead of replacing an existing
-  // message silently.
+  // Message IDs are stable identifiers.
+  // Duplicate IDs fail instead of replacing existing data.
   // ============================================================
 
   Future<void> saveMessage({
@@ -235,6 +247,9 @@ class ChatRepository {
 
   // ============================================================
   // DELETE CONVERSATION
+  //
+  // A delete is successful only if one database row was actually
+  // removed.
   // ============================================================
 
   Future<void> deleteConversation(
@@ -244,18 +259,34 @@ class ChatRepository {
     conversationId.trim();
 
     if (cleanConversationId.isEmpty) {
-      return;
+      throw ArgumentError(
+        'Conversation ID cannot be empty.',
+      );
     }
 
     final Database db =
     await _appDatabase.database;
 
+    final int deletedRows =
     await db.delete(
       'conversations',
-      where: 'id = ?',
+      where:
+      'id = ?',
       whereArgs: [
         cleanConversationId,
       ],
     );
+
+    if (deletedRows == 0) {
+      throw StateError(
+        'Conversation does not exist in the database.',
+      );
+    }
+
+    if (deletedRows > 1) {
+      throw StateError(
+        'Unexpected number of deleted conversations: $deletedRows.',
+      );
+    }
   }
 }
