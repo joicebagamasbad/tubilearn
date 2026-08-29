@@ -16,22 +16,12 @@ class MySkillsScreen extends StatefulWidget {
       _MySkillsScreenState();
 }
 
-class _MySkillsScreenState
-    extends State<MySkillsScreen> {
-  static const Color primary =
-  Color(0xFF5B5FEF);
-
-  static const Color darkText =
-  Color(0xFF171A2B);
-
-  static const Color mutedText =
-  Color(0xFF8A8FA3);
-
-  static const Color background =
-  Color(0xFFF9F9FF);
-
-  static const Color border =
-  Color(0xFFE8E8F2);
+class _MySkillsScreenState extends State<MySkillsScreen> {
+  static const Color primary = Color(0xFF5B5FEF);
+  static const Color darkText = Color(0xFF171A2B);
+  static const Color mutedText = Color(0xFF8A8FA3);
+  static const Color background = Color(0xFFF9F9FF);
+  static const Color border = Color(0xFFE8E8F2);
 
   final MySkillsRepository _repository =
       MySkillsRepository.instance;
@@ -95,16 +85,13 @@ class _MySkillsScreenState
   // ============================================================
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: background,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
-
             Expanded(
               child: _buildBody(),
             ),
@@ -135,12 +122,10 @@ class _MySkillsScreenState
       color: primary,
       onRefresh: _loadSkills,
       child: ListView(
-        physics:
-        const AlwaysScrollableScrollPhysics(
+        physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
-        padding:
-        const EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
           20,
           16,
           20,
@@ -148,14 +133,11 @@ class _MySkillsScreenState
         ),
         children: [
           _buildTubiIntro(),
-
           const SizedBox(height: 16),
-
           ..._skills.map(
                 (managedSkill) {
               return Padding(
-                padding:
-                const EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   bottom: 14,
                 ),
                 child: _buildSkillCard(
@@ -176,12 +158,10 @@ class _MySkillsScreenState
   Widget _buildTopBar() {
     return Container(
       height: 64,
-      padding:
-      const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration:
-      const BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
           bottom: BorderSide(
@@ -193,9 +173,7 @@ class _MySkillsScreenState
         children: [
           IconButton(
             onPressed: () {
-              Navigator.pop(
-                context,
-              );
+              Navigator.pop(context);
             },
             icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
@@ -203,21 +181,18 @@ class _MySkillsScreenState
               color: primary,
             ),
           ),
-
           const Expanded(
             child: Center(
               child: Text(
                 'My Skills',
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                  FontWeight.w800,
+                  fontWeight: FontWeight.w800,
                   color: darkText,
                 ),
               ),
             ),
           ),
-
           TextButton.icon(
             onPressed: _openAddSkill,
             icon: const Icon(
@@ -229,8 +204,7 @@ class _MySkillsScreenState
               'ADD SKILL',
               style: TextStyle(
                 fontSize: 9,
-                fontWeight:
-                FontWeight.w700,
+                fontWeight: FontWeight.w700,
                 color: primary,
               ),
             ),
@@ -249,21 +223,17 @@ class _MySkillsScreenState
       children: [
         const Expanded(
           child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Manage your skills',
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight:
-                  FontWeight.w800,
+                  fontWeight: FontWeight.w800,
                   color: darkText,
                 ),
               ),
-
               SizedBox(height: 4),
-
               Text(
                 'Update, add, or review the skills you share.',
                 style: TextStyle(
@@ -275,9 +245,7 @@ class _MySkillsScreenState
             ],
           ),
         ),
-
         const SizedBox(width: 10),
-
         Image.asset(
           'assets/images/mascot/tubi_checking.png',
           width: 66,
@@ -295,39 +263,30 @@ class _MySkillsScreenState
   Widget _buildSkillCard(
       ManagedSkill managedSkill,
       ) {
-    final skill =
-        managedSkill.skill;
-
-    final userSkill =
-        managedSkill.userSkill;
+    final skill = managedSkill.skill;
+    final userSkill = managedSkill.userSkill;
 
     final bool customSkill =
-    managedSkill
-        .metadataCanBeEditedBy(
+    managedSkill.metadataCanBeEditedBy(
       _currentUser.userId,
     );
 
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-        BorderRadius.circular(16),
-        border:
-        Border.all(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
           color: border,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black
-                .withValues(
+            color: Colors.black.withValues(
               alpha: 0.025,
             ),
             blurRadius: 10,
-            offset:
-            const Offset(
+            offset: const Offset(
               0,
               4,
             ),
@@ -337,22 +296,16 @@ class _MySkillsScreenState
       child: Column(
         children: [
           Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 58,
                 height: 58,
-                decoration:
-                BoxDecoration(
-                  color:
-                  const Color(
+                decoration: BoxDecoration(
+                  color: const Color(
                     0xFFF3F0FF,
                   ),
-                  borderRadius:
-                  BorderRadius.circular(
-                    14,
-                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   skill.icon,
@@ -360,160 +313,98 @@ class _MySkillsScreenState
                   color: primary,
                 ),
               ),
-
-              const SizedBox(
-                width: 14,
-              ),
-
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             skill.title,
-                            style:
-                            const TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
-                              fontWeight:
-                              FontWeight
-                                  .w800,
-                              color:
-                              darkText,
+                              fontWeight: FontWeight.w800,
+                              color: darkText,
                             ),
                           ),
                         ),
-
                         if (customSkill)
                           Container(
-                            padding:
-                            const EdgeInsets
-                                .symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 7,
                               vertical: 3,
                             ),
-                            decoration:
-                            BoxDecoration(
-                              color:
-                              const Color(
+                            decoration: BoxDecoration(
+                              color: const Color(
                                 0xFFF3F0FF,
                               ),
                               borderRadius:
-                              BorderRadius
-                                  .circular(
-                                20,
-                              ),
+                              BorderRadius.circular(20),
                             ),
-                            child:
-                            const Text(
+                            child: const Text(
                               'CUSTOM',
-                              style:
-                              TextStyle(
+                              style: TextStyle(
                                 fontSize: 7.5,
-                                fontWeight:
-                                FontWeight
-                                    .w700,
-                                color:
-                                primary,
+                                fontWeight: FontWeight.w700,
+                                color: primary,
                               ),
                             ),
                           ),
                       ],
                     ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(
-                          Icons
-                              .bar_chart_rounded,
+                          Icons.bar_chart_rounded,
                           size: 14,
                           color: primary,
                         ),
-
-                        const SizedBox(
-                          width: 6,
-                        ),
-
+                        const SizedBox(width: 6),
                         const Text(
                           'Level:',
-                          style:
-                          TextStyle(
+                          style: TextStyle(
                             fontSize: 9.5,
-                            color:
-                            mutedText,
+                            color: mutedText,
                           ),
                         ),
-
-                        const SizedBox(
-                          width: 4,
-                        ),
-
+                        const SizedBox(width: 4),
                         Text(
                           userSkill.level,
-                          style:
-                          const TextStyle(
+                          style: const TextStyle(
                             fontSize: 9.5,
-                            fontWeight:
-                            FontWeight
-                                .w600,
+                            fontWeight: FontWeight.w600,
                             color: darkText,
                           ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(
-                      height: 7,
-                    ),
-
+                    const SizedBox(height: 7),
                     Row(
                       children: [
                         const Icon(
-                          Icons
-                              .schedule_rounded,
+                          Icons.schedule_rounded,
                           size: 14,
                           color: primary,
                         ),
-
-                        const SizedBox(
-                          width: 6,
-                        ),
-
+                        const SizedBox(width: 6),
                         const Text(
                           'Availability:',
-                          style:
-                          TextStyle(
+                          style: TextStyle(
                             fontSize: 9.5,
-                            color:
-                            mutedText,
+                            color: mutedText,
                           ),
                         ),
-
-                        const SizedBox(
-                          width: 4,
-                        ),
-
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            userSkill
-                                .availability,
-                            style:
-                            const TextStyle(
-                              fontSize:
-                              9.5,
-                              fontWeight:
-                              FontWeight
-                                  .w600,
-                              color:
-                              darkText,
+                            userSkill.availability,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: darkText,
                             ),
                           ),
                         ),
@@ -524,23 +415,14 @@ class _MySkillsScreenState
               ),
             ],
           ),
-
-          const SizedBox(
-            height: 14,
-          ),
-
+          const SizedBox(height: 14),
           const Divider(
             height: 1,
             color: border,
           ),
-
-          const SizedBox(
-            height: 8,
-          ),
-
+          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment:
-            MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton.icon(
                 onPressed: () {
@@ -553,23 +435,16 @@ class _MySkillsScreenState
                   size: 15,
                   color: primary,
                 ),
-                label:
-                const Text(
+                label: const Text(
                   'EDIT',
                   style: TextStyle(
                     fontSize: 9,
-                    fontWeight:
-                    FontWeight
-                        .w700,
+                    fontWeight: FontWeight.w700,
                     color: primary,
                   ),
                 ),
               ),
-
-              const SizedBox(
-                width: 8,
-              ),
-
+              const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () {
                   _showDeleteDialog(
@@ -577,22 +452,16 @@ class _MySkillsScreenState
                   );
                 },
                 icon: const Icon(
-                  Icons
-                      .delete_outline_rounded,
+                  Icons.delete_outline_rounded,
                   size: 15,
-                  color:
-                  Colors.redAccent,
+                  color: Colors.redAccent,
                 ),
-                label:
-                const Text(
+                label: const Text(
                   'DELETE',
                   style: TextStyle(
                     fontSize: 9,
-                    fontWeight:
-                    FontWeight
-                        .w700,
-                    color:
-                    Colors.redAccent,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.redAccent,
                   ),
                 ),
               ),
@@ -612,10 +481,13 @@ class _MySkillsScreenState
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-        const AddSkillScreen(),
+        builder: (_) => const AddSkillScreen(),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
 
     if (changed == true) {
       await _loadSkills();
@@ -633,13 +505,15 @@ class _MySkillsScreenState
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            EditSkillScreen(
-              managedSkill:
-              managedSkill,
-            ),
+        builder: (_) => EditSkillScreen(
+          managedSkill: managedSkill,
+        ),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
 
     if (changed == true) {
       await _loadSkills();
@@ -656,115 +530,84 @@ class _MySkillsScreenState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (dialogContext) {
+      builder: (dialogContext) {
         bool deleting = false;
 
         return StatefulBuilder(
           builder: (
-              context,
+              dialogBuilderContext,
               setDialogState,
               ) {
             return AlertDialog(
-              backgroundColor:
-              Colors.white,
-              shape:
-              RoundedRectangleBorder(
-                borderRadius:
-                BorderRadius.circular(
-                  20,
-                ),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
               icon: Container(
                 width: 58,
                 height: 58,
-                decoration:
-                BoxDecoration(
-                  color:
-                  const Color(
+                decoration: BoxDecoration(
+                  color: const Color(
                     0xFFFFEFEF,
                   ),
-                  borderRadius:
-                  BorderRadius.circular(
-                    18,
-                  ),
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                child:
-                const Icon(
-                  Icons
-                      .delete_outline_rounded,
-                  color:
-                  Colors.redAccent,
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.redAccent,
                   size: 30,
                 ),
               ),
-              title:
-              const Text(
+              title: const Text(
                 'Delete Skill?',
-                textAlign:
-                TextAlign.center,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight:
-                  FontWeight.w800,
+                  fontWeight: FontWeight.w800,
                   color: darkText,
                 ),
               ),
               content: Text(
                 'Remove "${managedSkill.skill.title}" from your offered skills?',
-                textAlign:
-                TextAlign.center,
-                style:
-                const TextStyle(
+                textAlign: TextAlign.center,
+                style: const TextStyle(
                   fontSize: 10.5,
                   height: 1.5,
                   color: mutedText,
                 ),
               ),
-              actionsAlignment:
-              MainAxisAlignment
-                  .center,
+              actionsAlignment: MainAxisAlignment.center,
               actions: [
                 OutlinedButton(
-                  onPressed:
-                  deleting
+                  onPressed: deleting
                       ? null
                       : () {
                     Navigator.pop(
                       dialogContext,
                     );
                   },
-                  child:
-                  const Text(
+                  child: const Text(
                     'CANCEL',
                   ),
                 ),
-
                 ElevatedButton(
-                  onPressed:
-                  deleting
+                  onPressed: deleting
                       ? null
                       : () async {
-                    setDialogState(
-                          () {
-                        deleting =
-                        true;
-                      },
-                    );
+                    setDialogState(() {
+                      deleting = true;
+                    });
 
                     try {
                       await _repository
                           .deleteOfferedSkill(
                         userId:
-                        _currentUser
-                            .userId,
+                        _currentUser.userId,
                         userSkillId:
-                        managedSkill
-                            .userSkill
-                            .id,
+                        managedSkill.userSkill.id,
                       );
 
-                      if (!mounted) {
+                      if (!dialogContext.mounted) {
                         return;
                       }
 
@@ -778,55 +621,41 @@ class _MySkillsScreenState
                         return;
                       }
 
-                      ScaffoldMessenger
-                          .of(
+                      ScaffoldMessenger.of(
                         context,
-                      )
-                          .showSnackBar(
+                      ).showSnackBar(
                         SnackBar(
-                          content:
-                          Text(
+                          content: Text(
                             '${managedSkill.skill.title} removed.',
                           ),
                         ),
                       );
                     } catch (error) {
-                      setDialogState(
-                            () {
-                          deleting =
-                          false;
-                        },
-                      );
+                      if (dialogContext.mounted) {
+                        setDialogState(() {
+                          deleting = false;
+                        });
+                      }
 
                       if (!mounted) {
                         return;
                       }
 
-                      ScaffoldMessenger
-                          .of(
+                      ScaffoldMessenger.of(
                         context,
-                      )
-                          .showSnackBar(
+                      ).showSnackBar(
                         SnackBar(
-                          content:
-                          Text(
-                            error
-                                .toString(),
+                          content: Text(
+                            error.toString(),
                           ),
                         ),
                       );
                     }
                   },
-                  style:
-                  ElevatedButton
-                      .styleFrom(
-                    backgroundColor:
-                    Colors
-                        .redAccent,
-                    foregroundColor:
-                    Colors.white,
-                    minimumSize:
-                    const Size(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(
                       90,
                       40,
                     ),
@@ -835,12 +664,9 @@ class _MySkillsScreenState
                       ? const SizedBox(
                     width: 17,
                     height: 17,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth:
-                      2,
-                      color:
-                      Colors.white,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
                   )
                       : const Text(
@@ -862,77 +688,52 @@ class _MySkillsScreenState
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding:
-        const EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: 35,
         ),
         child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/images/mascot/tubi_confused.png',
               width: 130,
               height: 130,
             ),
-
-            const SizedBox(
-              height: 15,
-            ),
-
+            const SizedBox(height: 15),
             const Text(
               'No skills yet',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight:
-                FontWeight.w800,
+                fontWeight: FontWeight.w800,
                 color: darkText,
               ),
             ),
-
-            const SizedBox(
-              height: 7,
-            ),
-
+            const SizedBox(height: 7),
             const Text(
               'Add a skill you can share with the TubiLearn community.',
-              textAlign:
-              TextAlign.center,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10.5,
                 height: 1.5,
                 color: mutedText,
               ),
             ),
-
-            const SizedBox(
-              height: 20,
-            ),
-
+            const SizedBox(height: 20),
             ElevatedButton(
-              onPressed:
-              _openAddSkill,
-              style:
-              ElevatedButton
-                  .styleFrom(
-                backgroundColor:
-                primary,
-                foregroundColor:
-                Colors.white,
-                minimumSize:
-                const Size(
+              onPressed: _openAddSkill,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(
                   140,
                   44,
                 ),
               ),
-              child:
-              const Text(
+              child: const Text(
                 'ADD A SKILL',
                 style: TextStyle(
                   fontSize: 9,
-                  fontWeight:
-                  FontWeight
-                      .w800,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -949,60 +750,39 @@ class _MySkillsScreenState
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding:
-        const EdgeInsets.all(
+        padding: const EdgeInsets.all(
           30,
         ),
         child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons
-                  .error_outline_rounded,
+              Icons.error_outline_rounded,
               size: 46,
-              color:
-              Colors.redAccent,
+              color: Colors.redAccent,
             ),
-
-            const SizedBox(
-              height: 14,
-            ),
-
+            const SizedBox(height: 14),
             const Text(
               'Could not load your skills.',
               style: TextStyle(
                 fontSize: 15,
-                fontWeight:
-                FontWeight.w800,
+                fontWeight: FontWeight.w800,
                 color: darkText,
               ),
             ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
+            const SizedBox(height: 8),
             Text(
               _error ?? '',
-              textAlign:
-              TextAlign.center,
-              style:
-              const TextStyle(
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 fontSize: 10,
                 color: mutedText,
               ),
             ),
-
-            const SizedBox(
-              height: 18,
-            ),
-
+            const SizedBox(height: 18),
             ElevatedButton(
-              onPressed:
-              _loadSkills,
-              child:
-              const Text(
+              onPressed: _loadSkills,
+              child: const Text(
                 'TRY AGAIN',
               ),
             ),

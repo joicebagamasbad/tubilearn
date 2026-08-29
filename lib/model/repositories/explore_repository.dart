@@ -6,16 +6,6 @@ import '../user.dart';
 import '../user_skill.dart';
 
 class ExploreRepository {
-  // ============================================================
-  // SINGLETON
-  //
-  // Existing code can continue using:
-  //
-  // ExploreRepository()
-  //
-  // All calls point to the same repository instance/cache.
-  // ============================================================
-
   ExploreRepository._();
 
   static final ExploreRepository instance =
@@ -30,19 +20,18 @@ class ExploreRepository {
   // ============================================================
 
   final List<User> _users = [];
+
   final List<Skill> _skills = [];
+
   final List<UserSkill> _userSkills = [];
 
   bool _initialized = false;
 
-  bool get isInitialized => _initialized;
+  bool get isInitialized =>
+      _initialized;
 
   // ============================================================
   // INITIALIZE
-  //
-  // Loads persistent normalized Explore data from SQLite.
-  //
-  // Call this before runApp().
   // ============================================================
 
   Future<void> initialize() async {
@@ -50,182 +39,137 @@ class ExploreRepository {
       return;
     }
 
-    final db =
-    await AppDatabase.instance.database;
-
-    final List<Map<String, Object?>> userRows =
-    await db.query(
-      'users',
-      orderBy: 'name COLLATE NOCASE ASC',
-    );
-
-    final List<Map<String, Object?>> skillRows =
-    await db.query(
-      'skills',
-      orderBy: 'title COLLATE NOCASE ASC',
-    );
-
-    final List<Map<String, Object?>> userSkillRows =
-    await db.query(
-      'user_skills',
-      orderBy: 'id ASC',
-    );
-
-    // ----------------------------------------------------------
-    // Build users
-    // ----------------------------------------------------------
-
-    final List<User> loadedUsers =
-    userRows.map(_userFromMap).toList();
-
-    // ----------------------------------------------------------
-    // Build skills + ordered learnings
-    // ----------------------------------------------------------
-
-    final List<Skill> loadedSkills = [];
-
-    for (final Map<String, Object?> skillRow
-    in skillRows) {
-      final String skillId =
-      skillRow['id'] as String;
-
-      final List<Map<String, Object?>>
-      learningRows =
-      await db.query(
-        'skill_learnings',
-        columns: [
-          'text',
-        ],
-        where: 'skill_id = ?',
-        whereArgs: [
-          skillId,
-        ],
-        orderBy: 'position ASC',
-      );
-
-      final List<String> learnings =
-      learningRows
-          .map(
-            (row) =>
-        row['text'] as String,
-      )
-          .toList();
-
-      loadedSkills.add(
-        _skillFromMap(
-          skillRow,
-          learnings,
-        ),
-      );
-    }
-
-    // ----------------------------------------------------------
-    // Build user-skill relationships
-    // ----------------------------------------------------------
-
-    final List<UserSkill> loadedUserSkills =
-    userSkillRows
-        .map(_userSkillFromMap)
-        .toList();
-
-    // ----------------------------------------------------------
-    // Replace cache only after complete successful loading.
-    //
-    // This avoids leaving the repository half-populated if any
-    // database operation fails during initialization.
-    // ----------------------------------------------------------
-
-    _users
-      ..clear()
-      ..addAll(
-        loadedUsers,
-      );
-
-    _skills
-      ..clear()
-      ..addAll(
-        loadedSkills,
-      );
-
-    _userSkills
-      ..clear()
-      ..addAll(
-        loadedUserSkills,
-      );
-
-    _initialized = true;
+    await _loadFromDatabase();
   }
 
   // ============================================================
   // REFRESH
-  //
-  // Useful later after Add/Edit/Delete Skill operations so the
-  // in-memory cache can reflect the current SQLite contents.
   // ============================================================
 
   Future<void> refresh() async {
-    final db =
-    await AppDatabase.instance.database;
+    await _loadFromDatabase();
+  }
 
-    final List<Map<String, Object?>> userRows =
+  // ============================================================
+  // LOAD FROM DATABASE
+  //
+  // Loads all Explore reference data first, then replaces the
+  // in-memory cache only after the entire operation succeeds.
+  // ============================================================
+
+  Future<void> _loadFromDatabase() async {
+    final db =
+    await AppDatabase
+        .instance
+        .database;
+
+    final List<Map<String, Object?>>
+    userRows =
     await db.query(
       'users',
-      orderBy: 'name COLLATE NOCASE ASC',
+      orderBy:
+      'name COLLATE NOCASE ASC',
     );
 
-    final List<Map<String, Object?>> skillRows =
+    final List<Map<String, Object?>>
+    skillRows =
     await db.query(
       'skills',
-      orderBy: 'title COLLATE NOCASE ASC',
+      orderBy:
+      'title COLLATE NOCASE ASC',
     );
 
-    final List<Map<String, Object?>> userSkillRows =
+    final List<Map<String, Object?>>
+    learningRows =
+    await db.query(
+      'skill_learnings',
+      orderBy:
+      'skill_id ASC, position ASC',
+    );
+
+    final List<Map<String, Object?>>
+    userSkillRows =
     await db.query(
       'user_skills',
       orderBy: 'id ASC',
     );
 
+    // ----------------------------------------------------------
+    // USERS
+    // ----------------------------------------------------------
+
     final List<User> loadedUsers =
-    userRows.map(_userFromMap).toList();
+    userRows
+        .map(
+      _userFromMap,
+    )
+        .toList();
 
-    final List<Skill> loadedSkills = [];
+    // ----------------------------------------------------------
+    // GROUP LEARNINGS BY SKILL ID
+    // ----------------------------------------------------------
 
-    for (final Map<String, Object?> skillRow
-    in skillRows) {
+    final Map<String, List<String>>
+    learningsBySkill = {};
+
+    for (final Map<String, Object?>
+    row in learningRows) {
       final String skillId =
-      skillRow['id'] as String;
+      row['skill_id']
+      as String;
 
-      final List<Map<String, Object?>>
-      learningRows =
-      await db.query(
-        'skill_learnings',
-        columns: [
-          'text',
-        ],
-        where: 'skill_id = ?',
-        whereArgs: [
-          skillId,
-        ],
-        orderBy: 'position ASC',
-      );
+      final String text =
+      row['text']
+      as String;
 
-      loadedSkills.add(
-        _skillFromMap(
-          skillRow,
-          learningRows
-              .map(
-                (row) =>
-            row['text'] as String,
-          )
-              .toList(),
-        ),
+      learningsBySkill
+          .putIfAbsent(
+        skillId,
+            () => [],
+      )
+          .add(
+        text,
       );
     }
 
-    final List<UserSkill> loadedUserSkills =
+    // ----------------------------------------------------------
+    // SKILLS
+    // ----------------------------------------------------------
+
+    final List<Skill> loadedSkills =
+    skillRows.map(
+          (
+          Map<String, Object?>
+          skillRow,
+          ) {
+        final String skillId =
+        skillRow['id']
+        as String;
+
+        return _skillFromMap(
+          skillRow,
+          learningsBySkill[
+          skillId] ??
+              const [],
+        );
+      },
+    ).toList();
+
+    // ----------------------------------------------------------
+    // USER SKILLS
+    // ----------------------------------------------------------
+
+    final List<UserSkill>
+    loadedUserSkills =
     userSkillRows
-        .map(_userSkillFromMap)
+        .map(
+      _userSkillFromMap,
+    )
         .toList();
+
+    // ----------------------------------------------------------
+    // REPLACE CACHE ONLY AFTER SUCCESS
+    // ----------------------------------------------------------
 
     _users
       ..clear()
@@ -256,36 +200,71 @@ class ExploreRepository {
       Map<String, Object?> map,
       ) {
     return User(
-      id: map['id'] as String,
-      name: map['name'] as String,
+      id:
+      map['id']
+      as String,
+
+      name:
+      map['name']
+      as String,
+
       initials:
-      map['initials'] as String,
-      city: map['city'] as String,
-      bio: map['bio'] as String,
+      map['initials']
+      as String,
+
+      city:
+      map['city']
+      as String,
+
+      bio:
+      map['bio']
+      as String,
+
       rating:
-      (map['rating'] as num)
+      (map['rating']
+      as num)
           .toDouble(),
+
       reviewCount:
-      map['review_count'] as int,
+      map['review_count']
+      as int,
+
       completedSwaps:
-      map['completed_swaps'] as int,
+      map['completed_swaps']
+      as int,
+
       responseRate:
-      map['response_rate'] as int,
+      map['response_rate']
+      as int,
+
       memberSince:
-      map['member_since'] as String,
+      map['member_since']
+      as String,
+
       availability:
-      map['availability'] as String,
+      map['availability']
+      as String,
+
       language:
-      map['language'] as String,
+      map['language']
+      as String,
+
       preferredMode:
-      map['preferred_mode'] as String,
+      map['preferred_mode']
+      as String,
+
       teachingStyle:
-      map['teaching_style'] as String,
+      map['teaching_style']
+      as String,
+
       emailVerified:
-      (map['email_verified'] as int) ==
+      (map['email_verified']
+      as int) ==
           1,
+
       profileCompleted:
-      (map['profile_completed'] as int) ==
+      (map['profile_completed']
+      as int) ==
           1,
     );
   }
@@ -299,35 +278,96 @@ class ExploreRepository {
       List<String> learnings,
       ) {
     final int iconCodePoint =
-    map['icon_code_point'] as int;
+    map['icon_code_point']
+    as int;
 
     return Skill(
-      id: map['id'] as String,
-      title: map['title'] as String,
-      category:
-      map['category'] as String,
-      level: map['level'] as String,
+      id:
+      map['id']
+      as String,
 
-      // Material icon persisted as its numeric code point.
-      icon: IconData(
+      title:
+      map['title']
+      as String,
+
+      category:
+      map['category']
+      as String,
+
+      level:
+      map['level']
+      as String,
+
+      icon:
+      _iconFromCodePoint(
         iconCodePoint,
-        fontFamily: 'MaterialIcons',
       ),
 
       sessionLength:
-      map['session_length'] as String,
-      mode: map['mode'] as String,
+      map['session_length']
+      as String,
+
+      mode:
+      map['mode']
+      as String,
+
       language:
-      map['language'] as String,
+      map['language']
+      as String,
+
       prerequisite:
-      map['prerequisite'] as String,
+      map['prerequisite']
+      as String,
+
       description:
-      map['description'] as String,
+      map['description']
+      as String,
+
       learnings:
       List.unmodifiable(
         learnings,
       ),
     );
+  }
+
+  // ============================================================
+  // ICON CODE POINT -> MATERIAL ICON CONSTANT
+  //
+  // We intentionally do NOT create IconData dynamically.
+  //
+  // Flutter recommends using stable IconData constants so icons
+  // remain compatible with release-mode icon tree shaking.
+  // ============================================================
+
+  IconData _iconFromCodePoint(
+      int codePoint,
+      ) {
+    const List<IconData> supportedIcons = [
+      Icons.design_services_outlined,
+      Icons.camera_alt_outlined,
+      Icons.movie_creation_outlined,
+      Icons.code_rounded,
+      Icons.translate_rounded,
+      Icons.table_chart_outlined,
+      Icons.record_voice_over_outlined,
+      Icons.music_note_rounded,
+      Icons.palette_outlined,
+      Icons.web_outlined,
+      Icons.school_outlined,
+      Icons.self_improvement_rounded,
+      Icons.lightbulb_outline_rounded,
+    ];
+
+    for (final IconData icon
+    in supportedIcons) {
+      if (icon.codePoint ==
+          codePoint) {
+        return icon;
+      }
+    }
+
+    return Icons
+        .lightbulb_outline_rounded;
   }
 
   // ============================================================
@@ -338,19 +378,23 @@ class ExploreRepository {
       Map<String, Object?> map,
       ) {
     final String type =
-    map['type'] as String;
+    map['type']
+    as String;
 
-    late final UserSkillType parsedType;
+    late final UserSkillType
+    parsedType;
 
     switch (type) {
       case 'offered':
         parsedType =
-            UserSkillType.offered;
+            UserSkillType
+                .offered;
         break;
 
       case 'wanted':
         parsedType =
-            UserSkillType.wanted;
+            UserSkillType
+                .wanted;
         break;
 
       default:
@@ -360,16 +404,28 @@ class ExploreRepository {
     }
 
     return UserSkill(
-      id: map['id'] as String,
+      id:
+      map['id']
+      as String,
+
       userId:
-      map['user_id'] as String,
+      map['user_id']
+      as String,
+
       skillId:
-      map['skill_id'] as String,
-      type: parsedType,
+      map['skill_id']
+      as String,
+
+      type:
+      parsedType,
+
       level:
-      map['level'] as String,
+      map['level']
+      as String,
+
       availability:
-      map['availability'] as String,
+      map['availability']
+      as String,
     );
   }
 
@@ -406,7 +462,8 @@ class ExploreRepository {
       return null;
     }
 
-    for (final User user in _users) {
+    for (final User user
+    in _users) {
       if (user.id ==
           normalizedId) {
         return user;
@@ -458,11 +515,14 @@ class ExploreRepository {
 
     return _userSkills
         .where(
-          (item) =>
+          (
+          UserSkill item,
+          ) =>
       item.userId ==
           normalizedUserId &&
           item.type ==
-              UserSkillType.offered,
+              UserSkillType
+                  .offered,
     )
         .toList();
   }
@@ -484,11 +544,14 @@ class ExploreRepository {
 
     return _userSkills
         .where(
-          (item) =>
+          (
+          UserSkill item,
+          ) =>
       item.userId ==
           normalizedUserId &&
           item.type ==
-              UserSkillType.wanted,
+              UserSkillType
+                  .wanted,
     )
         .toList();
   }
@@ -510,22 +573,30 @@ class ExploreRepository {
     final Set<String> providerIds =
     _userSkills
         .where(
-          (item) =>
+          (
+          UserSkill item,
+          ) =>
       item.skillId ==
           normalizedSkillId &&
           item.type ==
-              UserSkillType.offered,
+              UserSkillType
+                  .offered,
     )
         .map(
-          (item) =>
+          (
+          UserSkill item,
+          ) =>
       item.userId,
     )
         .toSet();
 
     return _users
         .where(
-          (user) =>
-          providerIds.contains(
+          (
+          User user,
+          ) =>
+          providerIds
+              .contains(
             user.id,
           ),
     )
@@ -558,7 +629,8 @@ class ExploreRepository {
           normalizedUserId &&
           item.skillId ==
               normalizedSkillId &&
-          item.type == type) {
+          item.type ==
+              type) {
         return item;
       }
     }

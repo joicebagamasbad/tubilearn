@@ -50,58 +50,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
+                physics:
+                const BouncingScrollPhysics(),
+                padding:
+                const EdgeInsets.fromLTRB(
                   20,
                   18,
                   20,
                   24,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     _buildHeader(),
-
                     const SizedBox(height: 20),
-
                     _buildSearchBar(),
-
                     const SizedBox(height: 24),
-
                     _buildSectionHeader(
                       title: '✦ Your AI Match',
                       action: 'See all',
                     ),
-
                     const SizedBox(height: 12),
-
                     _buildMatchCard(),
-
                     const SizedBox(height: 28),
-
                     _buildSectionHeader(
                       title: 'Popular Skills',
                       action: 'Explore',
                     ),
-
                     const SizedBox(height: 14),
-
                     _buildPopularSkills(),
-
                     const SizedBox(height: 28),
-
                     _buildSectionHeader(
                       title: 'Upcoming Session',
                     ),
-
                     const SizedBox(height: 12),
-
                     _buildUpcomingSession(),
                   ],
                 ),
               ),
             ),
-
             _buildBottomNavigation(),
           ],
         ),
@@ -118,15 +106,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         const Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               Text(
                 'Hello, Joice! 👋',
                 style: AppTextStyles.pageTitle,
               ),
-
               SizedBox(height: 4),
-
               Text(
                 'Ready to share and learn?',
                 style: AppTextStyles.secondary,
@@ -134,13 +121,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-
         Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius:
+            BorderRadius.circular(12),
           ),
           child: const Icon(
             Icons.notifications_none_rounded,
@@ -148,13 +135,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: darkText,
           ),
         ),
-
         const SizedBox(width: 10),
-
         Container(
           width: 42,
           height: 42,
-          decoration: const BoxDecoration(
+          decoration:
+          const BoxDecoration(
             color: Color(0xFFFFAA45),
             shape: BoxShape.circle,
           ),
@@ -169,7 +155,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSearchBar() {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius:
+      BorderRadius.circular(14),
       onTap: () {
         Navigator.pushNamed(
           context,
@@ -180,36 +167,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         height: 50,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius:
+          BorderRadius.circular(14),
           border: Border.all(
-            color: const Color(0xFFE9E9F3),
+            color: const Color(
+              0xFFE9E9F3,
+            ),
           ),
         ),
         child: const Row(
           children: [
             SizedBox(width: 14),
-
             Icon(
               Icons.search,
               color: mutedText,
               size: 20,
             ),
-
             SizedBox(width: 10),
-
             Expanded(
               child: Text(
                 'Search skills or people',
-                style: AppTextStyles.secondary,
+                style:
+                AppTextStyles.secondary,
               ),
             ),
-
             Icon(
               Icons.filter_list_rounded,
               color: primary,
               size: 20,
             ),
-
             SizedBox(width: 14),
           ],
         ),
@@ -230,22 +216,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Expanded(
           child: Text(
             title,
-            style: AppTextStyles.sectionTitle,
+            style:
+            AppTextStyles.sectionTitle,
           ),
         ),
-
         if (action != null)
           InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius:
+            BorderRadius.circular(8),
             onTap: () {
-              if (action == 'Explore') {
+              if (action ==
+                  'Explore') {
                 Navigator.pushNamed(
                   context,
                   '/explore',
                 );
               }
 
-              if (action == 'See all') {
+              if (action ==
+                  'See all') {
                 Navigator.pushNamed(
                   context,
                   '/swap-requests',
@@ -253,15 +242,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(
+              padding:
+              const EdgeInsets.symmetric(
                 horizontal: 4,
                 vertical: 4,
               ),
               child: Text(
                 action,
-                style: AppTextStyles.caption.copyWith(
+                style:
+                AppTextStyles.caption
+                    .copyWith(
                   color: primary,
-                  fontWeight: FontWeight.w700,
+                  fontWeight:
+                  FontWeight.w700,
                 ),
               ),
             ),
@@ -280,9 +273,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFFEAEAF4),
+          color: const Color(
+            0xFFEAEAF4,
+          ),
         ),
       ),
       child: Column(
@@ -292,79 +288,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFAA45),
+                decoration:
+                const BoxDecoration(
+                  color:
+                  Color(0xFFFFAA45),
                   shape: BoxShape.circle,
                 ),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Alex Rivera',
-                      style: AppTextStyles.cardTitle,
+                      style:
+                      AppTextStyles.cardTitle,
                     ),
-
-                    const SizedBox(height: 3),
-
+                    const SizedBox(
+                      height: 3,
+                    ),
                     Text(
                       'Video Editing • Advanced',
-                      style: AppTextStyles.secondary.copyWith(
+                      style:
+                      AppTextStyles.secondary
+                          .copyWith(
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-
               Container(
-                padding: const EdgeInsets.symmetric(
+                padding:
+                const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
                 ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0EFFF),
-                  borderRadius: BorderRadius.circular(20),
+                decoration:
+                BoxDecoration(
+                  color:
+                  const Color(
+                    0xFFF0EFFF,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(
+                    20,
+                  ),
                 ),
                 child: Text(
                   '92% Match',
-                  style: AppTextStyles.caption.copyWith(
+                  style:
+                  AppTextStyles.caption
+                      .copyWith(
                     color: primary,
-                    fontWeight: FontWeight.w700,
+                    fontWeight:
+                    FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment:
+            CrossAxisAlignment.center,
             children: [
               Image.asset(
                 'assets/images/mascot/tubi_happy.png',
                 width: 52,
                 height: 52,
               ),
-
               const SizedBox(width: 10),
-
               const Expanded(
                 child: Text(
                   'Great fit! You teach Photography, while Alex can teach Video Editing.',
-                  style: AppTextStyles.bodyMuted,
+                  style:
+                  AppTextStyles.bodyMuted,
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -372,7 +378,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {},
               child: const Text(
                 'VIEW MATCH',
-                style: AppTextStyles.button,
+                style:
+                AppTextStyles.button,
               ),
             ),
           ),
@@ -389,17 +396,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return SizedBox(
       height: 138,
       child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
+        scrollDirection:
+        Axis.horizontal,
+        physics:
+        const BouncingScrollPhysics(),
         itemCount: skills.length,
-        separatorBuilder: (_, __) {
-          return const SizedBox(width: 12);
+        separatorBuilder: (_, _) {
+          return const SizedBox(
+            width: 12,
+          );
         },
-        itemBuilder: (context, index) {
-          final skill = skills[index];
+        itemBuilder: (
+            context,
+            index,
+            ) {
+          final skill =
+          skills[index];
 
           return InkWell(
-            borderRadius: BorderRadius.circular(17),
+            borderRadius:
+            BorderRadius.circular(17),
             onTap: () {
               Navigator.pushNamed(
                 context,
@@ -408,39 +424,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
             child: Container(
               width: 132,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F2FF),
-                borderRadius: BorderRadius.circular(17),
-                border: Border.all(
-                  color: const Color(0xFFE5E1FF),
+              padding:
+              const EdgeInsets.all(
+                14,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                const Color(
+                  0xFFF4F2FF,
+                ),
+                borderRadius:
+                BorderRadius.circular(
+                  17,
+                ),
+                border:
+                Border.all(
+                  color:
+                  const Color(
+                    0xFFE5E1FF,
+                  ),
                 ),
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                MainAxisAlignment.center,
                 children: [
                   Container(
                     width: 50,
                     height: 50,
-                    decoration: BoxDecoration(
+                    decoration:
+                    BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius:
+                      BorderRadius.circular(
+                        14,
+                      ),
                     ),
                     child: Icon(
-                      skill['icon'] as IconData,
+                      skill['icon']
+                      as IconData,
                       color: primary,
                       size: 25,
                     ),
                   ),
-
-                  const SizedBox(height: 11),
-
+                  const SizedBox(
+                    height: 11,
+                  ),
                   Text(
-                    skill['title'] as String,
+                    skill['title']
+                    as String,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.cardTitle.copyWith(
+                    overflow:
+                    TextOverflow.ellipsis,
+                    textAlign:
+                    TextAlign.center,
+                    style:
+                    AppTextStyles.cardTitle
+                        .copyWith(
                       fontSize: 13,
                     ),
                   ),
@@ -463,9 +504,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+        BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFFEAEAF4),
+          color: const Color(
+            0xFFEAEAF4,
+          ),
         ),
       ),
       child: Row(
@@ -473,56 +517,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             width: 46,
             height: 46,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFAA45),
+            decoration:
+            const BoxDecoration(
+              color:
+              Color(0xFFFFAA45),
               shape: BoxShape.circle,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Alex Rivera',
-                  style: AppTextStyles.cardTitle,
+                  style:
+                  AppTextStyles.cardTitle,
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   'Video Editing Session',
-                  style: AppTextStyles.secondary.copyWith(
+                  style:
+                  AppTextStyles.secondary
+                      .copyWith(
                     fontSize: 12,
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 const Text(
                   'Today • 4:00 PM',
-                  style: AppTextStyles.caption,
+                  style:
+                  AppTextStyles.caption,
                 ),
               ],
             ),
           ),
-
           SizedBox(
             width: 100,
             height: 38,
             child: ElevatedButton(
               onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+              style:
+              ElevatedButton.styleFrom(
+                padding:
+                EdgeInsets.zero,
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    20,
+                  ),
                 ),
               ),
               child: Text(
                 'JOIN CALL',
-                style: AppTextStyles.button.copyWith(
+                style:
+                AppTextStyles.button
+                    .copyWith(
                   fontSize: 11,
                 ),
               ),
@@ -541,38 +593,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final items = [
       {
         'icon': Icons.home_outlined,
-        'selected': Icons.home_rounded,
+        'selected':
+        Icons.home_rounded,
         'label': 'Home',
       },
       {
         'icon': Icons.explore_outlined,
-        'selected': Icons.explore,
+        'selected':
+        Icons.explore,
         'label': 'Explore',
       },
       {
-        'icon': Icons.auto_awesome_outlined,
-        'selected': Icons.auto_awesome,
+        'icon':
+        Icons.auto_awesome_outlined,
+        'selected':
+        Icons.auto_awesome,
         'label': 'AI Match',
       },
       {
-        'icon': Icons.chat_bubble_outline_rounded,
-        'selected': Icons.chat_bubble_rounded,
+        'icon':
+        Icons.chat_bubble_outline_rounded,
+        'selected':
+        Icons.chat_bubble_rounded,
         'label': 'Chat',
       },
       {
-        'icon': Icons.person_outline_rounded,
-        'selected': Icons.person_rounded,
+        'icon':
+        Icons.person_outline_rounded,
+        'selected':
+        Icons.person_rounded,
         'label': 'Profile',
       },
     ];
 
     return Container(
       height: 76,
-      decoration: const BoxDecoration(
+      decoration:
+      const BoxDecoration(
         color: Colors.white,
         border: Border(
           top: BorderSide(
-            color: Color(0xFFEEEEF5),
+            color:
+            Color(0xFFEEEEF5),
           ),
         ),
       ),
@@ -581,14 +643,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           items.length,
               (index) {
             final bool selected =
-                _selectedNav == index;
+                _selectedNav ==
+                    index;
 
             return Expanded(
               child: InkWell(
                 onTap: () {
                   if (index == 0) {
                     setState(() {
-                      _selectedNav = 0;
+                      _selectedNav =
+                      0;
                     });
                     return;
                   }
@@ -603,7 +667,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   if (index == 2) {
                     setState(() {
-                      _selectedNav = 2;
+                      _selectedNav =
+                      2;
                     });
                     return;
                   }
@@ -625,42 +690,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }
                 },
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment:
+                  MainAxisAlignment.center,
                   children: [
                     AnimatedContainer(
-                      duration: const Duration(
-                        milliseconds: 180,
+                      duration:
+                      const Duration(
+                        milliseconds:
+                        180,
                       ),
                       width: 36,
                       height: 29,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFFF0EFFF)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        selected
+                            ? const Color(
+                          0xFFF0EFFF,
+                        )
+                            : Colors
+                            .transparent,
+                        borderRadius:
+                        BorderRadius.circular(
+                          12,
+                        ),
                       ),
                       child: Icon(
                         selected
-                            ? items[index]['selected'] as IconData
-                            : items[index]['icon'] as IconData,
+                            ? items[index][
+                        'selected']
+                        as IconData
+                            : items[index]
+                        ['icon']
+                        as IconData,
                         size: 20,
-                        color: selected
+                        color:
+                        selected
                             ? primary
-                            : const Color(0xFF777C8F),
+                            : const Color(
+                          0xFF777C8F,
+                        ),
                       ),
                     ),
-
-                    const SizedBox(height: 3),
-
+                    const SizedBox(
+                      height: 3,
+                    ),
                     Text(
-                      items[index]['label'] as String,
-                      style: AppTextStyles.navLabel.copyWith(
-                        color: selected
+                      items[index]
+                      ['label']
+                      as String,
+                      style:
+                      AppTextStyles.navLabel
+                          .copyWith(
+                        color:
+                        selected
                             ? primary
-                            : const Color(0xFF777C8F),
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                            : const Color(
+                          0xFF777C8F,
+                        ),
+                        fontWeight:
+                        selected
+                            ? FontWeight
+                            .w700
+                            : FontWeight
+                            .w600,
                       ),
                     ),
                   ],

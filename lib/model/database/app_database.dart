@@ -21,7 +21,8 @@ class AppDatabase {
       return _database!;
     }
 
-    _database = await _openDatabase();
+    _database =
+    await _openDatabase();
 
     return _database!;
   }
@@ -38,7 +39,6 @@ class AppDatabase {
     return openDatabase(
       path,
       version: _databaseVersion,
-
       onConfigure: (db) async {
         await db.execute(
           'PRAGMA foreign_keys = ON',
@@ -128,23 +128,11 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 5 - REFERENCE / PROFILE TABLES
-  //
-  // In v7, skills also includes optional owner_user_id.
-  //
-  // NULL owner_user_id:
-  // shared/catalog skill.
-  //
-  // Non-null owner_user_id:
-  // custom skill owned by a user.
   // ============================================================
 
   Future<void> _createReferenceTablesV5(
       Database db,
       ) async {
-    // ----------------------------------------------------------
-    // USERS
-    // ----------------------------------------------------------
-
     await db.execute(
       '''
       CREATE TABLE users (
@@ -201,10 +189,6 @@ class AppDatabase {
       ''',
     );
 
-    // ----------------------------------------------------------
-    // SKILLS
-    // ----------------------------------------------------------
-
     await db.execute(
       '''
       CREATE TABLE skills (
@@ -248,10 +232,6 @@ class AppDatabase {
       ''',
     );
 
-    // ----------------------------------------------------------
-    // SKILL LEARNINGS
-    // ----------------------------------------------------------
-
     await db.execute(
       '''
       CREATE TABLE skill_learnings (
@@ -275,10 +255,6 @@ class AppDatabase {
       )
       ''',
     );
-
-    // ----------------------------------------------------------
-    // USER SKILLS
-    // ----------------------------------------------------------
 
     await db.execute(
       '''
@@ -562,86 +538,6 @@ class AppDatabase {
 
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
-      )
-      ''',
-    );
-
-    await _createSwapIndexesV3(
-      db,
-    );
-  }
-
-  // ============================================================
-  // VERSION 3 - HARDENED SWAP TABLE
-  // ============================================================
-
-  Future<void> _createSwapTablesV3(
-      Database db,
-      ) async {
-    await db.execute(
-      '''
-      CREATE TABLE swap_requests (
-        id TEXT PRIMARY KEY
-          CHECK(length(trim(id)) > 0),
-
-        provider_name TEXT NOT NULL
-          CHECK(length(trim(provider_name)) > 0),
-
-        provider_initials TEXT NOT NULL
-          CHECK(length(trim(provider_initials)) > 0),
-
-        provider_city TEXT NOT NULL
-          CHECK(length(trim(provider_city)) > 0),
-
-        skill_to_learn TEXT NOT NULL
-          CHECK(length(trim(skill_to_learn)) > 0),
-
-        skill_to_offer TEXT NOT NULL
-          CHECK(length(trim(skill_to_offer)) > 0),
-
-        proposed_at INTEGER NOT NULL
-          CHECK(proposed_at > 0),
-
-        mode TEXT NOT NULL
-          CHECK(
-            mode IN (
-              'Online',
-              'In-person'
-            )
-          ),
-
-        meeting_details TEXT
-          CHECK(
-            meeting_details IS NULL
-            OR (
-              length(trim(meeting_details)) > 0
-              AND length(meeting_details) <= 150
-            )
-          ),
-
-        note TEXT
-          CHECK(
-            note IS NULL
-            OR length(note) <= 300
-          ),
-
-        status TEXT NOT NULL
-          CHECK(
-            status IN (
-              'pending',
-              'accepted',
-              'declined',
-              'scheduled',
-              'completed',
-              'cancelled'
-            )
-          ),
-
-        created_at INTEGER NOT NULL
-          CHECK(created_at > 0),
-
-        updated_at INTEGER NOT NULL
-          CHECK(updated_at > 0)
       )
       ''',
     );
@@ -1288,8 +1184,6 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATION TO VERSION 6
-  //
-  // Adds DB-level duplicate protection for ACTIVE stable-ID swaps.
   // ============================================================
 
   Future<void> _migrateToVersion6(
@@ -1303,10 +1197,6 @@ class AppDatabase {
       db,
     );
   }
-
-  // ============================================================
-  // VERSION 6 DUPLICATE PREFLIGHT
-  // ============================================================
 
   Future<void> _assertNoDuplicateActiveSwaps(
       Database db,
@@ -1352,11 +1242,6 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATION TO VERSION 7
-  //
-  // Adds optional ownership to skills.
-  //
-  // Existing skills remain shared catalog skills because
-  // owner_user_id is NULL after migration.
   // ============================================================
 
   Future<void> _migrateToVersion7(

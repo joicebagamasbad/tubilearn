@@ -40,7 +40,6 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             _buildTopBar(),
-
             Expanded(
               child: conversations.isEmpty
                   ? _buildEmptyState()
@@ -53,11 +52,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   30,
                 ),
                 itemCount: conversations.length,
-                separatorBuilder: (_, __) {
+                separatorBuilder: (_, _) {
                   return const SizedBox(height: 12);
                 },
                 itemBuilder: (context, index) {
-                  final conversation = conversations[index];
+                  final conversation =
+                  conversations[index];
 
                   final latestMessage =
                   conversation.messages.isEmpty
@@ -65,31 +65,41 @@ class _ChatScreenState extends State<ChatScreen> {
                       : conversation.messages.last;
 
                   return InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius:
+                    BorderRadius.circular(16),
                     onTap: () async {
                       await Navigator.pushNamed(
                         context,
                         '/conversation',
-                        arguments: conversation.id,
+                        arguments:
+                        conversation.id,
                       );
+
+                      if (!mounted) {
+                        return;
+                      }
 
                       setState(() {});
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(14),
+                      padding:
+                      const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius:
+                        BorderRadius.circular(16),
                         border: Border.all(
                           color: border,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(
+                            color: Colors.black
+                                .withValues(
                               alpha: 0.025,
                             ),
                             blurRadius: 10,
-                            offset: const Offset(
+                            offset:
+                            const Offset(
                               0,
                               4,
                             ),
@@ -101,37 +111,55 @@ class _ChatScreenState extends State<ChatScreen> {
                         CrossAxisAlignment.start,
                         children: [
                           Stack(
-                            clipBehavior: Clip.none,
+                            clipBehavior:
+                            Clip.none,
                             children: [
                               Container(
                                 width: 52,
                                 height: 52,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFFB45E),
-                                  shape: BoxShape.circle,
+                                decoration:
+                                const BoxDecoration(
+                                  color:
+                                  Color(
+                                    0xFFFFB45E,
+                                  ),
+                                  shape:
+                                  BoxShape.circle,
                                 ),
-                                alignment: Alignment.center,
+                                alignment:
+                                Alignment.center,
                                 child: Text(
-                                  conversation.initials,
-                                  style: const TextStyle(
+                                  conversation
+                                      .initials,
+                                  style:
+                                  const TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
+                                    fontWeight:
+                                    FontWeight
+                                        .w800,
+                                    color:
+                                    Colors.white,
                                   ),
                                 ),
                               ),
-
                               Positioned(
                                 right: 0,
                                 bottom: 0,
                                 child: Container(
                                   width: 13,
                                   height: 13,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF4CAF67),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
+                                  decoration:
+                                  BoxDecoration(
+                                    color:
+                                    const Color(
+                                      0xFF4CAF67,
+                                    ),
+                                    shape:
+                                    BoxShape.circle,
+                                    border:
+                                    Border.all(
+                                      color:
+                                      Colors.white,
                                       width: 2,
                                     ),
                                   ),
@@ -139,125 +167,157 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             ],
                           ),
-
-                          const SizedBox(width: 12),
-
+                          const SizedBox(
+                            width: 12,
+                          ),
                           Expanded(
                             child: Column(
                               crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                              CrossAxisAlignment
+                                  .start,
                               children: [
                                 Row(
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        conversation.userName,
-                                        style: const TextStyle(
-                                          fontSize: 13,
+                                        conversation
+                                            .userName,
+                                        style:
+                                        const TextStyle(
+                                          fontSize:
+                                          13,
                                           fontWeight:
-                                          FontWeight.w800,
-                                          color: darkText,
+                                          FontWeight
+                                              .w800,
+                                          color:
+                                          darkText,
                                         ),
                                       ),
                                     ),
-
-                                    if (latestMessage != null)
+                                    if (latestMessage !=
+                                        null)
                                       Text(
                                         _formatListTime(
-                                          latestMessage.sentAt,
+                                          latestMessage
+                                              .sentAt,
                                         ),
-                                        style: const TextStyle(
-                                          fontSize: 8.5,
-                                          color: mutedText,
+                                        style:
+                                        const TextStyle(
+                                          fontSize:
+                                          8.5,
+                                          color:
+                                          mutedText,
                                         ),
                                       ),
                                   ],
                                 ),
-
-                                const SizedBox(height: 4),
-
+                                const SizedBox(
+                                  height: 4,
+                                ),
                                 Text(
                                   conversation.city,
-                                  style: const TextStyle(
+                                  style:
+                                  const TextStyle(
                                     fontSize: 8.5,
                                     color: mutedText,
                                   ),
                                 ),
-
-                                const SizedBox(height: 7),
-
+                                const SizedBox(
+                                  height: 7,
+                                ),
                                 Row(
                                   children: [
                                     const Icon(
-                                      Icons.swap_horiz_rounded,
+                                      Icons
+                                          .swap_horiz_rounded,
                                       size: 14,
                                       color: primary,
                                     ),
-
-                                    const SizedBox(width: 5),
-
+                                    const SizedBox(
+                                      width: 5,
+                                    ),
                                     Expanded(
                                       child: Text(
                                         '${conversation.skillWanted} ↔ ${conversation.skillOffered}',
                                         maxLines: 1,
                                         overflow:
-                                        TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        TextOverflow
+                                            .ellipsis,
+                                        style:
+                                        const TextStyle(
                                           fontSize: 9,
                                           fontWeight:
-                                          FontWeight.w600,
-                                          color: primary,
+                                          FontWeight
+                                              .w600,
+                                          color:
+                                          primary,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-
-                                const SizedBox(height: 8),
-
+                                const SizedBox(
+                                  height: 8,
+                                ),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        latestMessage == null
+                                        latestMessage ==
+                                            null
                                             ? 'No messages yet'
-                                            : latestMessage.text,
+                                            : latestMessage
+                                            .text,
                                         maxLines: 1,
                                         overflow:
-                                        TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: mutedText,
+                                        TextOverflow
+                                            .ellipsis,
+                                        style:
+                                        const TextStyle(
+                                          fontSize:
+                                          10,
+                                          color:
+                                          mutedText,
                                         ),
                                       ),
                                     ),
-
-                                    const SizedBox(width: 8),
-
+                                    const SizedBox(
+                                      width: 8,
+                                    ),
                                     Container(
                                       padding:
-                                      const EdgeInsets.symmetric(
+                                      const EdgeInsets
+                                          .symmetric(
                                         horizontal: 8,
                                         vertical: 4,
                                       ),
-                                      decoration: BoxDecoration(
+                                      decoration:
+                                      BoxDecoration(
                                         color:
                                         _statusBackground(
-                                          conversation.status,
+                                          conversation
+                                              .status,
                                         ),
                                         borderRadius:
-                                        BorderRadius.circular(
+                                        BorderRadius
+                                            .circular(
                                           12,
                                         ),
                                       ),
                                       child: Text(
-                                        conversation.status,
-                                        style: TextStyle(
-                                          fontSize: 7.5,
+                                        conversation
+                                            .status,
+                                        style:
+                                        TextStyle(
+                                          fontSize:
+                                          7.5,
                                           fontWeight:
-                                          FontWeight.w700,
-                                          color: _statusColor(
-                                            conversation.status,
+                                          FontWeight
+                                              .w700,
+                                          color:
+                                          _statusColor(
+                                            conversation
+                                                .status,
                                           ),
                                         ),
                                       ),
@@ -306,7 +366,6 @@ class _ChatScreenState extends State<ChatScreen> {
               color: primary,
             ),
           ),
-
           const Expanded(
             child: Center(
               child: Text(
@@ -319,7 +378,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
-
           IconButton(
             onPressed: () {},
             icon: const Icon(
@@ -340,7 +398,8 @@ class _ChatScreenState extends State<ChatScreen> {
           horizontal: 36,
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+          MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/images/mascot/tubi_sleeping.png',
@@ -348,9 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 120,
               fit: BoxFit.contain,
             ),
-
             const SizedBox(height: 14),
-
             const Text(
               'No conversations yet',
               style: TextStyle(
@@ -359,9 +416,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: darkText,
               ),
             ),
-
             const SizedBox(height: 6),
-
             const Text(
               'Find someone with a skill you want to learn and start a conversation.',
               textAlign: TextAlign.center,
@@ -483,7 +538,9 @@ class _ChatScreenState extends State<ChatScreen> {
         dateTime.minute;
 
     final String period =
-    hour >= 12 ? 'PM' : 'AM';
+    hour >= 12
+        ? 'PM'
+        : 'AM';
 
     if (hour == 0) {
       hour = 12;
