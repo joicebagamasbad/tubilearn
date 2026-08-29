@@ -58,18 +58,13 @@ class SwapService {
     String? providerUserId,
     String? skillToLearnId,
     String? skillToOfferId,
-
     required String providerName,
     required String providerInitials,
     required String providerCity,
-
     required String skillToLearn,
     required String skillToOffer,
-
     required DateTime proposedAt,
-
     required String mode,
-
     String? meetingDetails,
     String? note,
   }) async {
@@ -141,28 +136,22 @@ class SwapService {
       cleanSkillToLearnId,
       skillToOfferId:
       cleanSkillToOfferId,
-
       providerName:
       cleanProviderName,
       providerInitials:
       cleanProviderInitials,
       providerCity:
       cleanProviderCity,
-
       skillToLearn:
       cleanSkillToLearn,
       skillToOffer:
       cleanSkillToOffer,
-
       proposedAt:
       proposedAt,
-
       mode:
       cleanMode,
-
       meetingDetails:
       cleanMeetingDetails,
-
       note:
       cleanNote,
     );
@@ -176,7 +165,6 @@ class SwapService {
       cleanSkillToLearnId,
       skillToOfferId:
       cleanSkillToOfferId,
-
       providerName:
       cleanProviderName,
       skillToLearn:
@@ -190,54 +178,39 @@ class SwapService {
 
     final SwapRequest request =
     SwapRequest(
-      id: now.microsecondsSinceEpoch
+      id:
+      now.microsecondsSinceEpoch
           .toString(),
-
       requesterUserId:
       cleanRequesterUserId,
-
       providerUserId:
       cleanProviderUserId,
-
       skillToLearnId:
       cleanSkillToLearnId,
-
       skillToOfferId:
       cleanSkillToOfferId,
-
       providerName:
       cleanProviderName,
-
       providerInitials:
       cleanProviderInitials,
-
       providerCity:
       cleanProviderCity,
-
       skillToLearn:
       cleanSkillToLearn,
-
       skillToOffer:
       cleanSkillToOffer,
-
       proposedAt:
       proposedAt,
-
       mode:
       cleanMode,
-
       meetingDetails:
       cleanMeetingDetails,
-
       note:
       cleanNote,
-
       status:
       SwapRequestStatus.pending,
-
       createdAt:
       now,
-
       updatedAt:
       now,
     );
@@ -453,9 +426,12 @@ class SwapService {
 
     try {
       await _repository.updateStatus(
-        requestId: request.id,
-        status: nextStatus,
-        updatedAt: updatedAt,
+        requestId:
+        request.id,
+        status:
+        nextStatus,
+        updatedAt:
+        updatedAt,
       );
     } catch (_) {
       throw const SwapServiceException(
@@ -473,47 +449,74 @@ class SwapService {
   // ============================================================
   // DELETE REQUEST
   //
-  // Internal/local cleanup only.
-  // Do not expose this as a normal participant action.
+  // Hard deletion is intentionally restricted.
+  //
+  // Rules:
+  // - Actor identity is required.
+  // - Request must have stable participant IDs.
+  // - Actor must be requester or provider.
+  // - Active requests cannot be hard-deleted.
+  // - Only terminal history may be removed.
+  //
+  // This prevents deletion from being used as a shortcut around
+  // the proper cancel / decline / complete lifecycle.
   // ============================================================
 
-  Future<void> deleteRequest(
-      String requestId,
-      ) async {
-    final String cleanRequestId =
-    requestId.trim();
+  Future<void> deleteRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
 
-    if (cleanRequestId.isEmpty) {
+    final String cleanActorUserId =
+    _requireActorUserId(
+      actorUserId,
+    );
+
+    if (!request.hasStableIdentity) {
       throw const SwapServiceException(
-        'Swap request ID is required.',
+        'This legacy swap request cannot be safely deleted because participant identity is incomplete.',
       );
     }
 
-    final SwapRequest? request =
-    findById(
-      cleanRequestId,
-    );
+    final bool isRequester =
+        request.requesterUserId ==
+            cleanActorUserId;
 
-    if (request == null) {
+    final bool isProvider =
+        request.providerUserId ==
+            cleanActorUserId;
+
+    if (!isRequester &&
+        !isProvider) {
       throw const SwapServiceException(
-        'Swap request not found.',
+        'You are not allowed to delete this swap request.',
+      );
+    }
+
+    if (request.status.isActive) {
+      throw const SwapServiceException(
+        'Active swap requests cannot be deleted. Cancel or finish the request first.',
       );
     }
 
     try {
       await _repository.deleteSwapRequest(
-        cleanRequestId,
+        request.id,
       );
     } catch (_) {
       throw const SwapServiceException(
-        'Could not delete the swap request.',
+        'Could not delete the swap request. Please try again.',
       );
     }
 
     _requests.removeWhere(
           (item) =>
       item.id ==
-          cleanRequestId,
+          request.id,
     );
   }
 
@@ -611,10 +614,14 @@ class SwapService {
       return;
     }
 
-    if (requesterUserId == null ||
-        providerUserId == null ||
-        skillToLearnId == null ||
-        skillToOfferId == null) {
+    if (requesterUserId ==
+        null ||
+        providerUserId ==
+            null ||
+        skillToLearnId ==
+            null ||
+        skillToOfferId ==
+            null) {
       throw const SwapServiceException(
         'Incomplete swap request identity.',
       );
@@ -644,18 +651,13 @@ class SwapService {
     required String? providerUserId,
     required String? skillToLearnId,
     required String? skillToOfferId,
-
     required String providerName,
     required String providerInitials,
     required String providerCity,
-
     required String skillToLearn,
     required String skillToOffer,
-
     required DateTime proposedAt,
-
     required String mode,
-
     required String? meetingDetails,
     required String? note,
   }) {
@@ -689,8 +691,10 @@ class SwapService {
       );
     }
 
-    if (skillToLearn.toLowerCase() ==
-        skillToOffer.toLowerCase()) {
+    if (skillToLearn
+        .toLowerCase() ==
+        skillToOffer
+            .toLowerCase()) {
       throw const SwapServiceException(
         'The skill you want to learn and the skill you offer must be different.',
       );
@@ -717,10 +721,12 @@ class SwapService {
       );
     }
 
-    if (meetingDetails == null ||
+    if (meetingDetails ==
+        null ||
         meetingDetails.isEmpty) {
       throw SwapServiceException(
-        mode == 'Online'
+        mode ==
+            'Online'
             ? 'Preferred online platform is required.'
             : 'Preferred public meeting area is required.',
       );
@@ -734,7 +740,8 @@ class SwapService {
     }
 
     if (note != null &&
-        note.length > 300) {
+        note.length >
+            300) {
       throw const SwapServiceException(
         'Message must be 300 characters or less.',
       );
@@ -767,7 +774,6 @@ class SwapService {
     required String? providerUserId,
     required String? skillToLearnId,
     required String? skillToOfferId,
-
     required String providerName,
     required String skillToLearn,
     required String skillToOffer,
