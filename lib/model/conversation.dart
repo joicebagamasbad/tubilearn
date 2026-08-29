@@ -2,6 +2,13 @@ import 'message.dart';
 
 class Conversation {
   final String id;
+
+  // Stable identity of the other participant.
+  //
+  // Nullable only for legacy conversations that could not be
+  // safely matched to an existing TubiLearn user.
+  final String? participantUserId;
+
   final String userName;
   final String initials;
   final String city;
@@ -13,6 +20,7 @@ class Conversation {
 
   Conversation({
     required this.id,
+    required this.participantUserId,
     required this.userName,
     required this.initials,
     required this.city,
@@ -21,4 +29,8 @@ class Conversation {
     required this.status,
     required this.messages,
   });
+
+  bool get hasStableParticipant =>
+      participantUserId != null &&
+          participantUserId!.trim().isNotEmpty;
 }

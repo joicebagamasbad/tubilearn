@@ -39,8 +39,9 @@ class UserProfileScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(context),
-
+            _buildTopBar(
+              context,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 physics:
@@ -58,11 +59,15 @@ class UserProfileScreen extends StatelessWidget {
                   children: [
                     _buildProfileHeader(),
 
-                    const SizedBox(height: 22),
+                    const SizedBox(
+                      height: 22,
+                    ),
 
                     _buildStatsRow(),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     const Text(
                       'About',
@@ -70,7 +75,9 @@ class UserProfileScreen extends StatelessWidget {
                       AppTextStyles.cardTitle,
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     Text(
                       user.bio,
@@ -78,11 +85,15 @@ class UserProfileScreen extends StatelessWidget {
                       AppTextStyles.bodyMuted,
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     _buildInfoCard(),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     const Text(
                       'Skills offered',
@@ -90,7 +101,9 @@ class UserProfileScreen extends StatelessWidget {
                       AppTextStyles.cardTitle,
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                      height: 10,
+                    ),
 
                     if (offeredSkills.isEmpty)
                       const Text(
@@ -104,7 +117,9 @@ class UserProfileScreen extends StatelessWidget {
                         runSpacing: 8,
                         children:
                         offeredSkills.map(
-                              (skill) {
+                              (
+                              skill,
+                              ) {
                             return _skillChip(
                               skill.title,
                               const Color(
@@ -116,7 +131,9 @@ class UserProfileScreen extends StatelessWidget {
                         ).toList(),
                       ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     const Text(
                       'Wants to learn',
@@ -124,7 +141,9 @@ class UserProfileScreen extends StatelessWidget {
                       AppTextStyles.cardTitle,
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                      height: 10,
+                    ),
 
                     if (wantedSkills.isEmpty)
                       const Text(
@@ -138,7 +157,9 @@ class UserProfileScreen extends StatelessWidget {
                         runSpacing: 8,
                         children:
                         wantedSkills.map(
-                              (skill) {
+                              (
+                              skill,
+                              ) {
                             return _skillChip(
                               skill.title,
                               const Color(
@@ -152,11 +173,15 @@ class UserProfileScreen extends StatelessWidget {
                         ).toList(),
                       ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     _buildTrustCard(),
 
-                    const SizedBox(height: 26),
+                    const SizedBox(
+                      height: 26,
+                    ),
 
                     _buildActionButtons(
                       context,
@@ -199,15 +224,17 @@ class UserProfileScreen extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(
+                context,
+              );
             },
             icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons
+                  .arrow_back_ios_new_rounded,
               size: 18,
               color: primary,
             ),
           ),
-
           const Expanded(
             child: Center(
               child: Text(
@@ -217,7 +244,6 @@ class UserProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-
           IconButton(
             onPressed: () {},
             icon: const Icon(
@@ -263,9 +289,9 @@ class UserProfileScreen extends StatelessWidget {
             ),
           ),
         ),
-
-        const SizedBox(width: 16),
-
+        const SizedBox(
+          width: 16,
+        ),
         Expanded(
           child: Column(
             crossAxisAlignment:
@@ -276,9 +302,9 @@ class UserProfileScreen extends StatelessWidget {
                 style:
                 AppTextStyles.pageTitle,
               ),
-
-              const SizedBox(height: 4),
-
+              const SizedBox(
+                height: 4,
+              ),
               Row(
                 children: [
                   const Icon(
@@ -287,9 +313,9 @@ class UserProfileScreen extends StatelessWidget {
                     size: 15,
                     color: mutedText,
                   ),
-
-                  const SizedBox(width: 4),
-
+                  const SizedBox(
+                    width: 4,
+                  ),
                   Expanded(
                     child: Text(
                       user.city,
@@ -299,9 +325,9 @@ class UserProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 8),
-
+              const SizedBox(
+                height: 8,
+              ),
               Row(
                 children: [
                   const Icon(
@@ -312,9 +338,9 @@ class UserProfileScreen extends StatelessWidget {
                       0xFFFFB547,
                     ),
                   ),
-
-                  const SizedBox(width: 3),
-
+                  const SizedBox(
+                    width: 3,
+                  ),
                   Text(
                     user.rating
                         .toStringAsFixed(
@@ -328,9 +354,9 @@ class UserProfileScreen extends StatelessWidget {
                       FontWeight.w700,
                     ),
                   ),
-
-                  const SizedBox(width: 5),
-
+                  const SizedBox(
+                    width: 5,
+                  ),
                   Text(
                     '(${user.reviewCount} reviews)',
                     style:
@@ -341,7 +367,6 @@ class UserProfileScreen extends StatelessWidget {
             ],
           ),
         ),
-
         Image.asset(
           'assets/images/mascot/tubi_happy.png',
           width: 58,
@@ -364,18 +389,18 @@ class UserProfileScreen extends StatelessWidget {
             'Completed swaps',
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: _statBox(
             '${user.responseRate}%',
             'Response rate',
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: _statBox(
             user.memberSince,
@@ -396,10 +421,13 @@ class UserProfileScreen extends StatelessWidget {
         vertical: 14,
         horizontal: 8,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(14),
+        BorderRadius.circular(
+          14,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -411,9 +439,9 @@ class UserProfileScreen extends StatelessWidget {
             style:
             AppTextStyles.cardTitle,
           ),
-
-          const SizedBox(height: 4),
-
+          const SizedBox(
+            height: 4,
+          ),
           Text(
             label,
             textAlign:
@@ -433,11 +461,16 @@ class UserProfileScreen extends StatelessWidget {
   Widget _buildInfoCard() {
     return Container(
       padding:
-      const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(16),
+        BorderRadius.circular(
+          16,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -449,34 +482,28 @@ class UserProfileScreen extends StatelessWidget {
             'Languages',
             user.language,
           ),
-
           const Divider(
             height: 22,
             color: border,
           ),
-
           _infoRow(
             Icons.schedule_rounded,
             'Availability',
             user.availability,
           ),
-
           const Divider(
             height: 22,
             color: border,
           ),
-
           _infoRow(
             Icons.devices_rounded,
             'Preferred mode',
             user.preferredMode,
           ),
-
           const Divider(
             height: 22,
             color: border,
           ),
-
           _infoRow(
             Icons.school_outlined,
             'Teaching style',
@@ -501,9 +528,9 @@ class UserProfileScreen extends StatelessWidget {
           size: 18,
           color: primary,
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: Column(
             crossAxisAlignment:
@@ -514,9 +541,9 @@ class UserProfileScreen extends StatelessWidget {
                 style:
                 AppTextStyles.caption,
               ),
-
-              const SizedBox(height: 3),
-
+              const SizedBox(
+                height: 3,
+              ),
               Text(
                 value,
                 style:
@@ -554,7 +581,9 @@ class UserProfileScreen extends StatelessWidget {
         color:
         backgroundColor,
         borderRadius:
-        BorderRadius.circular(20),
+        BorderRadius.circular(
+          20,
+        ),
       ),
       child: Text(
         skill,
@@ -579,7 +608,9 @@ class UserProfileScreen extends StatelessWidget {
       width:
       double.infinity,
       padding:
-      const EdgeInsets.all(14),
+      const EdgeInsets.all(
+        14,
+      ),
       decoration:
       BoxDecoration(
         color:
@@ -587,7 +618,9 @@ class UserProfileScreen extends StatelessWidget {
           0xFFF3FBF6,
         ),
         borderRadius:
-        BorderRadius.circular(15),
+        BorderRadius.circular(
+          15,
+        ),
         border: Border.all(
           color:
           const Color(
@@ -608,25 +641,25 @@ class UserProfileScreen extends StatelessWidget {
               14,
             ),
           ),
-
-          const SizedBox(height: 10),
-
+          const SizedBox(
+            height: 10,
+          ),
           if (user.emailVerified)
             _trustRow(
               'Email verified',
             ),
-
           if (user.emailVerified)
-            const SizedBox(height: 7),
-
+            const SizedBox(
+              height: 7,
+            ),
           if (user.profileCompleted)
             _trustRow(
               'Profile completed',
             ),
-
           if (user.profileCompleted)
-            const SizedBox(height: 7),
-
+            const SizedBox(
+              height: 7,
+            ),
           _trustRow(
             '${user.completedSwaps} completed exchanges',
           ),
@@ -648,9 +681,9 @@ class UserProfileScreen extends StatelessWidget {
             0xFF47A568,
           ),
         ),
-
-        const SizedBox(width: 7),
-
+        const SizedBox(
+          width: 7,
+        ),
         Expanded(
           child: Text(
             text,
@@ -676,8 +709,11 @@ class UserProfileScreen extends StatelessWidget {
       user.id,
     )
         .map(
-          (relationship) =>
-          _repository.findSkillById(
+          (
+          relationship,
+          ) =>
+          _repository
+              .findSkillById(
             relationship.skillId,
           ),
     )
@@ -691,8 +727,11 @@ class UserProfileScreen extends StatelessWidget {
       user.id,
     )
         .map(
-          (relationship) =>
-          _repository.findSkillById(
+          (
+          relationship,
+          ) =>
+          _repository
+              .findSkillById(
             relationship.skillId,
           ),
     )
@@ -735,7 +774,8 @@ class UserProfileScreen extends StatelessWidget {
                 AppTextStyles.button,
               ),
               style:
-              OutlinedButton.styleFrom(
+              OutlinedButton
+                  .styleFrom(
                 foregroundColor:
                 primary,
                 side:
@@ -754,9 +794,9 @@ class UserProfileScreen extends StatelessWidget {
             ),
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: SizedBox(
             height: 46,
@@ -780,7 +820,8 @@ class UserProfileScreen extends StatelessWidget {
                 AppTextStyles.button,
               ),
               style:
-              ElevatedButton.styleFrom(
+              ElevatedButton
+                  .styleFrom(
                 backgroundColor:
                 primary,
                 foregroundColor:
@@ -818,6 +859,8 @@ class UserProfileScreen extends StatelessWidget {
     final conversation =
     ChatService.instance
         .getOrCreateConversation(
+      userId:
+      user.id,
       userName:
       user.name,
       initials:
@@ -877,19 +920,14 @@ class UserProfileScreen extends StatelessWidget {
             CreateSwapRequestScreen(
               providerUserId:
               user.id,
-
               skillToLearnId:
               skillToLearn.id,
-
               providerName:
               user.name,
-
               providerInitials:
               user.initials,
-
               providerCity:
               user.city,
-
               skillToLearn:
               skillToLearn.title,
             ),

@@ -3,6 +3,19 @@ import 'dart:async';
 import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
+import '../model/repositories/explore_repository.dart';
+import '../model/user.dart';
+
+class ChatServiceException implements Exception {
+  final String message;
+
+  const ChatServiceException(
+      this.message,
+      );
+
+  @override
+  String toString() => message;
+}
 
 class ChatService {
   ChatService._();
@@ -13,14 +26,19 @@ class ChatService {
   final ChatRepository _repository =
   ChatRepository();
 
+  final ExploreRepository
+  _exploreRepository =
+      ExploreRepository.instance;
+
   final List<Conversation>
   _conversations = [];
 
   bool _initialized = false;
 
-  List<Conversation>
-  get conversations =>
-      _conversations;
+  List<Conversation> get conversations =>
+      List.unmodifiable(
+        _conversations,
+      );
 
   // ============================================================
   // INITIALIZE
@@ -31,7 +49,8 @@ class ChatService {
       return;
     }
 
-    final savedConversations =
+    final List<Conversation>
+    savedConversations =
     await _repository
         .getAllConversations();
 
@@ -52,43 +71,38 @@ class ChatService {
   // INITIAL SAMPLE CONVERSATION
   // ============================================================
 
-  Future<void>
-  _createInitialData() async {
+  Future<void> _createInitialData() async {
     final DateTime now =
     DateTime.now();
 
-    final alexConversation =
+    final Conversation alexConversation =
     Conversation(
-      id: 'alex-rivera',
-
+      id:
+      _createConversationIdForUser(
+        'user_alex_rivera',
+      ),
+      participantUserId:
+      'user_alex_rivera',
       userName:
       'Alex Rivera',
-
       initials:
       'AR',
-
       city:
       'Mabalacat City',
-
       skillWanted:
       'Photography',
-
       skillOffered:
       'Graphic Design',
-
       status:
       'Planning',
-
       messages: [
         Message(
-          id: 'alex-initial-1',
-
+          id:
+          'alex-initial-1',
           text:
           'Hi! I saw that you offer Photography. I’m interested in learning the basics.',
-
           isMe:
           true,
-
           sentAt:
           now.subtract(
             const Duration(
@@ -96,16 +110,13 @@ class ChatService {
             ),
           ),
         ),
-
         Message(
-          id: 'alex-initial-2',
-
+          id:
+          'alex-initial-2',
           text:
           'Sure! I usually start with the practical basics first before going into more advanced topics.',
-
           isMe:
           false,
-
           sentAt:
           now.subtract(
             const Duration(
@@ -120,17 +131,15 @@ class ChatService {
       alexConversation,
     );
 
-    await _repository
-        .saveConversation(
+    await _repository.saveConversation(
       alexConversation,
     );
 
-    for (final message
+    for (final Message message
     in alexConversation.messages) {
       await _repository.saveMessage(
         conversationId:
         alexConversation.id,
-
         message:
         message,
       );
@@ -139,51 +148,126 @@ class ChatService {
 
   // ============================================================
   // GET OR CREATE CONVERSATION
+  //
+  // userId is optional temporarily so older call sites continue
+  // compiling while we migrate them.
+  //
+  // When userId is absent, we only accept a unique exact match
+  // against the normalized Explore users. We do not invent IDs.
   // ============================================================
 
-  Conversation
-  getOrCreateConversation({
+  Conversation getOrCreateConversation({
+    String? userId,
     required String userName,
     required String initials,
     required String city,
     required String skillWanted,
     required String skillOffered,
   }) {
-    final String id =
-    _createConversationId(
+    final String cleanUserName =
+    _requireText(
       userName,
+      'User name',
     );
 
-    for (final conversation
+    final String cleanInitials =
+    _requireText(
+      initials,
+      'Initials',
+    );
+
+    final String cleanCity =
+    _requireText(
+      city,
+      'City',
+    );
+
+    final String cleanSkillWanted =
+    _requireText(
+      skillWanted,
+      'Wanted skill',
+    );
+
+    final String cleanSkillOffered =
+    _requireText(
+      skillOffered,
+      'Offered skill',
+    );
+
+    final String? stableUserId =
+    _resolveStableUserId(
+      userId:
+      userId,
+      userName:
+      cleanUserName,
+    );
+
+    // ----------------------------------------------------------
+    // Stable identity path
+    // ----------------------------------------------------------
+
+    if (stableUserId != null) {
+      for (final Conversation conversation
+      in _conversations) {
+        if (conversation.participantUserId ==
+            stableUserId) {
+          return conversation;
+        }
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Legacy fallback
+    //
+    // If an old conversation exists without participant_user_id,
+    // reuse it instead of creating a duplicate.
+    // ----------------------------------------------------------
+
+    for (final Conversation conversation
     in _conversations) {
-      if (conversation.id == id) {
+      if (conversation.participantUserId !=
+          null) {
+        continue;
+      }
+
+      if (conversation.userName
+          .trim()
+          .toLowerCase() ==
+          cleanUserName
+              .toLowerCase()) {
         return conversation;
       }
     }
 
-    final newConversation =
+    final String conversationId =
+    stableUserId != null
+        ? _createConversationIdForUser(
+      stableUserId,
+    )
+        : _createLegacyConversationId(
+      cleanUserName,
+    );
+
+    final Conversation newConversation =
     Conversation(
-      id: id,
-
+      id:
+      conversationId,
+      participantUserId:
+      stableUserId,
       userName:
-      userName,
-
+      cleanUserName,
       initials:
-      initials,
-
+      cleanInitials,
       city:
-      city,
-
+      cleanCity,
       skillWanted:
-      skillWanted,
-
+      cleanSkillWanted,
       skillOffered:
-      skillOffered,
-
+      cleanSkillOffered,
       status:
       'New',
-
-      messages: [],
+      messages:
+      [],
     );
 
     _conversations.add(
@@ -207,27 +291,43 @@ class ChatService {
     required String conversationId,
     required String text,
   }) {
-    final conversation =
-    _conversations.firstWhere(
-          (conversation) =>
-      conversation.id ==
-          conversationId,
+    final String cleanConversationId =
+    _requireText(
+      conversationId,
+      'Conversation ID',
     );
 
-    final message =
-    Message(
-      id: DateTime.now()
-          .microsecondsSinceEpoch
-          .toString(),
-
-      text:
+    final String cleanText =
+    _requireText(
       text,
+      'Message',
+    );
 
+    final Conversation? conversation =
+    findConversation(
+      cleanConversationId,
+    );
+
+    if (conversation == null) {
+      throw const ChatServiceException(
+        'Conversation not found.',
+      );
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    final Message message =
+    Message(
+      id:
+      now.microsecondsSinceEpoch
+          .toString(),
+      text:
+      cleanText,
       isMe:
       true,
-
       sentAt:
-      DateTime.now(),
+      now,
     );
 
     conversation.messages.add(
@@ -237,8 +337,7 @@ class ChatService {
     unawaited(
       _repository.saveMessage(
         conversationId:
-        conversationId,
-
+        cleanConversationId,
         message:
         message,
       ),
@@ -249,14 +348,45 @@ class ChatService {
   // FIND CONVERSATION
   // ============================================================
 
-  Conversation?
-  findConversation(
+  Conversation? findConversation(
       String conversationId,
       ) {
-    for (final conversation
+    final String cleanConversationId =
+    conversationId.trim();
+
+    if (cleanConversationId.isEmpty) {
+      return null;
+    }
+
+    for (final Conversation conversation
     in _conversations) {
       if (conversation.id ==
-          conversationId) {
+          cleanConversationId) {
+        return conversation;
+      }
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // FIND BY PARTICIPANT
+  // ============================================================
+
+  Conversation? findConversationByUserId(
+      String userId,
+      ) {
+    final String cleanUserId =
+    userId.trim();
+
+    if (cleanUserId.isEmpty) {
+      return null;
+    }
+
+    for (final Conversation conversation
+    in _conversations) {
+      if (conversation.participantUserId ==
+          cleanUserId) {
         return conversation;
       }
     }
@@ -271,32 +401,137 @@ class ChatService {
   void deleteConversation(
       String conversationId,
       ) {
+    final String cleanConversationId =
+    conversationId.trim();
+
+    if (cleanConversationId.isEmpty) {
+      return;
+    }
+
     _conversations.removeWhere(
-          (conversation) =>
+          (
+          Conversation conversation,
+          ) =>
       conversation.id ==
-          conversationId,
+          cleanConversationId,
     );
 
     unawaited(
       _repository.deleteConversation(
-        conversationId,
+        cleanConversationId,
       ),
     );
   }
 
   // ============================================================
-  // CREATE STABLE CONVERSATION ID
+  // RESOLVE STABLE USER ID
   // ============================================================
 
-  String _createConversationId(
+  String? _resolveStableUserId({
+    required String? userId,
+    required String userName,
+  }) {
+    final String? cleanUserId =
+    _cleanNullableText(
+      userId,
+    );
+
+    if (cleanUserId != null) {
+      final User? user =
+      _exploreRepository.findUserById(
+        cleanUserId,
+      );
+
+      if (user == null) {
+        throw const ChatServiceException(
+          'Chat participant could not be found.',
+        );
+      }
+
+      return user.id;
+    }
+
+    final String normalizedName =
+    userName
+        .trim()
+        .toLowerCase();
+
+    User? matchedUser;
+
+    for (final User user
+    in _exploreRepository.users) {
+      if (user.name
+          .trim()
+          .toLowerCase() !=
+          normalizedName) {
+        continue;
+      }
+
+      if (matchedUser != null) {
+        // Two users with same display name:
+        // never guess identity.
+        return null;
+      }
+
+      matchedUser = user;
+    }
+
+    return matchedUser?.id;
+  }
+
+  // ============================================================
+  // CONVERSATION IDS
+  // ============================================================
+
+  String _createConversationIdForUser(
+      String userId,
+      ) {
+    return 'conversation_$userId';
+  }
+
+  String _createLegacyConversationId(
       String name,
       ) {
-    return name
-        .toLowerCase()
-        .trim()
-        .replaceAll(
+    return 'legacy_${name.toLowerCase().trim().replaceAll(
       RegExp(r'\s+'),
       '-',
-    );
+    )}';
+  }
+
+  // ============================================================
+  // TEXT VALIDATION
+  // ============================================================
+
+  String _requireText(
+      String value,
+      String fieldName,
+      ) {
+    final String cleaned =
+    value.trim();
+
+    if (cleaned.isEmpty) {
+      throw ChatServiceException(
+        '$fieldName is required.',
+      );
+    }
+
+    return cleaned;
+  }
+
+  String? _cleanNullableText(
+      String? value,
+      ) {
+    if (value == null) {
+      return null;
+    }
+
+    final String cleaned =
+    value.trim();
+
+    if (cleaned.isEmpty) {
+      return null;
+    }
+
+    return cleaned;
   }
 }

@@ -12,7 +12,7 @@ class AppDatabase {
   static const String _databaseName =
       'tubilearn.db';
 
-  static const int _databaseVersion = 7;
+  static const int _databaseVersion = 8;
 
   Database? _database;
 
@@ -76,6 +76,10 @@ class AppDatabase {
         await _createSkillOwnershipIndexesV7(
           db,
         );
+
+        await _createConversationIndexesV8(
+          db,
+        );
       },
 
       // ========================================================
@@ -119,6 +123,12 @@ class AppDatabase {
 
         if (oldVersion < 7) {
           await _migrateToVersion7(
+            db,
+          );
+        }
+
+        if (oldVersion < 8) {
+          await _migrateToVersion8(
             db,
           );
         }
@@ -444,7 +454,11 @@ class AppDatabase {
   }
 
   // ============================================================
-  // VERSION 3 - CONVERSATION TABLES
+  // CONVERSATION TABLES
+  //
+  // Originally introduced in v3.
+  //
+  // Fresh v8 installs also include participant_user_id.
   // ============================================================
 
   Future<void> _createConversationTablesV3(
@@ -455,6 +469,12 @@ class AppDatabase {
       CREATE TABLE conversations (
         id TEXT PRIMARY KEY
           CHECK(length(trim(id)) > 0),
+
+        participant_user_id TEXT
+          CHECK(
+            participant_user_id IS NULL
+            OR length(trim(participant_user_id)) > 0
+          ),
 
         user_name TEXT NOT NULL
           CHECK(length(trim(user_name)) > 0),
@@ -472,7 +492,11 @@ class AppDatabase {
           CHECK(length(trim(skill_offered)) > 0),
 
         status TEXT NOT NULL
-          CHECK(length(trim(status)) > 0)
+          CHECK(length(trim(status)) > 0),
+
+        FOREIGN KEY (participant_user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL
       )
       ''',
     );
@@ -1278,6 +1302,94 @@ class AppDatabase {
   }
 
   // ============================================================
+  // MIGRATION TO VERSION 8
+  //
+  // Adds stable participant identity to conversations.
+  //
+  // Existing conversations are preserved.
+  // Known seeded users are matched by the legacy display name.
+  // Unknown/ambiguous legacy conversations remain NULL.
+  // ============================================================
+
+  Future<void> _migrateToVersion8(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> columns =
+    await db.rawQuery(
+      '''
+      PRAGMA table_info(conversations)
+      ''',
+    );
+
+    final bool alreadyHasParticipant =
+    columns.any(
+          (column) =>
+      column['name'] ==
+          'participant_user_id',
+    );
+
+    if (!alreadyHasParticipant) {
+      await db.execute(
+        '''
+        ALTER TABLE conversations
+        ADD COLUMN participant_user_id TEXT
+          REFERENCES users(id)
+          ON DELETE SET NULL
+        ''',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Backfill only identities we can deterministically map.
+    //
+    // We never delete or merge conversations during migration.
+    // Unknown names remain NULL.
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      UPDATE conversations
+      SET participant_user_id =
+        CASE lower(trim(user_name))
+          WHEN 'mika santos'
+            THEN 'user_mika_santos'
+
+          WHEN 'paolo reyes'
+            THEN 'user_paolo_reyes'
+
+          WHEN 'alex rivera'
+            THEN 'user_alex_rivera'
+
+          WHEN 'bea mendoza'
+            THEN 'user_bea_mendoza'
+
+          WHEN 'carlo dela cruz'
+            THEN 'user_carlo_dela_cruz'
+
+          WHEN 'jamie garcia'
+            THEN 'user_jamie_garcia'
+
+          WHEN 'nico villanueva'
+            THEN 'user_nico_villanueva'
+
+          WHEN 'joshua lim'
+            THEN 'user_joshua_lim'
+
+          WHEN 'andrea flores'
+            THEN 'user_andrea_flores'
+
+          ELSE participant_user_id
+        END
+      WHERE participant_user_id IS NULL
+      ''',
+    );
+
+    await _createConversationIndexesV8(
+      db,
+    );
+  }
+
+  // ============================================================
   // MESSAGE INDEXES
   // ============================================================
 
@@ -1424,6 +1536,22 @@ class AppDatabase {
       CREATE INDEX IF NOT EXISTS
       idx_skills_owner_user
       ON skills(owner_user_id)
+      ''',
+    );
+  }
+
+  // ============================================================
+  // VERSION 8 CONVERSATION PARTICIPANT INDEX
+  // ============================================================
+
+  Future<void> _createConversationIndexesV8(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_conversations_participant_user
+      ON conversations(participant_user_id)
       ''',
     );
   }

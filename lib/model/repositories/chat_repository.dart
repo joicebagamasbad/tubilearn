@@ -1,27 +1,39 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../conversation.dart';
-import '../message.dart';
 import '../database/app_database.dart';
+import '../message.dart';
 
 class ChatRepository {
   final AppDatabase _appDatabase =
       AppDatabase.instance;
 
-  Future<List<Conversation>> getAllConversations() async {
-    final db = await _appDatabase.database;
+  // ============================================================
+  // GET ALL CONVERSATIONS
+  // ============================================================
 
-    final conversationRows = await db.query(
+  Future<List<Conversation>>
+  getAllConversations() async {
+    final Database db =
+    await _appDatabase.database;
+
+    final List<Map<String, Object?>>
+    conversationRows =
+    await db.query(
       'conversations',
     );
 
-    final List<Conversation> conversations = [];
+    final List<Conversation>
+    conversations = [];
 
-    for (final row in conversationRows) {
+    for (final Map<String, Object?> row
+    in conversationRows) {
       final String conversationId =
       row['id'] as String;
 
-      final messageRows = await db.query(
+      final List<Map<String, Object?>>
+      messageRows =
+      await db.query(
         'messages',
         where: 'conversation_id = ?',
         whereArgs: [
@@ -30,16 +42,28 @@ class ChatRepository {
         orderBy: 'sent_at ASC',
       );
 
-      final messages = messageRows.map(
-            (messageRow) {
+      final List<Message> messages =
+      messageRows.map(
+            (
+            Map<String, Object?>
+            messageRow,
+            ) {
           return Message(
-            id: messageRow['id'] as String,
-            text: messageRow['text'] as String,
+            id:
+            messageRow['id']
+            as String,
+            text:
+            messageRow['text']
+            as String,
             isMe:
-            (messageRow['is_me'] as int) == 1,
+            (messageRow['is_me']
+            as int) ==
+                1,
             sentAt:
-            DateTime.fromMillisecondsSinceEpoch(
-              messageRow['sent_at'] as int,
+            DateTime
+                .fromMillisecondsSinceEpoch(
+              messageRow['sent_at']
+              as int,
             ),
           );
         },
@@ -47,16 +71,32 @@ class ChatRepository {
 
       conversations.add(
         Conversation(
-          id: row['id'] as String,
-          userName: row['user_name'] as String,
-          initials: row['initials'] as String,
-          city: row['city'] as String,
+          id:
+          row['id']
+          as String,
+          participantUserId:
+          row['participant_user_id']
+          as String?,
+          userName:
+          row['user_name']
+          as String,
+          initials:
+          row['initials']
+          as String,
+          city:
+          row['city']
+          as String,
           skillWanted:
-          row['skill_wanted'] as String,
+          row['skill_wanted']
+          as String,
           skillOffered:
-          row['skill_offered'] as String,
-          status: row['status'] as String,
-          messages: messages,
+          row['skill_offered']
+          as String,
+          status:
+          row['status']
+          as String,
+          messages:
+          messages,
         ),
       );
     }
@@ -64,58 +104,96 @@ class ChatRepository {
     return conversations;
   }
 
+  // ============================================================
+  // SAVE CONVERSATION
+  // ============================================================
+
   Future<void> saveConversation(
       Conversation conversation,
       ) async {
-    final db = await _appDatabase.database;
+    final Database db =
+    await _appDatabase.database;
 
     await db.insert(
       'conversations',
       {
-        'id': conversation.id,
-        'user_name': conversation.userName,
-        'initials': conversation.initials,
-        'city': conversation.city,
-        'skill_wanted': conversation.skillWanted,
-        'skill_offered': conversation.skillOffered,
-        'status': conversation.status,
+        'id':
+        conversation.id,
+        'participant_user_id':
+        conversation.participantUserId,
+        'user_name':
+        conversation.userName,
+        'initials':
+        conversation.initials,
+        'city':
+        conversation.city,
+        'skill_wanted':
+        conversation.skillWanted,
+        'skill_offered':
+        conversation.skillOffered,
+        'status':
+        conversation.status,
       },
       conflictAlgorithm:
       ConflictAlgorithm.replace,
     );
   }
+
+  // ============================================================
+  // SAVE MESSAGE
+  // ============================================================
 
   Future<void> saveMessage({
     required String conversationId,
     required Message message,
   }) async {
-    final db = await _appDatabase.database;
+    final Database db =
+    await _appDatabase.database;
 
     await db.insert(
       'messages',
       {
-        'id': message.id,
-        'conversation_id': conversationId,
-        'text': message.text,
-        'is_me': message.isMe ? 1 : 0,
+        'id':
+        message.id,
+        'conversation_id':
+        conversationId,
+        'text':
+        message.text,
+        'is_me':
+        message.isMe
+            ? 1
+            : 0,
         'sent_at':
-        message.sentAt.millisecondsSinceEpoch,
+        message.sentAt
+            .millisecondsSinceEpoch,
       },
       conflictAlgorithm:
       ConflictAlgorithm.replace,
     );
   }
 
+  // ============================================================
+  // DELETE CONVERSATION
+  // ============================================================
+
   Future<void> deleteConversation(
       String conversationId,
       ) async {
-    final db = await _appDatabase.database;
+    final String cleanConversationId =
+    conversationId.trim();
+
+    if (cleanConversationId.isEmpty) {
+      return;
+    }
+
+    final Database db =
+    await _appDatabase.database;
 
     await db.delete(
       'conversations',
       where: 'id = ?',
       whereArgs: [
-        conversationId,
+        cleanConversationId,
       ],
     );
   }
