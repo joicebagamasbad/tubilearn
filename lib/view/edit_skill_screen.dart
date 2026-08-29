@@ -1,41 +1,60 @@
 import 'package:flutter/material.dart';
 
-class EditSkillScreen extends StatefulWidget {
-  final String skillName;
-  final String category;
-  final String description;
-  final String experienceLevel;
-  final String availability;
+import '../model/repositories/my_skills_repository.dart';
+import '../services/current_user_service.dart';
+
+class EditSkillScreen
+    extends StatefulWidget {
+  final ManagedSkill managedSkill;
 
   const EditSkillScreen({
     super.key,
-    required this.skillName,
-    required this.category,
-    required this.description,
-    required this.experienceLevel,
-    required this.availability,
+    required this.managedSkill,
   });
 
   @override
-  State<EditSkillScreen> createState() => _EditSkillScreenState();
+  State<EditSkillScreen> createState() =>
+      _EditSkillScreenState();
 }
 
-class _EditSkillScreenState extends State<EditSkillScreen> {
-  static const Color primary = Color(0xFF5B5FEF);
-  static const Color darkText = Color(0xFF171A2B);
-  static const Color mutedText = Color(0xFF8A8FA3);
-  static const Color background = Color(0xFFF9F9FF);
-  static const Color border = Color(0xFFE8E8F2);
+class _EditSkillScreenState
+    extends State<EditSkillScreen> {
+  static const Color primary =
+  Color(0xFF5B5FEF);
 
-  final TextEditingController _skillNameController =
-  TextEditingController();
+  static const Color darkText =
+  Color(0xFF171A2B);
 
-  final TextEditingController _descriptionController =
-  TextEditingController();
+  static const Color mutedText =
+  Color(0xFF8A8FA3);
+
+  static const Color background =
+  Color(0xFFF9F9FF);
+
+  static const Color border =
+  Color(0xFFE8E8F2);
+
+  final MySkillsRepository _repository =
+      MySkillsRepository.instance;
+
+  final CurrentUserService _currentUser =
+      CurrentUserService.instance;
+
+  late final TextEditingController
+  _skillNameController;
+
+  late final TextEditingController
+  _descriptionController;
 
   late String _category;
+
   late String _experienceLevel;
+
   late String _availability;
+
+  late bool _canEditMetadata;
+
+  bool _saving = false;
 
   final List<String> _categories = [
     'Design & Creative',
@@ -44,10 +63,12 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     'Technology',
     'Education',
     'Music',
+    'Language',
     'Lifestyle',
   ];
 
-  final List<String> _availabilityOptions = [
+  final List<String>
+  _availabilityOptions = [
     'Weekdays',
     'Weekends',
     'Mornings',
@@ -60,90 +81,178 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   void initState() {
     super.initState();
 
-    _category = widget.category;
-    _experienceLevel = widget.experienceLevel;
-    _availability = widget.availability;
+    final skill =
+        widget.managedSkill.skill;
 
-    if (!_categories.contains(_category)) {
-      _categories.insert(0, _category);
+    final userSkill =
+        widget.managedSkill.userSkill;
+
+    _skillNameController =
+        TextEditingController(
+          text: skill.title,
+        );
+
+    _descriptionController =
+        TextEditingController(
+          text: skill.description,
+        );
+
+    _category =
+        skill.category;
+
+    _experienceLevel =
+        userSkill.level;
+
+    _availability =
+        userSkill.availability;
+
+    _canEditMetadata =
+        widget.managedSkill
+            .metadataCanBeEditedBy(
+          _currentUser.userId,
+        );
+
+    if (!_categories.contains(
+      _category,
+    )) {
+      _categories.insert(
+        0,
+        _category,
+      );
     }
 
-    if (!_availabilityOptions.contains(_availability)) {
-      _availabilityOptions.insert(0, _availability);
+    if (!_availabilityOptions
+        .contains(
+      _availability,
+    )) {
+      _availabilityOptions.insert(
+        0,
+        _availability,
+      );
     }
   }
 
   @override
   void dispose() {
     _skillNameController.dispose();
+
     _descriptionController.dispose();
+
     super.dispose();
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      background,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
 
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
+              child:
+              SingleChildScrollView(
+                physics:
+                const BouncingScrollPhysics(),
+                padding:
+                const EdgeInsets
+                    .fromLTRB(
                   20,
                   18,
                   20,
                   30,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     _buildIntro(),
 
-                    const SizedBox(height: 20),
+                    if (!_canEditMetadata)
+                      _buildSharedSkillNotice(),
 
-                    _buildLabel('Skill Name'),
+                    const SizedBox(
+                      height: 20,
+                    ),
 
-                    const SizedBox(height: 8),
+                    _buildLabel(
+                      'Skill Name',
+                    ),
+
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     _buildSkillNameField(),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(
+                      height: 18,
+                    ),
 
-                    _buildLabel('Category'),
+                    _buildLabel(
+                      'Category',
+                    ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     _buildCategoryField(),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(
+                      height: 18,
+                    ),
 
-                    _buildLabel('Description'),
+                    _buildLabel(
+                      'Description',
+                    ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     _buildDescriptionField(),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(
+                      height: 18,
+                    ),
 
-                    _buildLabel('Experience Level'),
+                    _buildLabel(
+                      'Your Experience Level',
+                    ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                      height: 10,
+                    ),
 
                     _buildExperienceLevel(),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(
+                      height: 18,
+                    ),
 
-                    _buildLabel('Availability'),
+                    _buildLabel(
+                      'Your Availability',
+                    ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     _buildAvailabilityField(),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     _buildUpdateButton(),
                   ],
@@ -163,10 +272,12 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   Widget _buildTopBar() {
     return Container(
       height: 64,
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration: const BoxDecoration(
+      decoration:
+      const BoxDecoration(
         color: Colors.white,
         border: Border(
           bottom: BorderSide(
@@ -177,11 +288,17 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed:
+            _saving
+                ? null
+                : () {
+              Navigator.pop(
+                context,
+              );
             },
             icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons
+                  .arrow_back_ios_new_rounded,
               size: 18,
               color: primary,
             ),
@@ -193,42 +310,52 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                 'Edit Skill',
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight:
+                  FontWeight.w800,
                   color: darkText,
                 ),
               ),
             ),
           ),
 
-          const SizedBox(width: 48),
+          const SizedBox(
+            width: 48,
+          ),
         ],
       ),
     );
   }
 
   // ============================================================
-  // TUBI INTRO
+  // INTRO
   // ============================================================
 
   Widget _buildIntro() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment:
+      CrossAxisAlignment.center,
       children: [
         const Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               Text(
                 'Update your skill',
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight:
+                  FontWeight.w800,
                   color: darkText,
                 ),
               ),
-              SizedBox(height: 4),
+
+              SizedBox(
+                height: 4,
+              ),
+
               Text(
-                'Update the details of the skill you want to improve.',
+                'Keep your teaching details accurate and up to date.',
                 style: TextStyle(
                   fontSize: 10.5,
                   height: 1.4,
@@ -239,7 +366,9 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           ),
         ),
 
-        const SizedBox(width: 10),
+        const SizedBox(
+          width: 10,
+        ),
 
         Image.asset(
           'assets/images/mascot/tubi_planning.png',
@@ -251,81 +380,163 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     );
   }
 
-  // ============================================================
-  // LABEL
-  // ============================================================
+  Widget _buildSharedSkillNotice() {
+    return Container(
+      width: double.infinity,
+      margin:
+      const EdgeInsets.only(
+        top: 14,
+      ),
+      padding:
+      const EdgeInsets.all(
+        12,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        const Color(
+          0xFFF3F0FF,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+        border:
+        Border.all(
+          color:
+          const Color(
+            0xFFE3DEFF,
+          ),
+        ),
+      ),
+      child: const Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons
+                .info_outline_rounded,
+            size: 17,
+            color: primary,
+          ),
 
-  Widget _buildLabel(String text) {
+          SizedBox(
+            width: 9,
+          ),
+
+          Expanded(
+            child: Text(
+              'This is a shared TubiLearn skill. Its name, category, and description are shared with other users, so you can only update your level and availability.',
+              style: TextStyle(
+                fontSize: 9.5,
+                height: 1.45,
+                color: darkText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLabel(
+      String text,
+      ) {
     return Text(
       text,
-      style: const TextStyle(
+      style:
+      const TextStyle(
         fontSize: 11,
-        fontWeight: FontWeight.w700,
+        fontWeight:
+        FontWeight.w700,
         color: darkText,
       ),
     );
   }
 
   // ============================================================
-  // SKILL NAME
+  // NAME
   // ============================================================
 
   Widget _buildSkillNameField() {
     return TextField(
-      controller: _skillNameController,
-
-      // EDITABLE
-      readOnly: false,
-
-      style: const TextStyle(
+      controller:
+      _skillNameController,
+      readOnly:
+      !_canEditMetadata ||
+          _saving,
+      maxLength: 80,
+      style:
+      const TextStyle(
         fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontWeight:
+        FontWeight.w500,
         color: darkText,
       ),
-
-      decoration: InputDecoration(
-        // EXISTING NAME = PLACEHOLDER ONLY
-        hintText: widget.skillName,
-
-        hintStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          color: mutedText,
-        ),
-
-        prefixIcon: const Icon(
-          Icons.lightbulb_outline_rounded,
+      decoration:
+      InputDecoration(
+        counterText: '',
+        prefixIcon:
+        const Icon(
+          Icons
+              .lightbulb_outline_rounded,
           size: 19,
           color: primary,
         ),
-
+        suffixIcon:
+        !_canEditMetadata
+            ? const Icon(
+          Icons
+              .lock_outline_rounded,
+          size: 16,
+          color:
+          mutedText,
+        )
+            : null,
         filled: true,
-        fillColor: Colors.white,
-
-        contentPadding: const EdgeInsets.symmetric(
+        fillColor:
+        _canEditMetadata
+            ? Colors.white
+            : const Color(
+          0xFFF5F5FA,
+        ),
+        contentPadding:
+        const EdgeInsets
+            .symmetric(
           horizontal: 14,
           vertical: 14,
         ),
-
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          const BorderSide(
             color: border,
           ),
         ),
-
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          const BorderSide(
             color: border,
           ),
         ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          const BorderSide(
             color: primary,
-            width: 1.3,
           ),
         ),
       ),
@@ -337,71 +548,91 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // ============================================================
 
   Widget _buildCategoryField() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
+    return DropdownButtonFormField<
+        String>(
+      value: _category,
+      isExpanded: true,
+      icon:
+      const Icon(
+        Icons
+            .keyboard_arrow_down_rounded,
+        color: mutedText,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: border,
+      decoration:
+      InputDecoration(
+        prefixIcon:
+        const Icon(
+          Icons
+              .grid_view_rounded,
+          size: 18,
+          color: primary,
+        ),
+        filled: true,
+        fillColor:
+        _canEditMetadata
+            ? Colors.white
+            : const Color(
+          0xFFF5F5FA,
+        ),
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          const BorderSide(
+            color: border,
+          ),
+        ),
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          const BorderSide(
+            color: border,
+          ),
         ),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.grid_view_rounded,
-            size: 18,
-            color: primary,
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _category,
-                isExpanded: true,
-
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: mutedText,
-                ),
-
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: darkText,
-                ),
-
-                items: _categories.map(
-                      (category) {
-                    return DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(
-                        category,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  },
-                ).toList(),
-
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _category = value;
-                  });
-                },
+      items:
+      _categories.map(
+            (category) {
+          return DropdownMenuItem<
+              String>(
+            value: category,
+            child: Text(
+              category,
+              overflow:
+              TextOverflow.ellipsis,
+              style:
+              const TextStyle(
+                fontSize: 11,
+                color: darkText,
               ),
             ),
-          ),
-        ],
-      ),
+          );
+        },
+      ).toList(),
+      onChanged:
+      !_canEditMetadata ||
+          _saving
+          ? null
+          : (value) {
+        if (value ==
+            null) {
+          return;
+        }
+
+        setState(
+              () {
+            _category =
+                value;
+          },
+        );
+      },
     );
   }
 
@@ -413,65 +644,74 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     return Stack(
       children: [
         TextField(
-          controller: _descriptionController,
-
-          // EDITABLE
-          readOnly: false,
-
+          controller:
+          _descriptionController,
+          readOnly:
+          !_canEditMetadata ||
+              _saving,
           maxLines: 5,
           maxLength: 200,
-
-          style: const TextStyle(
+          style:
+          const TextStyle(
             fontSize: 11,
             height: 1.5,
             color: darkText,
           ),
-
           onChanged: (_) {
             setState(() {});
           },
-
-          decoration: InputDecoration(
-            // EXISTING DESCRIPTION = PLACEHOLDER ONLY
-            hintText: widget.description,
-
-            hintStyle: const TextStyle(
-              fontSize: 11,
-              height: 1.5,
-              color: mutedText,
-            ),
-
+          decoration:
+          InputDecoration(
             counterText: '',
-
             filled: true,
-            fillColor: Colors.white,
-
-            contentPadding: const EdgeInsets.fromLTRB(
+            fillColor:
+            _canEditMetadata
+                ? Colors.white
+                : const Color(
+              0xFFF5F5FA,
+            ),
+            contentPadding:
+            const EdgeInsets
+                .fromLTRB(
               14,
               14,
               14,
               30,
             ),
-
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
+            border:
+            OutlineInputBorder(
+              borderRadius:
+              BorderRadius
+                  .circular(
+                12,
+              ),
+              borderSide:
+              const BorderSide(
                 color: border,
               ),
             ),
-
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
+            enabledBorder:
+            OutlineInputBorder(
+              borderRadius:
+              BorderRadius
+                  .circular(
+                12,
+              ),
+              borderSide:
+              const BorderSide(
                 color: border,
               ),
             ),
-
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
+            focusedBorder:
+            OutlineInputBorder(
+              borderRadius:
+              BorderRadius
+                  .circular(
+                12,
+              ),
+              borderSide:
+              const BorderSide(
                 color: primary,
-                width: 1.3,
               ),
             ),
           ),
@@ -482,7 +722,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           bottom: 10,
           child: Text(
             '${_descriptionController.text.length}/200',
-            style: const TextStyle(
+            style:
+            const TextStyle(
               fontSize: 9,
               color: mutedText,
             ),
@@ -497,82 +738,101 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // ============================================================
 
   Widget _buildExperienceLevel() {
-    final levels = [
+    final List<String> levels = [
       'Beginner',
       'Intermediate',
       'Advanced',
     ];
 
     return Row(
-      children: List.generate(
+      children:
+      List.generate(
         levels.length,
             (index) {
-          final String level = levels[index];
+          final String level =
+          levels[index];
 
           final bool selected =
-              _experienceLevel == level;
+              _experienceLevel ==
+                  level;
 
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(
-                left: index == 0 ? 0 : 5,
+              padding:
+              EdgeInsets.only(
+                left:
+                index == 0
+                    ? 0
+                    : 5,
                 right:
-                index == levels.length - 1
+                index ==
+                    levels.length -
+                        1
                     ? 0
                     : 5,
               ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(
+              child:
+              InkWell(
+                borderRadius:
+                BorderRadius.circular(
                   10,
                 ),
-
-                onTap: () {
-                  setState(() {
-                    _experienceLevel = level;
-                  });
+                onTap:
+                _saving
+                    ? null
+                    : () {
+                  setState(
+                        () {
+                      _experienceLevel =
+                          level;
+                    },
+                  );
                 },
-
-                child: AnimatedContainer(
-                  duration: const Duration(
-                    milliseconds: 180,
+                child:
+                AnimatedContainer(
+                  duration:
+                  const Duration(
+                    milliseconds:
+                    180,
                   ),
-
                   height: 44,
-
-                  alignment: Alignment.center,
-
-                  decoration: BoxDecoration(
+                  alignment:
+                  Alignment.center,
+                  decoration:
+                  BoxDecoration(
                     color:
                     selected
                         ? primary
-                        : Colors.white,
-
+                        : Colors
+                        .white,
                     borderRadius:
-                    BorderRadius.circular(
+                    BorderRadius
+                        .circular(
                       10,
                     ),
-
-                    border: Border.all(
+                    border:
+                    Border.all(
                       color:
                       selected
                           ? primary
                           : border,
                     ),
                   ),
-
                   child: Text(
                     level,
-                    style: TextStyle(
+                    style:
+                    TextStyle(
                       fontSize: 9,
-
                       fontWeight:
                       selected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-
+                          ? FontWeight
+                          .w700
+                          : FontWeight
+                          .w500,
                       color:
                       selected
-                          ? Colors.white
+                          ? Colors
+                          .white
                           : darkText,
                     ),
                   ),
@@ -591,51 +851,63 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildAvailabilityField() {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
-
-      onTap: _showAvailabilitySheet,
-
-      child: Container(
+      borderRadius:
+      BorderRadius.circular(
+        12,
+      ),
+      onTap:
+      _saving
+          ? null
+          : _showAvailabilitySheet,
+      child:
+      Container(
         height: 50,
-
-        padding: const EdgeInsets.symmetric(
+        padding:
+        const EdgeInsets
+            .symmetric(
           horizontal: 14,
         ),
-
-        decoration: BoxDecoration(
+        decoration:
+        BoxDecoration(
           color: Colors.white,
-
           borderRadius:
-          BorderRadius.circular(12),
-
-          border: Border.all(
+          BorderRadius.circular(
+            12,
+          ),
+          border:
+          Border.all(
             color: border,
           ),
         ),
-
         child: Row(
           children: [
             const Icon(
-              Icons.calendar_month_outlined,
+              Icons
+                  .calendar_month_outlined,
               size: 18,
               color: primary,
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(
+              width: 12,
+            ),
 
             Expanded(
               child: Text(
                 _availability,
-                style: const TextStyle(
+                style:
+                const TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                  fontWeight:
+                  FontWeight.w500,
                   color: darkText,
                 ),
               ),
             ),
 
             const Icon(
-              Icons.chevron_right_rounded,
+              Icons
+                  .chevron_right_rounded,
               size: 20,
               color: mutedText,
             ),
@@ -645,195 +917,115 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     );
   }
 
-  // ============================================================
-  // UPDATE BUTTON
-  // ============================================================
-
-  Widget _buildUpdateButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-
-      child: ElevatedButton(
-        onPressed: () {
-          // If user didn't type a new value,
-          // keep the old placeholder value.
-          final String updatedSkillName =
-          _skillNameController.text.trim().isEmpty
-              ? widget.skillName
-              : _skillNameController.text.trim();
-
-          final String updatedDescription =
-          _descriptionController.text.trim().isEmpty
-              ? widget.description
-              : _descriptionController.text.trim();
-
-          // Temporary preview until database is connected.
-          debugPrint(
-            'Updated Skill: $updatedSkillName',
-          );
-
-          debugPrint(
-            'Updated Description: $updatedDescription',
-          );
-
-          debugPrint(
-            'Category: $_category',
-          );
-
-          debugPrint(
-            'Level: $_experienceLevel',
-          );
-
-          debugPrint(
-            'Availability: $_availability',
-          );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Skill updated successfully!',
-              ),
-              duration: Duration(seconds: 1),
-            ),
-          );
-
-          Future.delayed(
-            const Duration(
-              milliseconds: 500,
-            ),
-                () {
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
-          );
-        },
-
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-
-          minimumSize: const Size(
-            0,
-            48,
-          ),
-
-          shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(12),
-          ),
-        ),
-
-        child: const Text(
-          'UPDATE SKILL',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // AVAILABILITY BOTTOM SHEET
-  // ============================================================
-
   void _showAvailabilitySheet() {
     showModalBottomSheet(
       context: context,
-
       backgroundColor:
       Colors.transparent,
-
-      builder: (sheetContext) {
+      builder:
+          (sheetContext) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(
+          padding:
+          const EdgeInsets
+              .fromLTRB(
             20,
             12,
             20,
             28,
           ),
-
-          decoration: const BoxDecoration(
+          decoration:
+          const BoxDecoration(
             color: Colors.white,
-
             borderRadius:
             BorderRadius.vertical(
-              top: Radius.circular(24),
+              top:
+              Radius.circular(
+                24,
+              ),
             ),
           ),
-
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+            MainAxisSize.min,
             children: [
               Container(
                 width: 40,
                 height: 4,
-
-                decoration: BoxDecoration(
+                decoration:
+                BoxDecoration(
                   color: border,
-
                   borderRadius:
-                  BorderRadius.circular(20),
+                  BorderRadius.circular(
+                    20,
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(
+                height: 18,
+              ),
 
               const Align(
-                alignment: Alignment.centerLeft,
+                alignment:
+                Alignment.centerLeft,
                 child: Text(
                   'Choose availability',
-                  style: TextStyle(
+                  style:
+                  TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight
+                        .w800,
                     color: darkText,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(
+                height: 12,
+              ),
 
-              ..._availabilityOptions.map(
+              ..._availabilityOptions
+                  .map(
                     (option) {
                   final bool selected =
-                      _availability == option;
+                      _availability ==
+                          option;
 
                   return ListTile(
                     contentPadding:
                     EdgeInsets.zero,
-
                     title: Text(
                       option,
-
-                      style: TextStyle(
+                      style:
+                      TextStyle(
                         fontSize: 12,
-
                         fontWeight:
                         selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-
-                        color: darkText,
+                            ? FontWeight
+                            .w700
+                            : FontWeight
+                            .w500,
+                        color:
+                        darkText,
                       ),
                     ),
-
                     trailing:
                     selected
                         ? const Icon(
                       Icons
                           .check_circle_rounded,
-                      color: primary,
+                      color:
+                      primary,
                     )
                         : null,
-
                     onTap: () {
-                      setState(() {
-                        _availability = option;
-                      });
+                      setState(
+                            () {
+                          _availability =
+                              option;
+                        },
+                      );
 
                       Navigator.pop(
                         sheetContext,
@@ -846,6 +1038,161 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           ),
         );
       },
+    );
+  }
+
+  // ============================================================
+  // UPDATE BUTTON
+  // ============================================================
+
+  Widget _buildUpdateButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child:
+      ElevatedButton(
+        onPressed:
+        _saving
+            ? null
+            : _updateSkill,
+        style:
+        ElevatedButton
+            .styleFrom(
+          backgroundColor:
+          primary,
+          foregroundColor:
+          Colors.white,
+          elevation: 0,
+          minimumSize:
+          const Size(
+            0,
+            48,
+          ),
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              12,
+            ),
+          ),
+        ),
+        child:
+        _saving
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child:
+          CircularProgressIndicator(
+            strokeWidth: 2,
+            color:
+            Colors.white,
+          ),
+        )
+            : const Text(
+          'UPDATE SKILL',
+          style:
+          TextStyle(
+            fontSize: 10,
+            fontWeight:
+            FontWeight
+                .w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // UPDATE
+  // ============================================================
+
+  Future<void> _updateSkill() async {
+    final String title =
+    _skillNameController.text
+        .trim();
+
+    final String description =
+    _descriptionController.text
+        .trim();
+
+    if (title.isEmpty) {
+      _showMessage(
+        'Skill name is required.',
+      );
+
+      return;
+    }
+
+    if (description.isEmpty) {
+      _showMessage(
+        'Description is required.',
+      );
+
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    try {
+      await _repository
+          .updateOfferedSkill(
+        userId:
+        _currentUser.userId,
+        userSkillId:
+        widget.managedSkill
+            .userSkill.id,
+        title: title,
+        category:
+        _category,
+        description:
+        description,
+        level:
+        _experienceLevel,
+        availability:
+        _availability,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Skill updated successfully!',
+      );
+
+      Navigator.pop(
+        context,
+        true,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _saving = false;
+      });
+
+      _showMessage(
+        error.toString(),
+      );
+    }
+  }
+
+  void _showMessage(
+      String message,
+      ) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content:
+        Text(
+          message,
+        ),
+      ),
     );
   }
 }

@@ -12,7 +12,7 @@ class AppDatabase {
   static const String _databaseName =
       'tubilearn.db';
 
-  static const int _databaseVersion = 6;
+  static const int _databaseVersion = 7;
 
   Database? _database;
 
@@ -72,6 +72,10 @@ class AppDatabase {
         await _createSwapIndexesV6(
           db,
         );
+
+        await _createSkillOwnershipIndexesV7(
+          db,
+        );
       },
 
       // ========================================================
@@ -112,12 +116,26 @@ class AppDatabase {
             db,
           );
         }
+
+        if (oldVersion < 7) {
+          await _migrateToVersion7(
+            db,
+          );
+        }
       },
     );
   }
 
   // ============================================================
   // VERSION 5 - REFERENCE / PROFILE TABLES
+  //
+  // In v7, skills also includes optional owner_user_id.
+  //
+  // NULL owner_user_id:
+  // shared/catalog skill.
+  //
+  // Non-null owner_user_id:
+  // custom skill owned by a user.
   // ============================================================
 
   Future<void> _createReferenceTablesV5(
@@ -193,6 +211,8 @@ class AppDatabase {
         id TEXT PRIMARY KEY
           CHECK(length(trim(id)) > 0),
 
+        owner_user_id TEXT,
+
         title TEXT NOT NULL
           CHECK(length(trim(title)) > 0),
 
@@ -219,7 +239,11 @@ class AppDatabase {
         description TEXT NOT NULL
           CHECK(length(trim(description)) > 0),
 
-        UNIQUE(title)
+        UNIQUE(title),
+
+        FOREIGN KEY (owner_user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL
       )
       ''',
     );
@@ -1265,10 +1289,7 @@ class AppDatabase {
   // ============================================================
   // MIGRATION TO VERSION 6
   //
-  // Adds DB-level duplicate protection for ACTIVE stable-ID swap
-  // requests.
-  //
-  // We do NOT silently delete or rewrite existing requests.
+  // Adds DB-level duplicate protection for ACTIVE stable-ID swaps.
   // ============================================================
 
   Future<void> _migrateToVersion6(
@@ -1327,6 +1348,48 @@ class AppDatabase {
             'before retrying the migration.',
       );
     }
+  }
+
+  // ============================================================
+  // MIGRATION TO VERSION 7
+  //
+  // Adds optional ownership to skills.
+  //
+  // Existing skills remain shared catalog skills because
+  // owner_user_id is NULL after migration.
+  // ============================================================
+
+  Future<void> _migrateToVersion7(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> columns =
+    await db.rawQuery(
+      '''
+      PRAGMA table_info(skills)
+      ''',
+    );
+
+    final bool alreadyHasOwner =
+    columns.any(
+          (column) =>
+      column['name'] ==
+          'owner_user_id',
+    );
+
+    if (!alreadyHasOwner) {
+      await db.execute(
+        '''
+        ALTER TABLE skills
+        ADD COLUMN owner_user_id TEXT
+          REFERENCES users(id)
+          ON DELETE SET NULL
+        ''',
+      );
+    }
+
+    await _createSkillOwnershipIndexesV7(
+      db,
+    );
   }
 
   // ============================================================
@@ -1435,12 +1498,6 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 6 SWAP INDEXES
-  //
-  // Blocks duplicate ACTIVE requests with the same:
-  //
-  // requester + provider + learn skill + offer skill
-  //
-  // Terminal historical requests remain allowed.
   // ============================================================
 
   Future<void> _createSwapIndexesV6(
@@ -1466,6 +1523,22 @@ class AppDatabase {
           'accepted',
           'scheduled'
         )
+      ''',
+    );
+  }
+
+  // ============================================================
+  // VERSION 7 SKILL OWNERSHIP INDEX
+  // ============================================================
+
+  Future<void> _createSkillOwnershipIndexesV7(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_skills_owner_user
+      ON skills(owner_user_id)
       ''',
     );
   }
