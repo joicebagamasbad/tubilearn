@@ -7,7 +7,7 @@ import '../services/chat_service.dart';
 import '../theme/app_theme.dart';
 import 'create_swap_request_screen.dart';
 
-class UserProfileScreen extends StatelessWidget {
+class UserProfileScreen extends StatefulWidget {
   final User user;
 
   const UserProfileScreen({
@@ -15,6 +15,12 @@ class UserProfileScreen extends StatelessWidget {
     required this.user,
   });
 
+  @override
+  State<UserProfileScreen> createState() =>
+      _UserProfileScreenState();
+}
+
+class _UserProfileScreenState extends State<UserProfileScreen> {
   static const Color primary = AppTheme.primary;
   static const Color darkText = AppTheme.darkText;
   static const Color mutedText = AppTheme.mutedText;
@@ -24,10 +30,17 @@ class UserProfileScreen extends StatelessWidget {
   static final ExploreRepository _repository =
   ExploreRepository();
 
+  bool _isOpeningConversation = false;
+  bool _isOpeningSwapRequest = false;
+
+  User get user => widget.user;
+
+  bool get _hasPendingAction =>
+      _isOpeningConversation ||
+          _isOpeningSwapRequest;
+
   @override
-  Widget build(
-      BuildContext context,
-      ) {
+  Widget build(BuildContext context) {
     final List<Skill> offeredSkills =
     _getOfferedSkills();
 
@@ -39,9 +52,8 @@ class UserProfileScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(
-              context,
-            ),
+            _buildTopBar(),
+
             Expanded(
               child: SingleChildScrollView(
                 physics:
@@ -184,7 +196,6 @@ class UserProfileScreen extends StatelessWidget {
                     ),
 
                     _buildActionButtons(
-                      context,
                       offeredSkills,
                       wantedSkills,
                     ),
@@ -202,9 +213,7 @@ class UserProfileScreen extends StatelessWidget {
   // TOP BAR
   // ============================================================
 
-  Widget _buildTopBar(
-      BuildContext context,
-      ) {
+  Widget _buildTopBar() {
     return Container(
       height: 62,
       padding:
@@ -223,7 +232,10 @@ class UserProfileScreen extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
+            onPressed:
+            _hasPendingAction
+                ? null
+                : () {
               Navigator.pop(
                 context,
               );
@@ -235,6 +247,7 @@ class UserProfileScreen extends StatelessWidget {
               color: primary,
             ),
           ),
+
           const Expanded(
             child: Center(
               child: Text(
@@ -244,8 +257,12 @@ class UserProfileScreen extends StatelessWidget {
               ),
             ),
           ),
+
           IconButton(
-            onPressed: () {},
+            onPressed:
+            _hasPendingAction
+                ? null
+                : () {},
             icon: const Icon(
               Icons.more_horiz_rounded,
               color: mutedText,
@@ -268,12 +285,10 @@ class UserProfileScreen extends StatelessWidget {
           height: 78,
           decoration:
           const BoxDecoration(
-            color:
-            Color(
+            color: Color(
               0xFFFFB45E,
             ),
-            shape:
-            BoxShape.circle,
+            shape: BoxShape.circle,
           ),
           alignment:
           Alignment.center,
@@ -284,14 +299,15 @@ class UserProfileScreen extends StatelessWidget {
               fontSize: 20,
               fontWeight:
               FontWeight.w800,
-              color:
-              Colors.white,
+              color: Colors.white,
             ),
           ),
         ),
+
         const SizedBox(
           width: 16,
         ),
+
         Expanded(
           child: Column(
             crossAxisAlignment:
@@ -302,9 +318,11 @@ class UserProfileScreen extends StatelessWidget {
                 style:
                 AppTextStyles.pageTitle,
               ),
+
               const SizedBox(
                 height: 4,
               ),
+
               Row(
                 children: [
                   const Icon(
@@ -313,9 +331,11 @@ class UserProfileScreen extends StatelessWidget {
                     size: 15,
                     color: mutedText,
                   ),
+
                   const SizedBox(
                     width: 4,
                   ),
+
                   Expanded(
                     child: Text(
                       user.city,
@@ -325,22 +345,25 @@ class UserProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
+
               const SizedBox(
                 height: 8,
               ),
+
               Row(
                 children: [
                   const Icon(
                     Icons.star_rounded,
                     size: 17,
-                    color:
-                    Color(
+                    color: Color(
                       0xFFFFB547,
                     ),
                   ),
+
                   const SizedBox(
                     width: 3,
                   ),
+
                   Text(
                     user.rating
                         .toStringAsFixed(
@@ -354,9 +377,11 @@ class UserProfileScreen extends StatelessWidget {
                       FontWeight.w700,
                     ),
                   ),
+
                   const SizedBox(
                     width: 5,
                   ),
+
                   Text(
                     '(${user.reviewCount} reviews)',
                     style:
@@ -367,6 +392,7 @@ class UserProfileScreen extends StatelessWidget {
             ],
           ),
         ),
+
         Image.asset(
           'assets/images/mascot/tubi_happy.png',
           width: 58,
@@ -389,18 +415,22 @@ class UserProfileScreen extends StatelessWidget {
             'Completed swaps',
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
           child: _statBox(
             '${user.responseRate}%',
             'Response rate',
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
           child: _statBox(
             user.memberSince,
@@ -421,8 +451,7 @@ class UserProfileScreen extends StatelessWidget {
         vertical: 14,
         horizontal: 8,
       ),
-      decoration:
-      BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(
@@ -439,9 +468,11 @@ class UserProfileScreen extends StatelessWidget {
             style:
             AppTextStyles.cardTitle,
           ),
+
           const SizedBox(
             height: 4,
           ),
+
           Text(
             label,
             textAlign:
@@ -464,8 +495,7 @@ class UserProfileScreen extends StatelessWidget {
       const EdgeInsets.all(
         14,
       ),
-      decoration:
-      BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(
@@ -482,28 +512,34 @@ class UserProfileScreen extends StatelessWidget {
             'Languages',
             user.language,
           ),
+
           const Divider(
             height: 22,
             color: border,
           ),
+
           _infoRow(
             Icons.schedule_rounded,
             'Availability',
             user.availability,
           ),
+
           const Divider(
             height: 22,
             color: border,
           ),
+
           _infoRow(
             Icons.devices_rounded,
             'Preferred mode',
             user.preferredMode,
           ),
+
           const Divider(
             height: 22,
             color: border,
           ),
+
           _infoRow(
             Icons.school_outlined,
             'Teaching style',
@@ -528,9 +564,11 @@ class UserProfileScreen extends StatelessWidget {
           size: 18,
           color: primary,
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
           child: Column(
             crossAxisAlignment:
@@ -541,9 +579,11 @@ class UserProfileScreen extends StatelessWidget {
                 style:
                 AppTextStyles.caption,
               ),
+
               const SizedBox(
                 height: 3,
               ),
+
               Text(
                 value,
                 style:
@@ -576,10 +616,8 @@ class UserProfileScreen extends StatelessWidget {
         horizontal: 11,
         vertical: 7,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        backgroundColor,
+      decoration: BoxDecoration(
+        color: backgroundColor,
         borderRadius:
         BorderRadius.circular(
           20,
@@ -590,8 +628,7 @@ class UserProfileScreen extends StatelessWidget {
         style:
         AppTextStyles.secondary
             .copyWith(
-          color:
-          textColor,
+          color: textColor,
           fontWeight:
           FontWeight.w600,
         ),
@@ -605,16 +642,13 @@ class UserProfileScreen extends StatelessWidget {
 
   Widget _buildTrustCard() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        const Color(
+      decoration: BoxDecoration(
+        color: const Color(
           0xFFF3FBF6,
         ),
         borderRadius:
@@ -622,8 +656,7 @@ class UserProfileScreen extends StatelessWidget {
           15,
         ),
         border: Border.all(
-          color:
-          const Color(
+          color: const Color(
             0xFFD9F0E0,
           ),
         ),
@@ -637,29 +670,34 @@ class UserProfileScreen extends StatelessWidget {
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              fontSize:
-              14,
+              fontSize: 14,
             ),
           ),
+
           const SizedBox(
             height: 10,
           ),
+
           if (user.emailVerified)
             _trustRow(
               'Email verified',
             ),
+
           if (user.emailVerified)
             const SizedBox(
               height: 7,
             ),
+
           if (user.profileCompleted)
             _trustRow(
               'Profile completed',
             ),
+
           if (user.profileCompleted)
             const SizedBox(
               height: 7,
             ),
+
           _trustRow(
             '${user.completedSwaps} completed exchanges',
           ),
@@ -676,22 +714,22 @@ class UserProfileScreen extends StatelessWidget {
         const Icon(
           Icons.check_circle_rounded,
           size: 16,
-          color:
-          Color(
+          color: Color(
             0xFF47A568,
           ),
         ),
+
         const SizedBox(
           width: 7,
         ),
+
         Expanded(
           child: Text(
             text,
             style:
             AppTextStyles.secondary
                 .copyWith(
-              color:
-              darkText,
+              color: darkText,
             ),
           ),
         ),
@@ -700,7 +738,7 @@ class UserProfileScreen extends StatelessWidget {
   }
 
   // ============================================================
-  // SKILL RELATIONSHIPS
+  // SKILLS
   // ============================================================
 
   List<Skill> _getOfferedSkills() {
@@ -744,7 +782,6 @@ class UserProfileScreen extends StatelessWidget {
   // ============================================================
 
   Widget _buildActionButtons(
-      BuildContext context,
       List<Skill> offeredSkills,
       List<Skill> wantedSkills,
       ) {
@@ -755,33 +792,47 @@ class UserProfileScreen extends StatelessWidget {
             height: 46,
             child:
             OutlinedButton.icon(
-              onPressed: () {
+              onPressed:
+              _hasPendingAction
+                  ? null
+                  : () {
                 _openConversation(
-                  context,
                   offeredSkills,
                   wantedSkills,
                 );
               },
-              icon: const Icon(
+              icon:
+              _isOpeningConversation
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              )
+                  : const Icon(
                 Icons
                     .chat_bubble_outline_rounded,
                 size: 16,
               ),
-              label:
-              const Text(
-                'MESSAGE',
+              label: Text(
+                _isOpeningConversation
+                    ? 'OPENING...'
+                    : 'MESSAGE',
                 style:
                 AppTextStyles.button,
               ),
               style:
-              OutlinedButton
-                  .styleFrom(
-                foregroundColor:
-                primary,
-                side:
-                const BorderSide(
+              OutlinedButton.styleFrom(
+                foregroundColor: primary,
+                disabledForegroundColor:
+                mutedText,
+                side: BorderSide(
                   color:
-                  primary,
+                  _hasPendingAction
+                      ? border
+                      : primary,
                 ),
                 shape:
                 RoundedRectangleBorder(
@@ -794,38 +845,57 @@ class UserProfileScreen extends StatelessWidget {
             ),
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
           child: SizedBox(
             height: 46,
             child:
             ElevatedButton.icon(
-              onPressed: () {
+              onPressed:
+              _hasPendingAction
+                  ? null
+                  : () {
                 _openSwapRequest(
-                  context,
                   offeredSkills,
                 );
               },
-              icon: const Icon(
+              icon:
+              _isOpeningSwapRequest
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color:
+                  Colors.white,
+                ),
+              )
+                  : const Icon(
                 Icons
                     .swap_horiz_rounded,
                 size: 17,
               ),
-              label:
-              const Text(
-                'REQUEST SWAP',
+              label: Text(
+                _isOpeningSwapRequest
+                    ? 'OPENING...'
+                    : 'REQUEST SWAP',
                 style:
                 AppTextStyles.button,
               ),
               style:
-              ElevatedButton
-                  .styleFrom(
-                backgroundColor:
-                primary,
+              ElevatedButton.styleFrom(
+                backgroundColor: primary,
                 foregroundColor:
                 Colors.white,
+                disabledBackgroundColor:
+                border,
+                disabledForegroundColor:
+                mutedText,
                 elevation: 0,
                 minimumSize:
                 const Size(
@@ -852,59 +922,90 @@ class UserProfileScreen extends StatelessWidget {
   // ============================================================
 
   Future<void> _openConversation(
-      BuildContext context,
       List<Skill> offeredSkills,
       List<Skill> wantedSkills,
       ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    setState(() {
+      _isOpeningConversation = true;
+    });
+
     try {
       final conversation =
       await ChatService.instance
           .getOrCreateConversation(
-        userId:
-        user.id,
-        userName:
-        user.name,
-        initials:
-        user.initials,
-        city:
-        user.city,
+        userId: user.id,
+        userName: user.name,
+        initials: user.initials,
+        city: user.city,
         skillWanted:
         offeredSkills.isEmpty
             ? 'Skill'
-            : offeredSkills.first.title,
+            : offeredSkills
+            .first.title,
         skillOffered:
         wantedSkills.isEmpty
             ? 'Skill'
-            : wantedSkills.first.title,
+            : wantedSkills
+            .first.title,
       );
 
-      if (!context.mounted) {
+      if (!mounted) {
         return;
       }
 
-      Navigator.pushNamed(
+      await Navigator.pushNamed(
         context,
         '/conversation',
         arguments:
         conversation.id,
       );
     } on ChatServiceException catch (error) {
-      if (!context.mounted) {
+      if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(
-        SnackBar(
-          content:
-          Text(
-            error.message,
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content:
+            Text(
+              error.message,
+            ),
+            behavior:
+            SnackBarBehavior.floating,
           ),
-          behavior:
-          SnackBarBehavior.floating,
-        ),
-      );
+        );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Conversation could not be opened. Please try again.',
+            ),
+            behavior:
+            SnackBarBehavior.floating,
+          ),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningConversation = false;
+        });
+      }
     }
   }
 
@@ -913,66 +1014,105 @@ class UserProfileScreen extends StatelessWidget {
   // ============================================================
 
   Future<void> _openSwapRequest(
-      BuildContext context,
       List<Skill> offeredSkills,
       ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
     if (offeredSkills.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This user has no offered skill available for swap.',
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This user has no offered skill available for swap.',
+            ),
+            behavior:
+            SnackBarBehavior.floating,
           ),
-          behavior:
-          SnackBarBehavior.floating,
+        );
+
+      return;
+    }
+
+    setState(() {
+      _isOpeningSwapRequest = true;
+    });
+
+    try {
+      final Skill skillToLearn =
+          offeredSkills.first;
+
+      final bool? requestCreated =
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (
+              BuildContext routeContext,
+              ) =>
+              CreateSwapRequestScreen(
+                providerUserId:
+                user.id,
+                skillToLearnId:
+                skillToLearn.id,
+                providerName:
+                user.name,
+                providerInitials:
+                user.initials,
+                providerCity:
+                user.city,
+                skillToLearn:
+                skillToLearn.title,
+              ),
         ),
       );
 
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    final Skill skillToLearn =
-        offeredSkills.first;
-
-    final bool? requestCreated =
-    await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            CreateSwapRequestScreen(
-              providerUserId:
-              user.id,
-              skillToLearnId:
-              skillToLearn.id,
-              providerName:
-              user.name,
-              providerInitials:
-              user.initials,
-              providerCity:
-              user.city,
-              skillToLearn:
-              skillToLearn.title,
+      if (requestCreated == true) {
+        ScaffoldMessenger.of(
+          context,
+        )
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Your request to ${user.name} is now Pending.',
+              ),
+              behavior:
+              SnackBarBehavior.floating,
             ),
-      ),
-    );
+          );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
 
-    if (!context.mounted) {
-      return;
-    }
-
-    if (requestCreated == true) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Your request to ${user.name} is now Pending.',
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Swap request screen could not be opened. Please try again.',
+            ),
+            behavior:
+            SnackBarBehavior.floating,
           ),
-          behavior:
-          SnackBarBehavior.floating,
-        ),
-      );
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningSwapRequest = false;
+        });
+      }
     }
   }
 }

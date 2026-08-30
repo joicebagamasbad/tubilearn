@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../model/conversation.dart';
+import '../model/message.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
 
@@ -33,6 +36,8 @@ class _ConversationScreenState
   static const Color border =
   Color(0xFFE8E8F2);
 
+  static const int _maxMessageLength = 2000;
+
   final TextEditingController
   _messageController =
   TextEditingController();
@@ -45,18 +50,20 @@ class _ConversationScreenState
   _currentUserService =
       CurrentUserService.instance;
 
+  bool _isLoading = true;
   bool _isSending = false;
+  bool _isDeleting = false;
+
+  String? _loadError;
+
+  bool get _hasPendingAction =>
+      _isSending || _isDeleting;
 
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance
-        .addPostFrameCallback(
-          (_) {
-        _scrollToBottom();
-      },
-    );
+    _initializeConversation();
   }
 
   @override
@@ -67,273 +74,303 @@ class _ConversationScreenState
     super.dispose();
   }
 
+  // ============================================================
+  // INITIALIZE
+  // ============================================================
+
+  Future<void> _initializeConversation() async {
+    try {
+      await ChatService.instance.initialize();
+
+      if (!mounted) {
+        return;
+      }
+
+      final Conversation? conversation =
+      _findConversation();
+
+      if (conversation == null) {
+        setState(() {
+          _isLoading = false;
+          _loadError =
+          'This conversation is no longer available.';
+        });
+
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = null;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback(
+            (_) {
+          if (!mounted) {
+            return;
+          }
+
+          _scrollToBottom(
+            animate: false,
+          );
+        },
+      );
+    } on ChatServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError =
+        'Conversation could not be loaded. Please try again.';
+      });
+    }
+  }
+
+  Conversation? _findConversation() {
+    return ChatService.instance.findConversation(
+      widget.conversationId,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
       BuildContext context,
       ) {
-    final conversation =
-    ChatService.instance.conversations
-        .firstWhere(
-          (conversation) =>
-      conversation.id ==
-          widget.conversationId,
-    );
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: background,
+        body: const SafeArea(
+          child: Center(
+            child: CircularProgressIndicator(
+              color: primary,
+            ),
+          ),
+        ),
+      );
+    }
 
+    final Conversation? conversation =
+    _findConversation();
+
+    if (_loadError != null ||
+        conversation == null) {
+      return _buildUnavailableScreen();
+    }
+
+    return PopScope(
+      canPop: !_hasPendingAction,
+      child: Scaffold(
+        backgroundColor: background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(
+                conversation,
+              ),
+
+              _buildContextBar(
+                conversation.skillWanted,
+                conversation.skillOffered,
+              ),
+
+              Expanded(
+                child: conversation.messages.isEmpty
+                    ? _buildNoMessages()
+                    : _buildMessageList(
+                  conversation,
+                ),
+              ),
+
+              _buildComposer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // UNAVAILABLE
+  // ============================================================
+
+  Widget _buildUnavailableScreen() {
     return Scaffold(
-      backgroundColor:
-      background,
+      backgroundColor: background,
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(
-              conversation.userName,
-              conversation.initials,
-            ),
-
-            _buildContextBar(
-              conversation.skillWanted,
-              conversation.skillOffered,
-            ),
-
-            Expanded(
-              child:
-              conversation.messages.isEmpty
-                  ? _buildNoMessages()
-                  : ListView.builder(
-                controller:
-                _scrollController,
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  18,
+            Container(
+              height: 62,
+              padding:
+              const EdgeInsets.symmetric(
+                horizontal: 10,
+              ),
+              decoration:
+              const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(
+                    color: border,
+                  ),
                 ),
-                itemCount:
-                conversation
-                    .messages
-                    .length,
-                itemBuilder: (
-                    context,
-                    index,
-                    ) {
-                  final message =
-                  conversation
-                      .messages[index];
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pop(
+                        context,
+                      );
+                    },
+                    icon:
+                    const Icon(
+                      Icons
+                          .arrow_back_ios_new_rounded,
+                      size: 18,
+                      color: primary,
+                    ),
+                  ),
 
-                  final bool isMe =
-                  message.isSentBy(
-                    _currentUserService
-                        .userId,
-                  );
-
-                  final bool
-                  showDateSeparator =
-                      index == 0 ||
-                          !_isSameDay(
-                            conversation
-                                .messages[
-                            index -
-                                1]
-                                .sentAt,
-                            message
-                                .sentAt,
-                          );
-
-                  return Column(
-                    children: [
-                      if (showDateSeparator)
-                        _buildDateSeparator(
-                          message
-                              .sentAt,
-                        ),
-
-                      Align(
-                        alignment:
-                        isMe
-                            ? Alignment
-                            .centerRight
-                            : Alignment
-                            .centerLeft,
-                        child:
-                        Container(
-                          constraints:
-                          const BoxConstraints(
-                            maxWidth:
-                            290,
-                          ),
-                          margin:
-                          const EdgeInsets.only(
-                            bottom:
-                            11,
-                          ),
-                          padding:
-                          const EdgeInsets.fromLTRB(
-                            14,
-                            11,
-                            14,
-                            9,
-                          ),
-                          decoration:
-                          BoxDecoration(
-                            color:
-                            isMe
-                                ? primary
-                                : Colors
-                                .white,
-                            borderRadius:
-                            BorderRadius.only(
-                              topLeft:
-                              const Radius.circular(
-                                16,
-                              ),
-                              topRight:
-                              const Radius.circular(
-                                16,
-                              ),
-                              bottomLeft:
-                              Radius.circular(
-                                isMe
-                                    ? 16
-                                    : 4,
-                              ),
-                              bottomRight:
-                              Radius.circular(
-                                isMe
-                                    ? 4
-                                    : 16,
-                              ),
-                            ),
-                            border:
-                            isMe
-                                ? null
-                                : Border.all(
-                              color:
-                              border,
-                            ),
-                          ),
-                          child:
-                          Column(
-                            crossAxisAlignment:
-                            isMe
-                                ? CrossAxisAlignment
-                                .end
-                                : CrossAxisAlignment
-                                .start,
-                            children: [
-                              Text(
-                                message
-                                    .text,
-                                style:
-                                TextStyle(
-                                  fontSize:
-                                  14,
-                                  height:
-                                  1.4,
-                                  color:
-                                  isMe
-                                      ? Colors
-                                      .white
-                                      : darkText,
-                                ),
-                              ),
-
-                              const SizedBox(
-                                height:
-                                6,
-                              ),
-
-                              Row(
-                                mainAxisSize:
-                                MainAxisSize
-                                    .min,
-                                children: [
-                                  Text(
-                                    _formatMessageTime(
-                                      message
-                                          .sentAt,
-                                    ),
-                                    style:
-                                    TextStyle(
-                                      fontSize:
-                                      10.5,
-                                      fontWeight:
-                                      FontWeight
-                                          .w500,
-                                      color:
-                                      isMe
-                                          ? Colors
-                                          .white70
-                                          : mutedText,
-                                    ),
-                                  ),
-
-                                  if (isMe) ...[
-                                    const SizedBox(
-                                      width:
-                                      4,
-                                    ),
-                                    const Icon(
-                                      Icons
-                                          .done_rounded,
-                                      size:
-                                      12,
-                                      color:
-                                      Colors
-                                          .white70,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Conversation',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight:
+                          FontWeight.w800,
+                          color: darkText,
                         ),
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+
+                  const SizedBox(
+                    width: 48,
+                  ),
+                ],
               ),
             ),
 
-            _buildComposer(),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding:
+                  const EdgeInsets.symmetric(
+                    horizontal: 36,
+                  ),
+                  child: Column(
+                    mainAxisAlignment:
+                    MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons
+                            .chat_bubble_outline_rounded,
+                        size: 52,
+                        color: mutedText,
+                      ),
+
+                      const SizedBox(
+                        height: 14,
+                      ),
+
+                      const Text(
+                        'Conversation unavailable',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                          FontWeight.w800,
+                          color: darkText,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 7,
+                      ),
+
+                      Text(
+                        _loadError ??
+                            'This conversation may have been deleted.',
+                        textAlign:
+                        TextAlign.center,
+                        style:
+                        const TextStyle(
+                          fontSize: 11,
+                          height: 1.5,
+                          color: mutedText,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 18,
+                      ),
+
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(
+                            context,
+                          );
+                        },
+                        child:
+                        const Text(
+                          'BACK TO MESSAGES',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ============================================================
+  // TOP BAR
+  // ============================================================
+
   Widget _buildTopBar(
-      String name,
-      String initials,
+      Conversation conversation,
       ) {
     return Container(
-      height:
-      66,
+      height: 66,
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        8,
+        horizontal: 8,
       ),
       decoration:
       const BoxDecoration(
-        color:
-        Colors.white,
-        border:
-        Border(
-          bottom:
-          BorderSide(
-            color:
-            border,
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: border,
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           IconButton(
-            onPressed: () {
+            onPressed:
+            _hasPendingAction
+                ? null
+                : () {
               Navigator.pop(
                 context,
               );
@@ -342,22 +379,17 @@ class _ConversationScreenState
             const Icon(
               Icons
                   .arrow_back_ios_new_rounded,
-              size:
-              18,
-              color:
-              primary,
+              size: 18,
+              color: primary,
             ),
           ),
 
           Container(
-            width:
-            42,
-            height:
-            42,
+            width: 42,
+            height: 42,
             decoration:
             const BoxDecoration(
-              color:
-              Color(
+              color: Color(
                 0xFFFFB45E,
               ),
               shape:
@@ -365,135 +397,141 @@ class _ConversationScreenState
             ),
             alignment:
             Alignment.center,
-            child:
-            Text(
-              initials,
+            child: Text(
+              conversation.initials,
               style:
               const TextStyle(
-                fontSize:
-                11,
+                fontSize: 11,
                 fontWeight:
                 FontWeight.w800,
-                color:
-                Colors.white,
+                color: Colors.white,
               ),
             ),
           ),
 
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
 
           Expanded(
-            child:
-            Column(
+            child: Column(
               mainAxisAlignment:
               MainAxisAlignment.center,
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  conversation.userName,
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
                   const TextStyle(
-                    fontSize:
-                    14.5,
+                    fontSize: 14.5,
                     fontWeight:
                     FontWeight.w800,
-                    color:
-                    darkText,
+                    color: darkText,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  2,
+                  height: 2,
                 ),
 
                 const Text(
                   'Skill swap conversation',
                   style:
                   TextStyle(
-                    fontSize:
-                    11,
-                    color:
-                    mutedText,
+                    fontSize: 11,
+                    color: mutedText,
                   ),
                 ),
               ],
             ),
           ),
 
-          IconButton(
-            onPressed:
-                () {},
-            icon:
-            const Icon(
-              Icons
-                  .more_vert_rounded,
-              size:
-              20,
-              color:
-              mutedText,
+          if (_isDeleting)
+            const Padding(
+              padding:
+              EdgeInsets.only(
+                right: 14,
+              ),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: primary,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              onPressed:
+              _hasPendingAction
+                  ? null
+                  : () {
+                _showConversationMenu(
+                  conversation,
+                );
+              },
+              icon:
+              const Icon(
+                Icons
+                    .more_vert_rounded,
+                size: 20,
+                color: mutedText,
+              ),
             ),
-          ),
         ],
       ),
     );
   }
+
+  // ============================================================
+  // CONTEXT BAR
+  // ============================================================
 
   Widget _buildContextBar(
       String wanted,
       String offered,
       ) {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        16,
-        vertical:
-        12,
+        horizontal: 16,
+        vertical: 12,
       ),
       decoration:
       const BoxDecoration(
-        color:
-        Color(
+        color: Color(
           0xFFF3F1FF,
         ),
-        border:
-        Border(
-          bottom:
-          BorderSide(
-            color:
-            Color(
+        border: Border(
+          bottom: BorderSide(
+            color: Color(
               0xFFE4E0FF,
             ),
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           const Icon(
             Icons
                 .swap_horiz_rounded,
-            color:
-            primary,
-            size:
-            19,
+            color: primary,
+            size: 19,
           ),
 
           const SizedBox(
-            width:
-            9,
+            width: 9,
           ),
 
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -501,28 +539,26 @@ class _ConversationScreenState
                   'Skill swap discussion',
                   style:
                   TextStyle(
-                    fontSize:
-                    11,
-                    color:
-                    mutedText,
+                    fontSize: 11,
+                    color: mutedText,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  3,
+                  height: 3,
                 ),
 
                 Text(
                   '$wanted ↔ $offered',
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
                   const TextStyle(
-                    fontSize:
-                    12,
+                    fontSize: 12,
                     fontWeight:
                     FontWeight.w700,
-                    color:
-                    darkText,
+                    color: darkText,
                   ),
                 ),
               ],
@@ -533,56 +569,218 @@ class _ConversationScreenState
     );
   }
 
+  // ============================================================
+  // MESSAGE LIST
+  // ============================================================
+
+  Widget _buildMessageList(
+      Conversation conversation,
+      ) {
+    return ListView.builder(
+      controller:
+      _scrollController,
+      physics:
+      const BouncingScrollPhysics(),
+      padding:
+      const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        18,
+      ),
+      itemCount:
+      conversation.messages.length,
+      itemBuilder:
+          (
+          BuildContext context,
+          int index,
+          ) {
+        final Message message =
+        conversation.messages[index];
+
+        final bool isMe =
+        message.isSentBy(
+          _currentUserService.userId,
+        );
+
+        final bool showDateSeparator =
+            index == 0 ||
+                !_isSameDay(
+                  conversation
+                      .messages[index - 1]
+                      .sentAt,
+                  message.sentAt,
+                );
+
+        return Column(
+          children: [
+            if (showDateSeparator)
+              _buildDateSeparator(
+                message.sentAt,
+              ),
+
+            Align(
+              alignment:
+              isMe
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
+              child: Container(
+                constraints:
+                const BoxConstraints(
+                  maxWidth: 290,
+                ),
+                margin:
+                const EdgeInsets.only(
+                  bottom: 11,
+                ),
+                padding:
+                const EdgeInsets.fromLTRB(
+                  14,
+                  11,
+                  14,
+                  9,
+                ),
+                decoration:
+                BoxDecoration(
+                  color:
+                  isMe
+                      ? primary
+                      : Colors.white,
+                  borderRadius:
+                  BorderRadius.only(
+                    topLeft:
+                    const Radius.circular(
+                      16,
+                    ),
+                    topRight:
+                    const Radius.circular(
+                      16,
+                    ),
+                    bottomLeft:
+                    Radius.circular(
+                      isMe ? 16 : 4,
+                    ),
+                    bottomRight:
+                    Radius.circular(
+                      isMe ? 4 : 16,
+                    ),
+                  ),
+                  border:
+                  isMe
+                      ? null
+                      : Border.all(
+                    color: border,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                  isMe
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.text,
+                      style:
+                      TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color:
+                        isMe
+                            ? Colors.white
+                            : darkText,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 6,
+                    ),
+
+                    Row(
+                      mainAxisSize:
+                      MainAxisSize.min,
+                      children: [
+                        Text(
+                          _formatMessageTime(
+                            message.sentAt,
+                          ),
+                          style:
+                          TextStyle(
+                            fontSize: 10.5,
+                            fontWeight:
+                            FontWeight.w500,
+                            color:
+                            isMe
+                                ? Colors.white70
+                                : mutedText,
+                          ),
+                        ),
+
+                        if (isMe) ...[
+                          const SizedBox(
+                            width: 4,
+                          ),
+                          const Icon(
+                            Icons.done_rounded,
+                            size: 12,
+                            color:
+                            Colors.white70,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // DATE SEPARATOR
+  // ============================================================
+
   Widget _buildDateSeparator(
       DateTime date,
       ) {
     return Padding(
       padding:
       const EdgeInsets.only(
-        top:
-        4,
-        bottom:
-        14,
+        top: 4,
+        bottom: 14,
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           const Expanded(
-            child:
-            Divider(
-              color:
-              border,
+            child: Divider(
+              color: border,
             ),
           ),
 
           Padding(
             padding:
             const EdgeInsets.symmetric(
-              horizontal:
-              10,
+              horizontal: 10,
             ),
-            child:
-            Text(
+            child: Text(
               _formatDateSeparator(
                 date,
               ),
               style:
               const TextStyle(
-                fontSize:
-                10.5,
+                fontSize: 10.5,
                 fontWeight:
                 FontWeight.w600,
-                color:
-                mutedText,
+                color: mutedText,
               ),
             ),
           ),
 
           const Expanded(
-            child:
-            Divider(
-              color:
-              border,
+            child: Divider(
+              color: border,
             ),
           ),
         ],
@@ -590,51 +788,45 @@ class _ConversationScreenState
     );
   }
 
+  // ============================================================
+  // EMPTY
+  // ============================================================
+
   Widget _buildNoMessages() {
     return Center(
-      child:
-      Padding(
+      child: Padding(
         padding:
         const EdgeInsets.symmetric(
-          horizontal:
-          40,
+          horizontal: 40,
         ),
-        child:
-        Column(
+        child: Column(
           mainAxisAlignment:
           MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/images/mascot/tubi_typing.png',
-              width:
-              100,
-              height:
-              100,
-              fit:
-              BoxFit.contain,
+              width: 100,
+              height: 100,
+              fit: BoxFit.contain,
             ),
 
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
 
             const Text(
               'Start the conversation',
               style:
               TextStyle(
-                fontSize:
-                16,
+                fontSize: 16,
                 fontWeight:
                 FontWeight.w800,
-                color:
-                darkText,
+                color: darkText,
               ),
             ),
 
             const SizedBox(
-              height:
-              7,
+              height: 7,
             ),
 
             const Text(
@@ -643,12 +835,9 @@ class _ConversationScreenState
               TextAlign.center,
               style:
               TextStyle(
-                fontSize:
-                12,
-                height:
-                1.5,
-                color:
-                mutedText,
+                fontSize: 12,
+                height: 1.5,
+                color: mutedText,
               ),
             ),
           ],
@@ -656,6 +845,10 @@ class _ConversationScreenState
       ),
     );
   }
+
+  // ============================================================
+  // COMPOSER
+  // ============================================================
 
   Widget _buildComposer() {
     return Container(
@@ -668,66 +861,58 @@ class _ConversationScreenState
       ),
       decoration:
       const BoxDecoration(
-        color:
-        Colors.white,
-        border:
-        Border(
-          top:
-          BorderSide(
-            color:
-            border,
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: border,
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         crossAxisAlignment:
         CrossAxisAlignment.end,
         children: [
           Expanded(
-            child:
-            TextField(
+            child: TextField(
               controller:
               _messageController,
               enabled:
-              !_isSending,
-              minLines:
-              1,
-              maxLines:
-              4,
+              !_hasPendingAction,
+              minLines: 1,
+              maxLines: 4,
+              maxLength:
+              _maxMessageLength,
+              maxLengthEnforcement:
+              MaxLengthEnforcement.enforced,
               textCapitalization:
-              TextCapitalization
-                  .sentences,
+              TextCapitalization.sentences,
+              textInputAction:
+              TextInputAction.newline,
               style:
               const TextStyle(
-                fontSize:
-                14,
-                color:
-                darkText,
+                fontSize: 14,
+                color: darkText,
               ),
               decoration:
               InputDecoration(
                 hintText:
-                _isSending
+                _isDeleting
+                    ? 'Deleting conversation...'
+                    : _isSending
                     ? 'Sending...'
                     : 'Type a message...',
                 hintStyle:
                 const TextStyle(
-                  fontSize:
-                  13,
-                  color:
-                  mutedText,
+                  fontSize: 13,
+                  color: mutedText,
                 ),
-                filled:
-                true,
-                fillColor:
-                background,
+                counterText: '',
+                filled: true,
+                fillColor: background,
                 contentPadding:
                 const EdgeInsets.symmetric(
-                  horizontal:
-                  14,
-                  vertical:
-                  11,
+                  horizontal: 14,
+                  vertical: 11,
                 ),
                 border:
                 OutlineInputBorder(
@@ -739,63 +924,48 @@ class _ConversationScreenState
                   BorderSide.none,
                 ),
               ),
-              onSubmitted:
-                  (_) {
-                _sendMessage();
-              },
             ),
           ),
 
           const SizedBox(
-            width:
-            8,
+            width: 8,
           ),
 
           Container(
-            width:
-            44,
-            height:
-            44,
+            width: 44,
+            height: 44,
             decoration:
             BoxDecoration(
               color:
-              _isSending
+              _hasPendingAction
                   ? primary.withValues(
-                alpha:
-                0.55,
+                alpha: 0.55,
               )
                   : primary,
               shape:
               BoxShape.circle,
             ),
-            child:
-            IconButton(
+            child: IconButton(
               onPressed:
-              _isSending
+              _hasPendingAction
                   ? null
                   : _sendMessage,
               icon:
               _isSending
                   ? const SizedBox(
-                width:
-                17,
-                height:
-                17,
+                width: 17,
+                height: 17,
                 child:
                 CircularProgressIndicator(
-                  strokeWidth:
-                  2,
+                  strokeWidth: 2,
                   color:
                   Colors.white,
                 ),
               )
                   : const Icon(
-                Icons
-                    .send_rounded,
-                color:
-                Colors.white,
-                size:
-                19,
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 19,
               ),
             ),
           ),
@@ -804,8 +974,12 @@ class _ConversationScreenState
     );
   }
 
+  // ============================================================
+  // SEND
+  // ============================================================
+
   Future<void> _sendMessage() async {
-    if (_isSending) {
+    if (_hasPendingAction) {
       return;
     }
 
@@ -816,114 +990,349 @@ class _ConversationScreenState
       return;
     }
 
-    setState(
-          () {
-        _isSending =
-        true;
-      },
-    );
+    if (text.length >
+        _maxMessageLength) {
+      _showSnackBar(
+        'Message must be $_maxMessageLength characters or fewer.',
+      );
+
+      return;
+    }
+
+    setState(() {
+      _isSending = true;
+    });
 
     try {
       await ChatService.instance.sendMessage(
         conversationId:
         widget.conversationId,
-        text:
-        text,
+        text: text,
       );
+
+      if (!mounted) {
+        return;
+      }
 
       _messageController.clear();
 
-      if (!mounted) {
-        return;
-      }
+      setState(() {});
 
-      setState(
-            () {},
+      WidgetsBinding.instance
+          .addPostFrameCallback(
+            (_) {
+          if (!mounted) {
+            return;
+          }
+
+          _scrollToBottom(
+            animate: true,
+          );
+        },
       );
-
-      await Future.delayed(
-        const Duration(
-          milliseconds:
-          100,
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      _scrollToBottom();
     } on ChatServiceException catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-            () {},
-      );
+      setState(() {});
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content:
-          Text(
-            error.message,
-          ),
-          behavior:
-          SnackBarBehavior.floating,
-        ),
+      _showSnackBar(
+        error.message,
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      setState(
-            () {},
+      setState(() {});
+
+      _showSnackBar(
+        'Message could not be sent. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // MENU
+  // ============================================================
+
+  Future<void> _showConversationMenu(
+      Conversation conversation,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    final String? action =
+    await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor:
+      Colors.white,
+      showDragHandle: true,
+      builder:
+          (
+          BuildContext context,
+          ) {
+        return SafeArea(
+          child: Padding(
+            padding:
+            const EdgeInsets.only(
+              bottom: 12,
+            ),
+            child: Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading:
+                  const Icon(
+                    Icons
+                        .delete_outline_rounded,
+                    color:
+                    Colors.redAccent,
+                  ),
+                  title:
+                  const Text(
+                    'Delete conversation',
+                    style:
+                    TextStyle(
+                      color:
+                      Colors.redAccent,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      context,
+                      'delete',
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted ||
+        action == null) {
+      return;
+    }
+
+    if (action == 'delete') {
+      await _confirmDeleteConversation(
+        conversation,
+      );
+    }
+  }
+
+  // ============================================================
+  // DELETE
+  // ============================================================
+
+  Future<void> _confirmDeleteConversation(
+      Conversation conversation,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          title:
+          const Text(
+            'Delete conversation?',
+          ),
+          content: Text(
+            'This will permanently delete your conversation with ${conversation.userName} and all saved messages in this thread.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'CANCEL',
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'DELETE',
+                style:
+                TextStyle(
+                  color:
+                  Colors.redAccent,
+                  fontWeight:
+                  FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted ||
+        confirmed != true) {
+      return;
+    }
+
+    await _deleteConversation(
+      conversation,
+    );
+  }
+
+  Future<void> _deleteConversation(
+      Conversation conversation,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await ChatService.instance
+          .deleteConversation(
+        conversation.id,
       );
 
-      ScaffoldMessenger.of(
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pop(
         context,
-      ).showSnackBar(
-        const SnackBar(
+      );
+    } on ChatServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        'Conversation could not be deleted. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // SCROLL
+  // ============================================================
+
+  void _scrollToBottom({
+    required bool animate,
+  }) {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final double target =
+        _scrollController
+            .position
+            .maxScrollExtent;
+
+    if (animate) {
+      _scrollController.animateTo(
+        target,
+        duration:
+        const Duration(
+          milliseconds: 220,
+        ),
+        curve:
+        Curves.easeOut,
+      );
+
+      return;
+    }
+
+    _scrollController.jumpTo(
+      target,
+    );
+  }
+
+  // ============================================================
+  // SNACKBAR
+  // ============================================================
+
+  void _showSnackBar(
+      String message,
+      ) {
+    ScaffoldMessenger.of(
+      context,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
           content:
           Text(
-            'Message could not be sent. Please try again.',
+            message,
           ),
           behavior:
           SnackBarBehavior.floating,
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(
-              () {
-            _isSending =
-            false;
-          },
-        );
-      }
-    }
   }
 
-  void _scrollToBottom() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
+  // ============================================================
+  // DATE / TIME
+  // ============================================================
 
-    _scrollController.animateTo(
-      _scrollController
-          .position
-          .maxScrollExtent,
-      duration:
-      const Duration(
-        milliseconds:
-        220,
-      ),
-      curve:
-      Curves.easeOut,
-    );
+  bool _isSameDay(
+      DateTime first,
+      DateTime second,
+      ) {
+    return first.year ==
+        second.year &&
+        first.month ==
+            second.month &&
+        first.day ==
+            second.day;
   }
 
   String _formatMessageTime(
@@ -947,7 +1356,9 @@ class _ConversationScreenState
     }
 
     final String formattedMinute =
-    minute.toString().padLeft(
+    minute
+        .toString()
+        .padLeft(
       2,
       '0',
     );
@@ -990,19 +1401,20 @@ class _ConversationScreenState
       return 'Yesterday';
     }
 
-    final List<String> months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
+    const List<String> months =
+    <String>[
+      'January',
+      'February',
+      'March',
+      'April',
       'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
 
     if (date.year ==
@@ -1011,17 +1423,5 @@ class _ConversationScreenState
     }
 
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  bool _isSameDay(
-      DateTime first,
-      DateTime second,
-      ) {
-    return first.year ==
-        second.year &&
-        first.month ==
-            second.month &&
-        first.day ==
-            second.day;
   }
 }
