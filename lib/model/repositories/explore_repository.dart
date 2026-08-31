@@ -5,6 +5,17 @@ import '../skill.dart';
 import '../user.dart';
 import '../user_skill.dart';
 
+class ExploreRepositoryException implements Exception {
+  final String message;
+
+  const ExploreRepositoryException(
+      this.message,
+      );
+
+  @override
+  String toString() => message;
+}
+
 class ExploreRepository {
   ExploreRepository._();
 
@@ -25,6 +36,8 @@ class ExploreRepository {
 
   final List<UserSkill> _userSkills = [];
 
+  Future<void>? _loadingFuture;
+
   bool _initialized = false;
 
   bool get isInitialized =>
@@ -39,7 +52,29 @@ class ExploreRepository {
       return;
     }
 
-    await _loadFromDatabase();
+    final Future<void>? pending =
+        _loadingFuture;
+
+    if (pending != null) {
+      await pending;
+      return;
+    }
+
+    final Future<void> loading =
+    _loadFromDatabase();
+
+    _loadingFuture = loading;
+
+    try {
+      await loading;
+    } finally {
+      if (identical(
+        _loadingFuture,
+        loading,
+      )) {
+        _loadingFuture = null;
+      }
+    }
   }
 
   // ============================================================
@@ -47,149 +82,317 @@ class ExploreRepository {
   // ============================================================
 
   Future<void> refresh() async {
-    await _loadFromDatabase();
+    final Future<void>? pending =
+        _loadingFuture;
+
+    if (pending != null) {
+      await pending;
+    }
+
+    final Future<void> loading =
+    _loadFromDatabase();
+
+    _loadingFuture = loading;
+
+    try {
+      await loading;
+    } finally {
+      if (identical(
+        _loadingFuture,
+        loading,
+      )) {
+        _loadingFuture = null;
+      }
+    }
   }
 
   // ============================================================
   // LOAD FROM DATABASE
   //
-  // Loads all Explore reference data first, then replaces the
-  // in-memory cache only after the entire operation succeeds.
+  // Loads everything into temporary collections first.
+  // Existing in-memory data is replaced only after the complete
+  // read, parsing, and relationship validation succeeds.
   // ============================================================
 
   Future<void> _loadFromDatabase() async {
-    final db =
-    await AppDatabase
-        .instance
-        .database;
+    try {
+      final db =
+      await AppDatabase.instance.database;
 
-    final List<Map<String, Object?>>
-    userRows =
-    await db.query(
-      'users',
-      orderBy:
-      'name COLLATE NOCASE ASC',
-    );
-
-    final List<Map<String, Object?>>
-    skillRows =
-    await db.query(
-      'skills',
-      orderBy:
-      'title COLLATE NOCASE ASC',
-    );
-
-    final List<Map<String, Object?>>
-    learningRows =
-    await db.query(
-      'skill_learnings',
-      orderBy:
-      'skill_id ASC, position ASC',
-    );
-
-    final List<Map<String, Object?>>
-    userSkillRows =
-    await db.query(
-      'user_skills',
-      orderBy: 'id ASC',
-    );
-
-    // ----------------------------------------------------------
-    // USERS
-    // ----------------------------------------------------------
-
-    final List<User> loadedUsers =
-    userRows
-        .map(
-      _userFromMap,
-    )
-        .toList();
-
-    // ----------------------------------------------------------
-    // GROUP LEARNINGS BY SKILL ID
-    // ----------------------------------------------------------
-
-    final Map<String, List<String>>
-    learningsBySkill = {};
-
-    for (final Map<String, Object?>
-    row in learningRows) {
-      final String skillId =
-      row['skill_id']
-      as String;
-
-      final String text =
-      row['text']
-      as String;
-
-      learningsBySkill
-          .putIfAbsent(
-        skillId,
-            () => [],
-      )
-          .add(
-        text,
+      final List<Map<String, Object?>>
+      userRows = await db.query(
+        'users',
+        orderBy:
+        'name COLLATE NOCASE ASC',
       );
-    }
 
-    // ----------------------------------------------------------
-    // SKILLS
-    // ----------------------------------------------------------
+      final List<Map<String, Object?>>
+      skillRows = await db.query(
+        'skills',
+        orderBy:
+        'title COLLATE NOCASE ASC',
+      );
 
-    final List<Skill> loadedSkills =
-    skillRows.map(
-          (
-          Map<String, Object?>
-          skillRow,
-          ) {
+      final List<Map<String, Object?>>
+      learningRows = await db.query(
+        'skill_learnings',
+        orderBy:
+        'skill_id ASC, position ASC',
+      );
+
+      final List<Map<String, Object?>>
+      userSkillRows = await db.query(
+        'user_skills',
+        orderBy:
+        'id ASC',
+      );
+
+      // --------------------------------------------------------
+      // USERS
+      // --------------------------------------------------------
+
+      final List<User> loadedUsers =
+      <User>[];
+
+      final Set<String> userIds =
+      <String>{};
+
+      for (final Map<String, Object?> row
+      in userRows) {
+        final User user =
+        _userFromMap(
+          row,
+        );
+
+        if (!userIds.add(
+          user.id,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains duplicate user IDs.',
+          );
+        }
+
+        loadedUsers.add(
+          user,
+        );
+      }
+
+      // --------------------------------------------------------
+      // SKILL LEARNINGS
+      // --------------------------------------------------------
+
+      final Map<String, List<String>>
+      learningsBySkill =
+      <String, List<String>>{};
+
+      final Map<String, Set<int>>
+      learningPositionsBySkill =
+      <String, Set<int>>{};
+
+      for (final Map<String, Object?> row
+      in learningRows) {
         final String skillId =
-        skillRow['id']
-        as String;
+        _requireString(
+          row,
+          'skill_id',
+          'Skill learning skill ID',
+        );
 
-        return _skillFromMap(
-          skillRow,
+        final String text =
+        _requireString(
+          row,
+          'text',
+          'Skill learning text',
+        );
+
+        final int position =
+        _requireInt(
+          row,
+          'position',
+          'Skill learning position',
+        );
+
+        if (position < 0) {
+          throw const ExploreRepositoryException(
+            'Explore data contains an invalid skill learning position.',
+          );
+        }
+
+        final Set<int> positions =
+        learningPositionsBySkill
+            .putIfAbsent(
+          skillId,
+              () => <int>{},
+        );
+
+        if (!positions.add(
+          position,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains duplicate skill learning positions.',
+          );
+        }
+
+        learningsBySkill
+            .putIfAbsent(
+          skillId,
+              () => <String>[],
+        )
+            .add(
+          text,
+        );
+      }
+
+      // --------------------------------------------------------
+      // SKILLS
+      // --------------------------------------------------------
+
+      final List<Skill> loadedSkills =
+      <Skill>[];
+
+      final Set<String> skillIds =
+      <String>{};
+
+      for (final Map<String, Object?> row
+      in skillRows) {
+        final String skillId =
+        _requireString(
+          row,
+          'id',
+          'Skill ID',
+        );
+
+        if (!skillIds.add(
+          skillId,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains duplicate skill IDs.',
+          );
+        }
+
+        final Skill skill =
+        _skillFromMap(
+          row,
           learningsBySkill[
           skillId] ??
-              const [],
+              const <String>[],
         );
-      },
-    ).toList();
 
-    // ----------------------------------------------------------
-    // USER SKILLS
-    // ----------------------------------------------------------
+        loadedSkills.add(
+          skill,
+        );
+      }
 
-    final List<UserSkill>
-    loadedUserSkills =
-    userSkillRows
-        .map(
-      _userSkillFromMap,
-    )
-        .toList();
+      // --------------------------------------------------------
+      // LEARNING RELATIONSHIP VALIDATION
+      // --------------------------------------------------------
 
-    // ----------------------------------------------------------
-    // REPLACE CACHE ONLY AFTER SUCCESS
-    // ----------------------------------------------------------
+      for (final String learningSkillId
+      in learningsBySkill.keys) {
+        if (!skillIds.contains(
+          learningSkillId,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains a learning entry for an unknown skill.',
+          );
+        }
+      }
 
-    _users
-      ..clear()
-      ..addAll(
-        loadedUsers,
+      // --------------------------------------------------------
+      // USER SKILLS
+      // --------------------------------------------------------
+
+      final List<UserSkill>
+      loadedUserSkills =
+      <UserSkill>[];
+
+      final Set<String> userSkillIds =
+      <String>{};
+
+      final Set<String> userSkillKeys =
+      <String>{};
+
+      for (final Map<String, Object?> row
+      in userSkillRows) {
+        final UserSkill relationship =
+        _userSkillFromMap(
+          row,
+        );
+
+        if (!userSkillIds.add(
+          relationship.id,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains duplicate user-skill relationship IDs.',
+          );
+        }
+
+        if (!userIds.contains(
+          relationship.userId,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains a skill relationship for an unknown user.',
+          );
+        }
+
+        if (!skillIds.contains(
+          relationship.skillId,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains a user relationship for an unknown skill.',
+          );
+        }
+
+        final String relationshipKey =
+        <String>[
+          relationship.userId,
+          relationship.skillId,
+          relationship.type.name,
+        ].join('|');
+
+        if (!userSkillKeys.add(
+          relationshipKey,
+        )) {
+          throw const ExploreRepositoryException(
+            'Explore data contains a duplicate user-skill relationship.',
+          );
+        }
+
+        loadedUserSkills.add(
+          relationship,
+        );
+      }
+
+      // --------------------------------------------------------
+      // REPLACE CACHE ONLY AFTER SUCCESS
+      // --------------------------------------------------------
+
+      _users
+        ..clear()
+        ..addAll(
+          loadedUsers,
+        );
+
+      _skills
+        ..clear()
+        ..addAll(
+          loadedSkills,
+        );
+
+      _userSkills
+        ..clear()
+        ..addAll(
+          loadedUserSkills,
+        );
+
+      _initialized = true;
+    } on ExploreRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ExploreRepositoryException(
+        'Could not load Explore data. Please try again.',
       );
-
-    _skills
-      ..clear()
-      ..addAll(
-        loadedSkills,
-      );
-
-    _userSkills
-      ..clear()
-      ..addAll(
-        loadedUserSkills,
-      );
-
-    _initialized = true;
+    }
   }
 
   // ============================================================
@@ -199,73 +402,177 @@ class ExploreRepository {
   User _userFromMap(
       Map<String, Object?> map,
       ) {
+    final String id =
+    _requireString(
+      map,
+      'id',
+      'User ID',
+    );
+
+    final String name =
+    _requireString(
+      map,
+      'name',
+      'User name',
+    );
+
+    final String initials =
+    _requireString(
+      map,
+      'initials',
+      'User initials',
+    );
+
+    final String city =
+    _requireString(
+      map,
+      'city',
+      'User city',
+    );
+
+    final String bio =
+    _requireString(
+      map,
+      'bio',
+      'User bio',
+    );
+
+    final double rating =
+    _requireDouble(
+      map,
+      'rating',
+      'User rating',
+    );
+
+    final int reviewCount =
+    _requireInt(
+      map,
+      'review_count',
+      'User review count',
+    );
+
+    final int completedSwaps =
+    _requireInt(
+      map,
+      'completed_swaps',
+      'User completed swaps',
+    );
+
+    final int responseRate =
+    _requireInt(
+      map,
+      'response_rate',
+      'User response rate',
+    );
+
+    final String memberSince =
+    _requireString(
+      map,
+      'member_since',
+      'User member since',
+    );
+
+    final String availability =
+    _requireString(
+      map,
+      'availability',
+      'User availability',
+    );
+
+    final String language =
+    _requireString(
+      map,
+      'language',
+      'User language',
+    );
+
+    final String preferredMode =
+    _requireString(
+      map,
+      'preferred_mode',
+      'User preferred mode',
+    );
+
+    final String teachingStyle =
+    _requireString(
+      map,
+      'teaching_style',
+      'User teaching style',
+    );
+
+    final bool emailVerified =
+    _requireBooleanFlag(
+      map,
+      'email_verified',
+      'User email verification',
+    );
+
+    final bool profileCompleted =
+    _requireBooleanFlag(
+      map,
+      'profile_completed',
+      'User profile completion',
+    );
+
+    if (rating < 0 ||
+        rating > 5) {
+      throw const ExploreRepositoryException(
+        'Explore data contains an invalid user rating.',
+      );
+    }
+
+    if (reviewCount < 0) {
+      throw const ExploreRepositoryException(
+        'Explore data contains an invalid review count.',
+      );
+    }
+
+    if (completedSwaps < 0) {
+      throw const ExploreRepositoryException(
+        'Explore data contains an invalid completed swap count.',
+      );
+    }
+
+    if (responseRate < 0 ||
+        responseRate > 100) {
+      throw const ExploreRepositoryException(
+        'Explore data contains an invalid response rate.',
+      );
+    }
+
     return User(
       id:
-      map['id']
-      as String,
-
+      id,
       name:
-      map['name']
-      as String,
-
+      name,
       initials:
-      map['initials']
-      as String,
-
+      initials,
       city:
-      map['city']
-      as String,
-
+      city,
       bio:
-      map['bio']
-      as String,
-
+      bio,
       rating:
-      (map['rating']
-      as num)
-          .toDouble(),
-
+      rating,
       reviewCount:
-      map['review_count']
-      as int,
-
+      reviewCount,
       completedSwaps:
-      map['completed_swaps']
-      as int,
-
+      completedSwaps,
       responseRate:
-      map['response_rate']
-      as int,
-
+      responseRate,
       memberSince:
-      map['member_since']
-      as String,
-
+      memberSince,
       availability:
-      map['availability']
-      as String,
-
+      availability,
       language:
-      map['language']
-      as String,
-
+      language,
       preferredMode:
-      map['preferred_mode']
-      as String,
-
+      preferredMode,
       teachingStyle:
-      map['teaching_style']
-      as String,
-
+      teachingStyle,
       emailVerified:
-      (map['email_verified']
-      as int) ==
-          1,
-
+      emailVerified,
       profileCompleted:
-      (map['profile_completed']
-      as int) ==
-          1,
+      profileCompleted,
     );
   }
 
@@ -277,54 +584,102 @@ class ExploreRepository {
       Map<String, Object?> map,
       List<String> learnings,
       ) {
+    final String id =
+    _requireString(
+      map,
+      'id',
+      'Skill ID',
+    );
+
+    final String title =
+    _requireString(
+      map,
+      'title',
+      'Skill title',
+    );
+
+    final String category =
+    _requireString(
+      map,
+      'category',
+      'Skill category',
+    );
+
+    final String level =
+    _requireString(
+      map,
+      'level',
+      'Skill level',
+    );
+
     final int iconCodePoint =
-    map['icon_code_point']
-    as int;
+    _requireInt(
+      map,
+      'icon_code_point',
+      'Skill icon',
+    );
+
+    final String sessionLength =
+    _requireString(
+      map,
+      'session_length',
+      'Skill session length',
+    );
+
+    final String mode =
+    _requireString(
+      map,
+      'mode',
+      'Skill mode',
+    );
+
+    final String language =
+    _requireString(
+      map,
+      'language',
+      'Skill language',
+    );
+
+    // Prerequisite is allowed to be blank.
+    final String prerequisite =
+    _readStringAllowEmpty(
+      map,
+      'prerequisite',
+      'Skill prerequisite',
+    );
+
+    final String description =
+    _requireString(
+      map,
+      'description',
+      'Skill description',
+    );
 
     return Skill(
       id:
-      map['id']
-      as String,
-
+      id,
       title:
-      map['title']
-      as String,
-
+      title,
       category:
-      map['category']
-      as String,
-
+      category,
       level:
-      map['level']
-      as String,
-
+      level,
       icon:
       _iconFromCodePoint(
         iconCodePoint,
       ),
-
       sessionLength:
-      map['session_length']
-      as String,
-
+      sessionLength,
       mode:
-      map['mode']
-      as String,
-
+      mode,
       language:
-      map['language']
-      as String,
-
+      language,
       prerequisite:
-      map['prerequisite']
-      as String,
-
+      prerequisite,
       description:
-      map['description']
-      as String,
-
+      description,
       learnings:
-      List.unmodifiable(
+      List<String>.unmodifiable(
         learnings,
       ),
     );
@@ -333,16 +688,15 @@ class ExploreRepository {
   // ============================================================
   // ICON CODE POINT -> MATERIAL ICON CONSTANT
   //
-  // We intentionally do NOT create IconData dynamically.
-  //
-  // Flutter recommends using stable IconData constants so icons
-  // remain compatible with release-mode icon tree shaking.
+  // Dynamic IconData is intentionally avoided so release-mode
+  // icon tree shaking remains safe.
   // ============================================================
 
   IconData _iconFromCodePoint(
       int codePoint,
       ) {
-    const List<IconData> supportedIcons = [
+    const List<IconData> supportedIcons =
+    <IconData>[
       Icons.design_services_outlined,
       Icons.camera_alt_outlined,
       Icons.movie_creation_outlined,
@@ -377,55 +731,235 @@ class ExploreRepository {
   UserSkill _userSkillFromMap(
       Map<String, Object?> map,
       ) {
-    final String type =
-    map['type']
-    as String;
+    final String id =
+    _requireString(
+      map,
+      'id',
+      'User-skill relationship ID',
+    );
 
-    late final UserSkillType
-    parsedType;
+    final String userId =
+    _requireString(
+      map,
+      'user_id',
+      'User-skill user ID',
+    );
+
+    final String skillId =
+    _requireString(
+      map,
+      'skill_id',
+      'User-skill skill ID',
+    );
+
+    final String type =
+    _requireString(
+      map,
+      'type',
+      'User-skill type',
+    );
+
+    final String level =
+    _requireString(
+      map,
+      'level',
+      'User-skill level',
+    );
+
+    final String availability =
+    _requireString(
+      map,
+      'availability',
+      'User-skill availability',
+    );
+
+    late final UserSkillType parsedType;
 
     switch (type) {
       case 'offered':
         parsedType =
-            UserSkillType
-                .offered;
-        break;
+            UserSkillType.offered;
 
       case 'wanted':
         parsedType =
-            UserSkillType
-                .wanted;
-        break;
+            UserSkillType.wanted;
 
       default:
-        throw StateError(
-          'Unknown user skill type: $type',
+        throw const ExploreRepositoryException(
+          'Explore data contains an invalid user-skill type.',
         );
     }
 
     return UserSkill(
       id:
-      map['id']
-      as String,
-
+      id,
       userId:
-      map['user_id']
-      as String,
-
+      userId,
       skillId:
-      map['skill_id']
-      as String,
-
+      skillId,
       type:
       parsedType,
-
       level:
-      map['level']
-      as String,
-
+      level,
       availability:
-      map['availability']
-      as String,
+      availability,
+    );
+  }
+
+  // ============================================================
+  // DEFENSIVE FIELD PARSING
+  // ============================================================
+
+  String _requireString(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    final Object? value =
+    row[key];
+
+    if (value is! String) {
+      throw ExploreRepositoryException(
+        '$label is invalid.',
+      );
+    }
+
+    final String cleaned =
+    value.trim();
+
+    if (cleaned.isEmpty) {
+      throw ExploreRepositoryException(
+        '$label is required.',
+      );
+    }
+
+    return cleaned;
+  }
+
+  // ------------------------------------------------------------
+  // STRING THAT MAY BE EMPTY
+  //
+  // Used for valid optional text columns such as prerequisite.
+  // The database value must still be a String, but "" is valid.
+  // ------------------------------------------------------------
+
+  String _readStringAllowEmpty(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    final Object? value =
+    row[key];
+
+    if (value is! String) {
+      throw ExploreRepositoryException(
+        '$label is invalid.',
+      );
+    }
+
+    return value.trim();
+  }
+
+  int _requireInt(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    final Object? value =
+    row[key];
+
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      final double numericValue =
+      value.toDouble();
+
+      if (!numericValue.isFinite ||
+          numericValue !=
+              numericValue
+                  .truncateToDouble()) {
+        throw ExploreRepositoryException(
+          '$label is invalid.',
+        );
+      }
+
+      return numericValue.toInt();
+    }
+
+    if (value is String) {
+      final int? parsed =
+      int.tryParse(
+        value.trim(),
+      );
+
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+
+    throw ExploreRepositoryException(
+      '$label is invalid.',
+    );
+  }
+
+  double _requireDouble(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    final Object? value =
+    row[key];
+
+    if (value is num) {
+      final double parsed =
+      value.toDouble();
+
+      if (parsed.isFinite) {
+        return parsed;
+      }
+    }
+
+    if (value is String) {
+      final double? parsed =
+      double.tryParse(
+        value.trim(),
+      );
+
+      if (parsed != null &&
+          parsed.isFinite) {
+        return parsed;
+      }
+    }
+
+    throw ExploreRepositoryException(
+      '$label is invalid.',
+    );
+  }
+
+  bool _requireBooleanFlag(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    final int value =
+    _requireInt(
+      row,
+      key,
+      label,
+    );
+
+    if (value == 0) {
+      return false;
+    }
+
+    if (value == 1) {
+      return true;
+    }
+
+    throw ExploreRepositoryException(
+      '$label must be 0 or 1.',
     );
   }
 
@@ -434,17 +968,17 @@ class ExploreRepository {
   // ============================================================
 
   List<User> get users =>
-      List.unmodifiable(
+      List<User>.unmodifiable(
         _users,
       );
 
   List<Skill> get skills =>
-      List.unmodifiable(
+      List<Skill>.unmodifiable(
         _skills,
       );
 
   List<UserSkill> get userSkills =>
-      List.unmodifiable(
+      List<UserSkill>.unmodifiable(
         _userSkills,
       );
 
@@ -502,15 +1036,14 @@ class ExploreRepository {
   // OFFERED SKILLS
   // ============================================================
 
-  List<UserSkill>
-  getOfferedSkillsForUser(
+  List<UserSkill> getOfferedSkillsForUser(
       String userId,
       ) {
     final String normalizedUserId =
     userId.trim();
 
     if (normalizedUserId.isEmpty) {
-      return [];
+      return <UserSkill>[];
     }
 
     return _userSkills
@@ -521,8 +1054,7 @@ class ExploreRepository {
       item.userId ==
           normalizedUserId &&
           item.type ==
-              UserSkillType
-                  .offered,
+              UserSkillType.offered,
     )
         .toList();
   }
@@ -531,15 +1063,14 @@ class ExploreRepository {
   // WANTED SKILLS
   // ============================================================
 
-  List<UserSkill>
-  getWantedSkillsForUser(
+  List<UserSkill> getWantedSkillsForUser(
       String userId,
       ) {
     final String normalizedUserId =
     userId.trim();
 
     if (normalizedUserId.isEmpty) {
-      return [];
+      return <UserSkill>[];
     }
 
     return _userSkills
@@ -550,8 +1081,7 @@ class ExploreRepository {
       item.userId ==
           normalizedUserId &&
           item.type ==
-              UserSkillType
-                  .wanted,
+              UserSkillType.wanted,
     )
         .toList();
   }
@@ -567,7 +1097,7 @@ class ExploreRepository {
     skillId.trim();
 
     if (normalizedSkillId.isEmpty) {
-      return [];
+      return <User>[];
     }
 
     final Set<String> providerIds =
@@ -579,8 +1109,7 @@ class ExploreRepository {
       item.skillId ==
           normalizedSkillId &&
           item.type ==
-              UserSkillType
-                  .offered,
+              UserSkillType.offered,
     )
         .map(
           (
@@ -595,8 +1124,7 @@ class ExploreRepository {
           (
           User user,
           ) =>
-          providerIds
-              .contains(
+          providerIds.contains(
             user.id,
           ),
     )

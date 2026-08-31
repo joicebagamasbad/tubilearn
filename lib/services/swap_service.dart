@@ -75,8 +75,24 @@ class SwapService {
   }
 
   Future<void> _initializeInternal() async {
-    final List<SwapRequest> savedRequests =
-    await _repository.getAllSwapRequests();
+    late final List<SwapRequest> savedRequests;
+
+    try {
+      savedRequests =
+      await _repository.getAllSwapRequests();
+    } on SwapRepositoryException catch (_) {
+      throw const SwapServiceException(
+        'Could not load your swap requests. Please try again.',
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not load your swap requests. Please try again.',
+      );
+    }
+
+    _validateLoadedRequests(
+      savedRequests,
+    );
 
     _requests
       ..clear()
@@ -87,6 +103,238 @@ class SwapService {
     );
 
     _initialized = true;
+  }
+
+  // ============================================================
+  // LOADED DATA VALIDATION
+  //
+  // Repository parsing confirms that individual database values
+  // can be read. This layer validates domain consistency across
+  // the complete saved request collection before it becomes
+  // trusted in-memory state.
+  // ============================================================
+
+  void _validateLoadedRequests(
+      List<SwapRequest> requests,
+      ) {
+    final Set<String> seenRequestIds =
+    <String>{};
+
+    final Set<String> activeStableKeys =
+    <String>{};
+
+    final Set<String> activeLegacyKeys =
+    <String>{};
+
+    for (final SwapRequest request in requests) {
+      _validateLoadedRequest(
+        request,
+      );
+
+      final String requestId =
+      request.id.trim();
+
+      if (!seenRequestIds.add(
+        requestId,
+      )) {
+        throw const SwapServiceException(
+          'Saved swap data contains duplicate request IDs.',
+        );
+      }
+
+      if (!request.status.isActive) {
+        continue;
+      }
+
+      if (request.hasStableIdentity) {
+        final String stableKey =
+        _stableRequestIdentityKey(
+          requesterUserId:
+          request.requesterUserId!,
+          providerUserId:
+          request.providerUserId!,
+          skillToLearnId:
+          request.skillToLearnId!,
+          skillToOfferId:
+          request.skillToOfferId!,
+        );
+
+        if (!activeStableKeys.add(
+          stableKey,
+        )) {
+          throw const SwapServiceException(
+            'Saved swap data contains duplicate active requests.',
+          );
+        }
+
+        continue;
+      }
+
+      final String legacyKey =
+      _legacyRequestIdentityKey(
+        providerName:
+        request.providerName,
+        skillToLearn:
+        request.skillToLearn,
+        skillToOffer:
+        request.skillToOffer,
+      );
+
+      if (!activeLegacyKeys.add(
+        legacyKey,
+      )) {
+        throw const SwapServiceException(
+          'Saved swap data contains duplicate active legacy requests.',
+        );
+      }
+    }
+  }
+
+  void _validateLoadedRequest(
+      SwapRequest request,
+      ) {
+    if (request.id.trim().isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without an ID.',
+      );
+    }
+
+    final String providerName =
+    request.providerName.trim();
+
+    final String providerInitials =
+    request.providerInitials.trim();
+
+    final String providerCity =
+    request.providerCity.trim();
+
+    final String skillToLearn =
+    request.skillToLearn.trim();
+
+    final String skillToOffer =
+    request.skillToOffer.trim();
+
+    final String mode =
+    request.mode.trim();
+
+    final String? meetingDetails =
+    _cleanNullableText(
+      request.meetingDetails,
+    );
+
+    final String? note =
+    _cleanNullableText(
+      request.note,
+    );
+
+    if (providerName.isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without a provider name.',
+      );
+    }
+
+    if (providerInitials.isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without provider initials.',
+      );
+    }
+
+    if (providerCity.isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without a provider city.',
+      );
+    }
+
+    if (skillToLearn.isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without a skill to learn.',
+      );
+    }
+
+    if (skillToOffer.isEmpty) {
+      throw const SwapServiceException(
+        'Saved swap data contains a request without a skill to offer.',
+      );
+    }
+
+    if (skillToLearn.toLowerCase() ==
+        skillToOffer.toLowerCase()) {
+      throw const SwapServiceException(
+        'Saved swap data contains an invalid same-skill exchange.',
+      );
+    }
+
+    const Set<String> allowedModes =
+    <String>{
+      'Online',
+      'In-person',
+    };
+
+    if (!allowedModes.contains(
+      mode,
+    )) {
+      throw const SwapServiceException(
+        'Saved swap data contains an invalid session mode.',
+      );
+    }
+
+    if (meetingDetails == null) {
+      throw const SwapServiceException(
+        'Saved swap data contains missing meeting details.',
+      );
+    }
+
+    if (meetingDetails.length > 150) {
+      throw const SwapServiceException(
+        'Saved swap data contains meeting details that are too long.',
+      );
+    }
+
+    if (note != null &&
+        note.length > 300) {
+      throw const SwapServiceException(
+        'Saved swap data contains a message that is too long.',
+      );
+    }
+
+    if (request.updatedAt.isBefore(
+      request.createdAt,
+    )) {
+      throw const SwapServiceException(
+        'Saved swap data contains an invalid update timestamp.',
+      );
+    }
+
+    final String? requesterUserId =
+    _cleanNullableText(
+      request.requesterUserId,
+    );
+
+    final String? providerUserId =
+    _cleanNullableText(
+      request.providerUserId,
+    );
+
+    final String? skillToLearnId =
+    _cleanNullableText(
+      request.skillToLearnId,
+    );
+
+    final String? skillToOfferId =
+    _cleanNullableText(
+      request.skillToOfferId,
+    );
+
+    _validateIdentityGroup(
+      requesterUserId:
+      requesterUserId,
+      providerUserId:
+      providerUserId,
+      skillToLearnId:
+      skillToLearnId,
+      skillToOfferId:
+      skillToOfferId,
+    );
   }
 
   // ============================================================
@@ -218,7 +466,8 @@ class SwapService {
 
     final Future<SwapRequest>? pending =
     _pendingCreations[
-    creationKey];
+    creationKey
+    ];
 
     if (pending != null) {
       return pending;
@@ -255,14 +504,16 @@ class SwapService {
     );
 
     _pendingCreations[
-    creationKey] = creation;
+    creationKey
+    ] = creation;
 
     try {
       return await creation;
     } finally {
       if (identical(
         _pendingCreations[
-        creationKey],
+        creationKey
+        ],
         creation,
       )) {
         _pendingCreations.remove(
@@ -556,7 +807,8 @@ class SwapService {
 
     final Future<void>? pendingDeletion =
     _pendingDeletions[
-    requestId];
+    requestId
+    ];
 
     if (pendingDeletion != null) {
       throw const SwapServiceException(
@@ -567,7 +819,8 @@ class SwapService {
     while (true) {
       final Future<void>? pendingStatusChange =
       _pendingStatusChanges[
-      requestId];
+      requestId
+      ];
 
       if (pendingStatusChange == null) {
         break;
@@ -597,14 +850,16 @@ class SwapService {
     );
 
     _pendingStatusChanges[
-    requestId] = operation;
+    requestId
+    ] = operation;
 
     try {
       await operation;
     } finally {
       if (identical(
         _pendingStatusChanges[
-        requestId],
+        requestId
+        ],
         operation,
       )) {
         _pendingStatusChanges.remove(
@@ -680,7 +935,8 @@ class SwapService {
 
     final Future<void>? pendingDeletion =
     _pendingDeletions[
-    cleanRequestId];
+    cleanRequestId
+    ];
 
     if (pendingDeletion != null) {
       await pendingDeletion;
@@ -701,14 +957,16 @@ class SwapService {
     );
 
     _pendingDeletions[
-    cleanRequestId] = deletion;
+    cleanRequestId
+    ] = deletion;
 
     try {
       await deletion;
     } finally {
       if (identical(
         _pendingDeletions[
-        cleanRequestId],
+        cleanRequestId
+        ],
         deletion,
       )) {
         _pendingDeletions.remove(
@@ -724,7 +982,8 @@ class SwapService {
   }) async {
     final Future<void>? pendingStatusChange =
     _pendingStatusChanges[
-    requestId];
+    requestId
+    ];
 
     if (pendingStatusChange != null) {
       try {
@@ -959,10 +1218,8 @@ class SwapService {
       );
     }
 
-    if (skillToLearn
-        .toLowerCase() ==
-        skillToOffer
-            .toLowerCase()) {
+    if (skillToLearn.toLowerCase() ==
+        skillToOffer.toLowerCase()) {
       throw const SwapServiceException(
         'The skill you want to learn and the skill you offer must be different.',
       );
@@ -1050,20 +1307,29 @@ class SwapService {
             skillToLearnId != null &&
             skillToOfferId != null;
 
-    final String normalizedProviderName =
-    providerName
-        .trim()
-        .toLowerCase();
+    final String stableIncomingKey =
+    incomingHasStableIdentity
+        ? _stableRequestIdentityKey(
+      requesterUserId:
+      requesterUserId,
+      providerUserId:
+      providerUserId,
+      skillToLearnId:
+      skillToLearnId,
+      skillToOfferId:
+      skillToOfferId,
+    )
+        : '';
 
-    final String normalizedLearnTitle =
-    skillToLearn
-        .trim()
-        .toLowerCase();
-
-    final String normalizedOfferTitle =
-    skillToOffer
-        .trim()
-        .toLowerCase();
+    final String legacyIncomingKey =
+    _legacyRequestIdentityKey(
+      providerName:
+      providerName,
+      skillToLearn:
+      skillToLearn,
+      skillToOffer:
+      skillToOffer,
+    );
 
     for (final SwapRequest request
     in _requests) {
@@ -1073,26 +1339,20 @@ class SwapService {
 
       if (incomingHasStableIdentity &&
           request.hasStableIdentity) {
-        final bool sameRequester =
-            request.requesterUserId ==
-                requesterUserId;
+        final String existingStableKey =
+        _stableRequestIdentityKey(
+          requesterUserId:
+          request.requesterUserId!,
+          providerUserId:
+          request.providerUserId!,
+          skillToLearnId:
+          request.skillToLearnId!,
+          skillToOfferId:
+          request.skillToOfferId!,
+        );
 
-        final bool sameProvider =
-            request.providerUserId ==
-                providerUserId;
-
-        final bool sameLearnSkill =
-            request.skillToLearnId ==
-                skillToLearnId;
-
-        final bool sameOfferSkill =
-            request.skillToOfferId ==
-                skillToOfferId;
-
-        if (sameRequester &&
-            sameProvider &&
-            sameLearnSkill &&
-            sameOfferSkill) {
+        if (existingStableKey ==
+            stableIncomingKey) {
           throw const SwapServiceException(
             'You already have an active swap request with this user for the same skill exchange.',
           );
@@ -1101,32 +1361,59 @@ class SwapService {
         continue;
       }
 
-      final bool sameProvider =
-          request.providerName
-              .trim()
-              .toLowerCase() ==
-              normalizedProviderName;
+      final String existingLegacyKey =
+      _legacyRequestIdentityKey(
+        providerName:
+        request.providerName,
+        skillToLearn:
+        request.skillToLearn,
+        skillToOffer:
+        request.skillToOffer,
+      );
 
-      final bool sameLearnSkill =
-          request.skillToLearn
-              .trim()
-              .toLowerCase() ==
-              normalizedLearnTitle;
-
-      final bool sameOfferSkill =
-          request.skillToOffer
-              .trim()
-              .toLowerCase() ==
-              normalizedOfferTitle;
-
-      if (sameProvider &&
-          sameLearnSkill &&
-          sameOfferSkill) {
+      if (existingLegacyKey ==
+          legacyIncomingKey) {
         throw const SwapServiceException(
           'You already have an active swap request with this user for the same skill exchange.',
         );
       }
     }
+  }
+
+  // ============================================================
+  // IDENTITY KEYS
+  // ============================================================
+
+  String _stableRequestIdentityKey({
+    required String requesterUserId,
+    required String providerUserId,
+    required String skillToLearnId,
+    required String skillToOfferId,
+  }) {
+    return <String>[
+      requesterUserId.trim(),
+      providerUserId.trim(),
+      skillToLearnId.trim(),
+      skillToOfferId.trim(),
+    ].join('|');
+  }
+
+  String _legacyRequestIdentityKey({
+    required String providerName,
+    required String skillToLearn,
+    required String skillToOffer,
+  }) {
+    return <String>[
+      providerName
+          .trim()
+          .toLowerCase(),
+      skillToLearn
+          .trim()
+          .toLowerCase(),
+      skillToOffer
+          .trim()
+          .toLowerCase(),
+    ].join('|');
   }
 
   // ============================================================
@@ -1146,25 +1433,26 @@ class SwapService {
         providerUserId != null &&
         skillToLearnId != null &&
         skillToOfferId != null) {
-      return [
+      return _stableRequestIdentityKey(
+        requesterUserId:
         requesterUserId,
+        providerUserId:
         providerUserId,
+        skillToLearnId:
         skillToLearnId,
+        skillToOfferId:
         skillToOfferId,
-      ].join('|');
+      );
     }
 
-    return [
-      providerName
-          .trim()
-          .toLowerCase(),
-      skillToLearn
-          .trim()
-          .toLowerCase(),
-      skillToOffer
-          .trim()
-          .toLowerCase(),
-    ].join('|');
+    return _legacyRequestIdentityKey(
+      providerName:
+      providerName,
+      skillToLearn:
+      skillToLearn,
+      skillToOffer:
+      skillToOffer,
+    );
   }
 
   // ============================================================
