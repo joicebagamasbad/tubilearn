@@ -27,8 +27,16 @@ class _SwapRequestsScreenState
   final ExploreRepository _exploreRepository =
       ExploreRepository.instance;
 
+  final SwapService _swapService =
+      SwapService.instance;
+
   String _selectedFilter = 'All';
-  bool _isProcessing = false;
+
+  bool _isLoading = true;
+  String? _loadError;
+
+  final Set<String> _processingRequestIds =
+  <String>{};
 
   final List<String> _filters = const [
     'All',
@@ -36,10 +44,67 @@ class _SwapRequestsScreenState
     'Accepted',
     'Scheduled',
     'Completed',
+    'Declined',
+    'Cancelled',
   ];
 
   String get _currentUserId =>
       _currentUserService.userId;
+
+  bool get _hasPendingAction =>
+      _processingRequestIds.isNotEmpty;
+
+  // ============================================================
+  // INITIALIZE
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _loadRequests();
+  }
+
+  Future<void> _loadRequests() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      await _swapService.initialize();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = null;
+      });
+    } on SwapServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError =
+        'Swap requests could not be loaded. Please try again.';
+      });
+    }
+  }
 
   // ============================================================
   // FILTERED REQUESTS
@@ -47,21 +112,31 @@ class _SwapRequestsScreenState
 
   List<SwapRequest> get _filteredRequests {
     final List<SwapRequest> requests =
-    SwapService.instance.requests
+    _swapService.requests
         .where(
-          (request) =>
+          (SwapRequest request) =>
           request.involvesUser(
             _currentUserId,
           ),
     )
         .toList();
 
+    requests.sort(
+          (
+          SwapRequest first,
+          SwapRequest second,
+          ) =>
+          second.updatedAt.compareTo(
+            first.updatedAt,
+          ),
+    );
+
     if (_selectedFilter == 'All') {
       return requests;
     }
 
     return requests.where(
-          (request) {
+          (SwapRequest request) {
         switch (_selectedFilter) {
           case 'Pending':
             return request.status ==
@@ -79,6 +154,14 @@ class _SwapRequestsScreenState
             return request.status ==
                 SwapRequestStatus.completed;
 
+          case 'Declined':
+            return request.status ==
+                SwapRequestStatus.declined;
+
+          case 'Cancelled':
+            return request.status ==
+                SwapRequestStatus.cancelled;
+
           default:
             return true;
         }
@@ -94,197 +177,359 @@ class _SwapRequestsScreenState
   Widget build(
       BuildContext context,
       ) {
+    return PopScope(
+      canPop: !_hasPendingAction,
+      child: Scaffold(
+        backgroundColor:
+        AppTheme.background,
+        appBar: AppBar(
+          backgroundColor:
+          AppTheme.background,
+          surfaceTintColor:
+          AppTheme.background,
+          elevation: 0,
+          leading: IconButton(
+            onPressed:
+            _hasPendingAction
+                ? null
+                : () {
+              Navigator.pop(
+                context,
+              );
+            },
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 20,
+              color:
+              _hasPendingAction
+                  ? AppTheme.mutedText
+                  : AppTheme.darkText,
+            ),
+          ),
+          title: const Text(
+            'My Swap Requests',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight:
+              FontWeight.w800,
+              color:
+              AppTheme.darkText,
+            ),
+          ),
+          centerTitle: false,
+        ),
+        body: SafeArea(
+          child: _buildBody(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+
+    if (_loadError != null) {
+      return _buildErrorState();
+    }
+
     final List<SwapRequest> requests =
         _filteredRequests;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-
-      appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 20,
-            color: AppTheme.darkText,
+    return Column(
+      children: [
+        Padding(
+          padding:
+          const EdgeInsets.fromLTRB(
+            20,
+            8,
+            20,
+            12,
           ),
-        ),
-        title: const Text(
-          'My Swap Requests',
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.darkText,
-          ),
-        ),
-        centerTitle: false,
-      ),
-
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
+          child: Container(
+            width: double.infinity,
+            padding:
+            const EdgeInsets.all(
+              16,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+              BorderRadius.circular(
                 20,
-                8,
-                20,
-                12,
               ),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                  BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppTheme.border,
+              border: Border.all(
+                color: AppTheme.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                    children: [
+                      Text(
+                        'Manage your swaps',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                          FontWeight
+                              .w800,
+                          color:
+                          AppTheme
+                              .darkText,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 5,
+                      ),
+                      Text(
+                        'Track incoming and outgoing skill requests.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color:
+                          AppTheme
+                              .mutedText,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Manage your swaps',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight:
-                              FontWeight.w800,
-                              color:
-                              AppTheme.darkText,
-                            ),
-                          ),
-                          SizedBox(
-                            height: 5,
-                          ),
-                          Text(
-                            'Track incoming and outgoing skill requests.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              height: 1.4,
-                              color:
-                              AppTheme.mutedText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(
-                      width: 12,
-                    ),
-
-                    Image.asset(
-                      'assets/images/mascot/tubi_checking.png',
-                      width: 68,
-                      height: 68,
-                      fit: BoxFit.contain,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            SizedBox(
-              height: 42,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                ),
-                scrollDirection: Axis.horizontal,
-                itemCount: _filters.length,
-                separatorBuilder:
-                    (context, index) =>
                 const SizedBox(
-                  width: 8,
+                  width: 12,
                 ),
-                itemBuilder:
-                    (context, index) {
-                  final String filter =
-                  _filters[index];
+                Image.asset(
+                  'assets/images/mascot/tubi_checking.png',
+                  width: 68,
+                  height: 68,
+                  fit: BoxFit.contain,
+                ),
+              ],
+            ),
+          ),
+        ),
 
-                  final bool selected =
-                      filter ==
-                          _selectedFilter;
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            padding:
+            const EdgeInsets.symmetric(
+              horizontal: 20,
+            ),
+            scrollDirection:
+            Axis.horizontal,
+            itemCount:
+            _filters.length,
+            separatorBuilder:
+                (_, _) =>
+            const SizedBox(
+              width: 8,
+            ),
+            itemBuilder:
+                (
+                BuildContext context,
+                int index,
+                ) {
+              final String filter =
+              _filters[index];
 
-                  return ChoiceChip(
-                    label: Text(filter),
-                    selected: selected,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedFilter =
-                            filter;
-                      });
+              final bool selected =
+                  filter ==
+                      _selectedFilter;
+
+              return ChoiceChip(
+                label:
+                Text(filter),
+                selected:
+                selected,
+                onSelected:
+                _hasPendingAction
+                    ? null
+                    : (_) {
+                  setState(
+                        () {
+                      _selectedFilter =
+                          filter;
                     },
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                      FontWeight.w700,
-                      color: selected
-                          ? Colors.white
-                          : AppTheme.darkText,
-                    ),
-                    selectedColor:
-                    AppTheme.primary,
-                    backgroundColor:
-                    Colors.white,
-                    side: BorderSide(
-                      color: selected
-                          ? AppTheme.primary
-                          : AppTheme.border,
-                    ),
-                    shape:
-                    RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(
-                        20,
-                      ),
-                    ),
-                    showCheckmark: false,
                   );
                 },
-              ),
-            ),
+                labelStyle:
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight.w700,
+                  color:
+                  selected
+                      ? Colors.white
+                      : AppTheme
+                      .darkText,
+                ),
+                selectedColor:
+                AppTheme.primary,
+                backgroundColor:
+                Colors.white,
+                disabledColor:
+                Colors.white,
+                side: BorderSide(
+                  color:
+                  selected
+                      ? AppTheme.primary
+                      : AppTheme.border,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    20,
+                  ),
+                ),
+                showCheckmark:
+                false,
+              );
+            },
+          ),
+        ),
 
+        const SizedBox(
+          height: 12,
+        ),
+
+        Expanded(
+          child:
+          requests.isEmpty
+              ? _buildEmptyState()
+              : ListView.separated(
+            padding:
+            const EdgeInsets
+                .fromLTRB(
+              20,
+              4,
+              20,
+              28,
+            ),
+            itemCount:
+            requests.length,
+            separatorBuilder:
+                (_, _) =>
             const SizedBox(
               height: 12,
             ),
+            itemBuilder:
+                (
+                BuildContext
+                context,
+                int index,
+                ) {
+              return _buildRequestCard(
+                requests[index],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
-            Expanded(
-              child: requests.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  4,
-                  20,
-                  28,
-                ),
-                itemCount:
-                requests.length,
-                separatorBuilder:
-                    (context, index) =>
-                const SizedBox(
-                  height: 12,
-                ),
-                itemBuilder:
-                    (context, index) {
-                  final SwapRequest request =
-                  requests[index];
+  // ============================================================
+  // LOADING
+  // ============================================================
 
-                  return _buildRequestCard(
-                    request,
-                  );
-                },
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child:
+            CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color:
+              AppTheme.primary,
+            ),
+          ),
+          SizedBox(
+            height: 14,
+          ),
+          Text(
+            'Loading swap requests...',
+            style: TextStyle(
+              fontSize: 12.5,
+              color:
+              AppTheme.mutedText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding:
+        const EdgeInsets.all(
+          30,
+        ),
+        child: Column(
+          mainAxisSize:
+          MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons
+                  .error_outline_rounded,
+              size: 42,
+              color:
+              AppTheme.mutedText,
+            ),
+            const SizedBox(
+              height: 14,
+            ),
+            const Text(
+              'Could not load requests',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight:
+                FontWeight.w800,
+                color:
+                AppTheme.darkText,
+              ),
+            ),
+            const SizedBox(
+              height: 7,
+            ),
+            Text(
+              _loadError ??
+                  'Something went wrong.',
+              textAlign:
+              TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                color:
+                AppTheme.mutedText,
+              ),
+            ),
+            const SizedBox(
+              height: 18,
+            ),
+            ElevatedButton(
+              onPressed:
+              _loadRequests,
+              child:
+              const Text(
+                'RETRY',
               ),
             ),
           ],
@@ -307,11 +552,18 @@ class _SwapRequestsScreenState
 
     final bool isIncoming =
         direction ==
-            SwapRequestDirection.incoming;
+            SwapRequestDirection
+                .incoming;
 
     final bool isOutgoing =
         direction ==
-            SwapRequestDirection.outgoing;
+            SwapRequestDirection
+                .outgoing;
+
+    final bool isProcessing =
+    _processingRequestIds.contains(
+      request.id,
+    );
 
     User? requesterUser;
 
@@ -320,46 +572,61 @@ class _SwapRequestsScreenState
 
     if (isIncoming &&
         requesterUserId != null &&
-        requesterUserId.trim().isNotEmpty) {
+        requesterUserId
+            .trim()
+            .isNotEmpty) {
       requesterUser =
-          _exploreRepository.findUserById(
+          _exploreRepository
+              .findUserById(
             requesterUserId,
           );
     }
 
     final String displayInitials =
     isIncoming
-        ? requesterUser?.initials ?? '?'
-        : request.providerInitials;
+        ? requesterUser
+        ?.initials ??
+        '?'
+        : request
+        .providerInitials;
 
     final String displayName =
     isIncoming
-        ? requesterUser?.name ??
+        ? requesterUser
+        ?.name ??
         'Incoming skill request'
         : request.providerName;
 
     final String displayCity =
     isIncoming
-        ? requesterUser?.city ??
+        ? requesterUser
+        ?.city ??
         'Sender profile unavailable'
         : request.providerCity;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(20),
+        BorderRadius.circular(
+          20,
+        ),
         border: Border.all(
           color: AppTheme.border,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
+            color:
+            Colors.black.withValues(
               alpha: 0.025,
             ),
             blurRadius: 14,
-            offset: const Offset(
+            offset:
+            const Offset(
               0,
               4,
             ),
@@ -376,6 +643,24 @@ class _SwapRequestsScreenState
                 direction,
               ),
               const Spacer(),
+              if (isProcessing)
+                const Padding(
+                  padding:
+                  EdgeInsets.only(
+                    right: 10,
+                  ),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child:
+                    CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color:
+                      AppTheme
+                          .primary,
+                    ),
+                  ),
+                ),
               _buildStatusBadge(
                 request.status,
               ),
@@ -397,24 +682,26 @@ class _SwapRequestsScreenState
                 ),
                 child: Text(
                   displayInitials,
-                  style: const TextStyle(
+                  style:
+                  const TextStyle(
                     fontSize: 14,
                     fontWeight:
-                    FontWeight.w800,
+                    FontWeight
+                        .w800,
                     color:
-                    AppTheme.primary,
+                    AppTheme
+                        .primary,
                   ),
                 ),
               ),
-
               const SizedBox(
                 width: 12,
               ),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     Text(
                       displayName,
@@ -422,23 +709,24 @@ class _SwapRequestsScreenState
                       const TextStyle(
                         fontSize: 15,
                         fontWeight:
-                        FontWeight.w800,
+                        FontWeight
+                            .w800,
                         color:
-                        AppTheme.darkText,
+                        AppTheme
+                            .darkText,
                       ),
                     ),
-
                     const SizedBox(
                       height: 3,
                     ),
-
                     Text(
                       displayCity,
                       style:
                       const TextStyle(
                         fontSize: 12,
                         color:
-                        AppTheme.mutedText,
+                        AppTheme
+                            .mutedText,
                       ),
                     ),
                   ],
@@ -452,13 +740,19 @@ class _SwapRequestsScreenState
           ),
 
           Container(
-            width: double.infinity,
+            width:
+            double.infinity,
             padding:
-            const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: AppTheme.background,
+            const EdgeInsets.all(
+              13,
+            ),
+            decoration:
+            BoxDecoration(
+              color:
+              AppTheme.background,
               borderRadius:
-              BorderRadius.circular(
+              BorderRadius
+                  .circular(
                 14,
               ),
             ),
@@ -466,20 +760,26 @@ class _SwapRequestsScreenState
               children: [
                 _buildSkillRow(
                   icon:
-                  Icons.school_outlined,
-                  label: 'Learn',
+                  Icons
+                      .school_outlined,
+                  label:
+                  'Learn',
                   value:
-                  request.skillToLearn,
+                  request
+                      .skillToLearn,
                 ),
                 const SizedBox(
                   height: 9,
                 ),
                 _buildSkillRow(
                   icon:
-                  Icons.handshake_outlined,
-                  label: 'Offer',
+                  Icons
+                      .handshake_outlined,
+                  label:
+                  'Offer',
                   value:
-                  request.skillToOffer,
+                  request
+                      .skillToOffer,
                 ),
               ],
             ),
@@ -490,7 +790,8 @@ class _SwapRequestsScreenState
           ),
 
           _buildDetailRow(
-            Icons.calendar_today_outlined,
+            Icons
+                .calendar_today_outlined,
             _formatDateTime(
               request.proposedAt,
             ),
@@ -501,9 +802,12 @@ class _SwapRequestsScreenState
           ),
 
           _buildDetailRow(
-            request.mode == 'Online'
-                ? Icons.videocam_outlined
-                : Icons.location_on_outlined,
+            request.mode ==
+                'Online'
+                ? Icons
+                .videocam_outlined
+                : Icons
+                .location_on_outlined,
             request.mode,
           ),
 
@@ -517,7 +821,8 @@ class _SwapRequestsScreenState
             ),
             _buildDetailRow(
               Icons.info_outline,
-              request.meetingDetails!,
+              request
+                  .meetingDetails!,
             ),
           ],
 
@@ -529,7 +834,8 @@ class _SwapRequestsScreenState
               height: 12,
             ),
             Container(
-              width: double.infinity,
+              width:
+              double.infinity,
               padding:
               const EdgeInsets.all(
                 12,
@@ -542,7 +848,8 @@ class _SwapRequestsScreenState
                   alpha: 0.05,
                 ),
                 borderRadius:
-                BorderRadius.circular(
+                BorderRadius
+                    .circular(
                   12,
                 ),
               ),
@@ -553,14 +860,16 @@ class _SwapRequestsScreenState
                   fontSize: 12.5,
                   height: 1.4,
                   color:
-                  AppTheme.darkText,
+                  AppTheme
+                      .darkText,
                 ),
               ),
             ),
           ],
 
           if (isIncoming &&
-              requesterUser == null) ...[
+              requesterUser ==
+                  null) ...[
             const SizedBox(
               height: 10,
             ),
@@ -575,165 +884,429 @@ class _SwapRequestsScreenState
             ),
           ],
 
-          if (request.canAccept(
-            _currentUserId,
-          ) ||
-              request.canDecline(
-                _currentUserId,
-              ) ||
+          if (_hasAvailableAction(
+            request,
+          )) ...[
+            const SizedBox(
+              height: 16,
+            ),
+            _buildActions(
+              request:
+              request,
+              isIncoming:
+              isIncoming,
+              isOutgoing:
+              isOutgoing,
+              isProcessing:
+              isProcessing,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // AVAILABLE ACTION
+  // ============================================================
+
+  bool _hasAvailableAction(
+      SwapRequest request,
+      ) {
+    return request.canAccept(
+      _currentUserId,
+    ) ||
+        request.canDecline(
+          _currentUserId,
+        ) ||
+        request.canCancel(
+          _currentUserId,
+        ) ||
+        request.canSchedule(
+          _currentUserId,
+        ) ||
+        request.canComplete(
+          _currentUserId,
+        ) ||
+        _canDelete(
+          request,
+        );
+  }
+
+  bool _canDelete(
+      SwapRequest request,
+      ) {
+    return request.hasStableIdentity &&
+        request.status.isTerminal &&
+        request.involvesUser(
+          _currentUserId,
+        );
+  }
+
+  // ============================================================
+  // ACTIONS
+  // ============================================================
+
+  Widget _buildActions({
+    required SwapRequest request,
+    required bool isIncoming,
+    required bool isOutgoing,
+    required bool isProcessing,
+  }) {
+    final bool blocked =
+        isProcessing;
+
+    if (isIncoming &&
+        request.canRespond(
+          _currentUserId,
+        )) {
+      return Row(
+        children: [
+          Expanded(
+            child:
+            OutlinedButton(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _confirmDecline(
+                  request,
+                );
+              },
+              style:
+              OutlinedButton
+                  .styleFrom(
+                minimumSize:
+                const Size(
+                  0,
+                  46,
+                ),
+                side:
+                const BorderSide(
+                  color:
+                  Colors
+                      .redAccent,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    12,
+                  ),
+                ),
+              ),
+              child:
+              const Text(
+                'DECLINE',
+                style:
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight
+                      .w800,
+                  color:
+                  Colors
+                      .redAccent,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          Expanded(
+            child:
+            ElevatedButton(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _confirmAccept(
+                  request,
+                );
+              },
+              style:
+              ElevatedButton
+                  .styleFrom(
+                minimumSize:
+                const Size(
+                  0,
+                  46,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    12,
+                  ),
+                ),
+              ),
+              child:
+              const Text(
+                'ACCEPT',
+                style:
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight
+                      .w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (request.canSchedule(
+      _currentUserId,
+    )) {
+      return Column(
+        children: [
+          SizedBox(
+            width:
+            double.infinity,
+            child:
+            ElevatedButton(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _confirmSchedule(
+                  request,
+                );
+              },
+              style:
+              ElevatedButton
+                  .styleFrom(
+                minimumSize:
+                const Size(
+                  0,
+                  46,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    12,
+                  ),
+                ),
+              ),
+              child:
+              const Text(
+                'MARK AS SCHEDULED',
+                style:
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight
+                      .w800,
+                ),
+              ),
+            ),
+          ),
+          if (isOutgoing &&
               request.canCancel(
                 _currentUserId,
               )) ...[
             const SizedBox(
-              height: 16,
+              height: 9,
             ),
+            _buildCancelButton(
+              request,
+              blocked:
+              blocked,
+            ),
+          ],
+        ],
+      );
+    }
 
-            if (isIncoming &&
-                request.canRespond(
-                  _currentUserId,
-                ))
-              Row(
-                children: [
-                  Expanded(
-                    child:
-                    OutlinedButton(
-                      onPressed:
-                      _isProcessing
-                          ? null
-                          : () {
-                        _confirmDecline(
-                          request,
-                        );
-                      },
-                      style:
-                      OutlinedButton
-                          .styleFrom(
-                        minimumSize:
-                        const Size(
-                          0,
-                          46,
-                        ),
-                        side:
-                        const BorderSide(
-                          color:
-                          Colors.redAccent,
-                        ),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(
-                            12,
-                          ),
-                        ),
-                      ),
-                      child:
-                      const Text(
-                        'DECLINE',
-                        style:
-                        TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                          FontWeight.w800,
-                          color:
-                          Colors.redAccent,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(
-                    width: 10,
-                  ),
-
-                  Expanded(
-                    child:
-                    ElevatedButton(
-                      onPressed:
-                      _isProcessing
-                          ? null
-                          : () {
-                        _confirmAccept(
-                          request,
-                        );
-                      },
-                      style:
-                      ElevatedButton
-                          .styleFrom(
-                        minimumSize:
-                        const Size(
-                          0,
-                          46,
-                        ),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(
-                            12,
-                          ),
-                        ),
-                      ),
-                      child:
-                      const Text(
-                        'ACCEPT',
-                        style:
-                        TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                          FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-            if (isOutgoing &&
-                request.canCancel(
-                  _currentUserId,
-                ))
-              SizedBox(
-                width:
-                double.infinity,
-                child:
-                OutlinedButton(
-                  onPressed:
-                  _isProcessing
-                      ? null
-                      : () {
-                    _confirmCancel(
-                      request,
-                    );
-                  },
-                  style:
-                  OutlinedButton
-                      .styleFrom(
-                    minimumSize:
-                    const Size(
-                      0,
-                      46,
-                    ),
-                    shape:
-                    RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(
-                        12,
-                      ),
-                    ),
-                  ),
-                  child:
-                  const Text(
-                    'CANCEL REQUEST',
-                    style:
-                    TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                      FontWeight.w800,
-                    ),
+    if (request.canComplete(
+      _currentUserId,
+    )) {
+      return Column(
+        children: [
+          SizedBox(
+            width:
+            double.infinity,
+            child:
+            ElevatedButton(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _confirmComplete(
+                  request,
+                );
+              },
+              style:
+              ElevatedButton
+                  .styleFrom(
+                minimumSize:
+                const Size(
+                  0,
+                  46,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    12,
                   ),
                 ),
               ),
+              child:
+              const Text(
+                'MARK AS COMPLETED',
+                style:
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight
+                      .w800,
+                ),
+              ),
+            ),
+          ),
+          if (isOutgoing &&
+              request.canCancel(
+                _currentUserId,
+              )) ...[
+            const SizedBox(
+              height: 9,
+            ),
+            _buildCancelButton(
+              request,
+              blocked:
+              blocked,
+            ),
           ],
         ],
+      );
+    }
+
+    if (isOutgoing &&
+        request.canCancel(
+          _currentUserId,
+        )) {
+      return _buildCancelButton(
+        request,
+        blocked:
+        blocked,
+      );
+    }
+
+    if (_canDelete(
+      request,
+    )) {
+      return SizedBox(
+        width:
+        double.infinity,
+        child:
+        OutlinedButton.icon(
+          onPressed:
+          blocked
+              ? null
+              : () {
+            _confirmDelete(
+              request,
+            );
+          },
+          icon:
+          const Icon(
+            Icons
+                .delete_outline_rounded,
+            size: 18,
+          ),
+          label:
+          const Text(
+            'DELETE FROM HISTORY',
+            style:
+            TextStyle(
+              fontSize: 12,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          style:
+          OutlinedButton
+              .styleFrom(
+            foregroundColor:
+            Colors.redAccent,
+            minimumSize:
+            const Size(
+              0,
+              46,
+            ),
+            side:
+            const BorderSide(
+              color:
+              Colors.redAccent,
+            ),
+            shape:
+            RoundedRectangleBorder(
+              borderRadius:
+              BorderRadius
+                  .circular(
+                12,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildCancelButton(
+      SwapRequest request, {
+        required bool blocked,
+      }) {
+    return SizedBox(
+      width:
+      double.infinity,
+      child: OutlinedButton(
+        onPressed:
+        blocked
+            ? null
+            : () {
+          _confirmCancel(
+            request,
+          );
+        },
+        style:
+        OutlinedButton
+            .styleFrom(
+          minimumSize:
+          const Size(
+            0,
+            46,
+          ),
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius
+                .circular(
+              12,
+            ),
+          ),
+        ),
+        child:
+        const Text(
+          'CANCEL REQUEST',
+          style:
+          TextStyle(
+            fontSize: 12,
+            fontWeight:
+            FontWeight.w800,
+          ),
+        ),
       ),
     );
   }
@@ -747,11 +1320,13 @@ class _SwapRequestsScreenState
       ) {
     final bool incoming =
         direction ==
-            SwapRequestDirection.incoming;
+            SwapRequestDirection
+                .incoming;
 
     final bool outgoing =
         direction ==
-            SwapRequestDirection.outgoing;
+            SwapRequestDirection
+                .outgoing;
 
     final String text =
     incoming
@@ -762,10 +1337,13 @@ class _SwapRequestsScreenState
 
     final IconData icon =
     incoming
-        ? Icons.call_received_rounded
+        ? Icons
+        .call_received_rounded
         : outgoing
-        ? Icons.call_made_rounded
-        : Icons.help_outline_rounded;
+        ? Icons
+        .call_made_rounded
+        : Icons
+        .help_outline_rounded;
 
     return Container(
       padding:
@@ -825,28 +1403,28 @@ class _SwapRequestsScreenState
 
     switch (status) {
       case SwapRequestStatus.pending:
-        color = Colors.orange;
-        break;
+        color =
+            Colors.orange;
 
       case SwapRequestStatus.accepted:
-        color = Colors.green;
-        break;
+        color =
+            Colors.green;
 
       case SwapRequestStatus.declined:
-        color = Colors.redAccent;
-        break;
+        color =
+            Colors.redAccent;
 
       case SwapRequestStatus.scheduled:
-        color = Colors.blue;
-        break;
+        color =
+            Colors.blue;
 
       case SwapRequestStatus.completed:
-        color = Colors.teal;
-        break;
+        color =
+            Colors.teal;
 
       case SwapRequestStatus.cancelled:
-        color = AppTheme.mutedText;
-        break;
+        color =
+            AppTheme.mutedText;
     }
 
     return Container(
@@ -868,11 +1446,13 @@ class _SwapRequestsScreenState
       ),
       child: Text(
         status.label,
-        style: TextStyle(
+        style:
+        TextStyle(
           fontSize: 10.5,
           fontWeight:
           FontWeight.w800,
-          color: color,
+          color:
+          color,
         ),
       ),
     );
@@ -895,11 +1475,9 @@ class _SwapRequestsScreenState
           color:
           AppTheme.primary,
         ),
-
         const SizedBox(
           width: 9,
         ),
-
         SizedBox(
           width: 46,
           child: Text(
@@ -908,11 +1486,11 @@ class _SwapRequestsScreenState
             const TextStyle(
               fontSize: 11.5,
               color:
-              AppTheme.mutedText,
+              AppTheme
+                  .mutedText,
             ),
           ),
         ),
-
         Expanded(
           child: Text(
             value,
@@ -948,11 +1526,9 @@ class _SwapRequestsScreenState
           color:
           AppTheme.mutedText,
         ),
-
         const SizedBox(
           width: 8,
         ),
-
         Expanded(
           child: Text(
             text,
@@ -974,6 +1550,9 @@ class _SwapRequestsScreenState
   // ============================================================
 
   Widget _buildEmptyState() {
+    final bool filtered =
+        _selectedFilter != 'All';
+
     return Center(
       child: Padding(
         padding:
@@ -990,14 +1569,17 @@ class _SwapRequestsScreenState
               height: 100,
               fit: BoxFit.contain,
             ),
-
             const SizedBox(
               height: 14,
             ),
-
-            const Text(
-              'No swap requests yet',
-              style: TextStyle(
+            Text(
+              filtered
+                  ? 'No $_selectedFilter requests'
+                  : 'No swap requests yet',
+              textAlign:
+              TextAlign.center,
+              style:
+              const TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
@@ -1005,16 +1587,17 @@ class _SwapRequestsScreenState
                 AppTheme.darkText,
               ),
             ),
-
             const SizedBox(
               height: 6,
             ),
-
-            const Text(
-              'Your incoming and outgoing skill swaps will appear here.',
+            Text(
+              filtered
+                  ? 'There are no requests with this status right now.'
+                  : 'Your incoming and outgoing skill swaps will appear here.',
               textAlign:
               TextAlign.center,
-              style: TextStyle(
+              style:
+              const TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
                 color:
@@ -1034,10 +1617,19 @@ class _SwapRequestsScreenState
   Future<void> _confirmAccept(
       SwapRequest request,
       ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
     final bool? confirmed =
     await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
         return AlertDialog(
           title:
           const Text(
@@ -1049,9 +1641,10 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   false,
                 );
               },
@@ -1061,9 +1654,10 @@ class _SwapRequestsScreenState
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   true,
                 );
               },
@@ -1077,13 +1671,17 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true) {
+    if (confirmed != true ||
+        !mounted) {
       return;
     }
 
     await _performAction(
-      action: () =>
-          SwapService.instance
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
               .acceptRequest(
             requestId:
             request.id,
@@ -1102,10 +1700,19 @@ class _SwapRequestsScreenState
   Future<void> _confirmDecline(
       SwapRequest request,
       ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
     final bool? confirmed =
     await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
         return AlertDialog(
           title:
           const Text(
@@ -1117,9 +1724,10 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   false,
                 );
               },
@@ -1129,18 +1737,21 @@ class _SwapRequestsScreenState
               ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   true,
                 );
               },
               child:
               const Text(
                 'Decline',
-                style: TextStyle(
+                style:
+                TextStyle(
                   color:
-                  Colors.redAccent,
+                  Colors
+                      .redAccent,
                 ),
               ),
             ),
@@ -1149,13 +1760,17 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true) {
+    if (confirmed != true ||
+        !mounted) {
       return;
     }
 
     await _performAction(
-      action: () =>
-          SwapService.instance
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
               .declineRequest(
             requestId:
             request.id,
@@ -1174,10 +1789,19 @@ class _SwapRequestsScreenState
   Future<void> _confirmCancel(
       SwapRequest request,
       ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
     final bool? confirmed =
     await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
         return AlertDialog(
           title:
           const Text(
@@ -1189,9 +1813,10 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   false,
                 );
               },
@@ -1201,18 +1826,21 @@ class _SwapRequestsScreenState
               ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   true,
                 );
               },
               child:
               const Text(
                 'Cancel request',
-                style: TextStyle(
+                style:
+                TextStyle(
                   color:
-                  Colors.redAccent,
+                  Colors
+                      .redAccent,
                 ),
               ),
             ),
@@ -1221,13 +1849,17 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true) {
+    if (confirmed != true ||
+        !mounted) {
       return;
     }
 
     await _performAction(
-      action: () =>
-          SwapService.instance
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
               .cancelRequest(
             requestId:
             request.id,
@@ -1240,20 +1872,301 @@ class _SwapRequestsScreenState
   }
 
   // ============================================================
+  // SCHEDULE
+  // ============================================================
+
+  Future<void> _confirmSchedule(
+      SwapRequest request,
+      ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context: context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          title:
+          const Text(
+            'Mark as scheduled?',
+          ),
+          content:
+          const Text(
+            'This confirms that the accepted skill swap is scheduled.',
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'Back',
+              ),
+            ),
+            ElevatedButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'Schedule',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true ||
+        !mounted) {
+      return;
+    }
+
+    await _performAction(
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
+              .scheduleRequest(
+            requestId:
+            request.id,
+            actorUserId:
+            _currentUserId,
+          ),
+      successMessage:
+      'Swap marked as scheduled.',
+    );
+  }
+
+  // ============================================================
+  // COMPLETE
+  // ============================================================
+
+  Future<void> _confirmComplete(
+      SwapRequest request,
+      ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context: context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          title:
+          const Text(
+            'Complete this swap?',
+          ),
+          content:
+          const Text(
+            'Only mark the swap completed after the skill exchange has taken place.',
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'Back',
+              ),
+            ),
+            ElevatedButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'Complete',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true ||
+        !mounted) {
+      return;
+    }
+
+    await _performAction(
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
+              .completeRequest(
+            requestId:
+            request.id,
+            actorUserId:
+            _currentUserId,
+          ),
+      successMessage:
+      'Swap marked as completed.',
+    );
+  }
+
+  // ============================================================
+  // DELETE
+  // ============================================================
+
+  Future<void> _confirmDelete(
+      SwapRequest request,
+      ) async {
+    if (_isProcessing(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context: context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          title:
+          const Text(
+            'Delete from history?',
+          ),
+          content:
+          const Text(
+            'This permanently removes this finished swap request from local history. This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'Cancel',
+              ),
+            ),
+            TextButton(
+              onPressed:
+                  () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'Delete',
+                style:
+                TextStyle(
+                  color:
+                  Colors
+                      .redAccent,
+                  fontWeight:
+                  FontWeight
+                      .w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true ||
+        !mounted) {
+      return;
+    }
+
+    await _performAction(
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService
+              .deleteRequest(
+            requestId:
+            request.id,
+            actorUserId:
+            _currentUserId,
+          ),
+      successMessage:
+      'Swap request deleted.',
+    );
+  }
+
+  // ============================================================
+  // PROCESSING
+  // ============================================================
+
+  bool _isProcessing(
+      String requestId,
+      ) {
+    return _processingRequestIds
+        .contains(
+      requestId.trim(),
+    );
+  }
+
+  // ============================================================
   // SHARED ACTION HANDLER
   // ============================================================
 
   Future<void> _performAction({
+    required String requestId,
     required Future<void> Function()
     action,
     required String successMessage,
   }) async {
-    if (_isProcessing) {
+    final String cleanRequestId =
+    requestId.trim();
+
+    if (cleanRequestId.isEmpty ||
+        _processingRequestIds
+            .contains(
+          cleanRequestId,
+        )) {
       return;
     }
 
     setState(() {
-      _isProcessing = true;
+      _processingRequestIds.add(
+        cleanRequestId,
+      );
     });
 
     try {
@@ -1265,50 +2178,57 @@ class _SwapRequestsScreenState
 
       setState(() {});
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            successMessage,
-          ),
-        ),
+      _showMessage(
+        successMessage,
       );
     } on SwapServiceException catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            error.message,
-          ),
-        ),
+      _showMessage(
+        error.message,
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Something went wrong. Please try again.',
-          ),
-        ),
+      _showMessage(
+        'Something went wrong. Please try again.',
       );
     } finally {
       if (mounted) {
         setState(() {
-          _isProcessing = false;
+          _processingRequestIds.remove(
+            cleanRequestId,
+          );
         });
       }
     }
+  }
+
+  // ============================================================
+  // SNACKBAR
+  // ============================================================
+
+  void _showMessage(
+      String message,
+      ) {
+    final ScaffoldMessengerState messenger =
+    ScaffoldMessenger.of(
+      context,
+    );
+
+    messenger
+        .hideCurrentSnackBar();
+
+    messenger.showSnackBar(
+      SnackBar(
+        content:
+        Text(message),
+      ),
+    );
   }
 
   // ============================================================

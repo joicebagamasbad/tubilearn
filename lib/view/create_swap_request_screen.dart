@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/my_skills_repository.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
 
@@ -44,15 +46,22 @@ class _CreateSwapRequestScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
-  final ExploreRepository _repository =
-  ExploreRepository();
+  final ExploreRepository _exploreRepository =
+      ExploreRepository.instance;
+
+  final MySkillsRepository _mySkillsRepository =
+      MySkillsRepository.instance;
+
+  final SwapService _swapService =
+      SwapService.instance;
 
   final TextEditingController _noteController =
   TextEditingController();
 
-  final TextEditingController
-  _meetingDetailsController =
+  final TextEditingController _meetingDetailsController =
   TextEditingController();
+
+  final List<Skill> _mySkills = <Skill>[];
 
   Skill? _selectedSkillToOffer;
 
@@ -61,55 +70,174 @@ class _CreateSwapRequestScreenState
 
   String _selectedMode = 'Online';
 
+  bool _isLoading = true;
   bool _isSending = false;
 
+  String? _loadError;
+
   // ============================================================
-  // CURRENT USER SKILLS
-  //
-  // Temporary list for the local prototype.
-  // Later this will come from persistent UserSkill records.
+  // INITIALIZE
   // ============================================================
 
-  List<Skill> get _mySkills {
-    const List<String> ids = [
-      'skill_photography',
-      'skill_graphic_design',
-      'skill_video_editing',
-    ];
+  @override
+  void initState() {
+    super.initState();
 
-    return ids
-        .map(
-          (id) => _repository.findSkillById(id),
-    )
-        .whereType<Skill>()
-        .toList();
+    _loadScreenData();
+  }
+
+  Future<void> _loadScreenData() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      final String currentUserId =
+      _currentUserService.userId.trim();
+
+      if (currentUserId.isEmpty) {
+        throw const MySkillsRepositoryException(
+          'Current user identity is unavailable.',
+        );
+      }
+
+      await _swapService.initialize();
+
+      final List<ManagedSkill> managedSkills =
+      await _mySkillsRepository.getOfferedSkills(
+        currentUserId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final String? learnSkillId =
+          _resolvedSkillToLearn?.id;
+
+      final List<Skill> availableSkills =
+      managedSkills
+          .map(
+            (ManagedSkill item) =>
+        item.skill,
+      )
+          .where(
+            (Skill skill) =>
+        skill.id != learnSkillId,
+      )
+          .toList();
+
+      availableSkills.sort(
+            (
+            Skill first,
+            Skill second,
+            ) =>
+            first.title
+                .toLowerCase()
+                .compareTo(
+              second.title
+                  .toLowerCase(),
+            ),
+      );
+
+      setState(() {
+        _mySkills
+          ..clear()
+          ..addAll(
+            availableSkills,
+          );
+
+        if (_selectedSkillToOffer != null &&
+            !_mySkills.any(
+                  (Skill skill) =>
+              skill.id ==
+                  _selectedSkillToOffer!.id,
+            )) {
+          _selectedSkillToOffer = null;
+        }
+
+        _isLoading = false;
+        _loadError = null;
+      });
+    } on MySkillsRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } on SwapServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError =
+        'Swap request details could not be loaded. Please try again.';
+      });
+    }
   }
 
   // ============================================================
-  // RESOLVED PROVIDER ID
+  // RESOLVED PROVIDER
   // ============================================================
 
-  String? get _resolvedProviderUserId {
-    final String? supplied =
+  User? get _resolvedProvider {
+    final String? suppliedId =
     _cleanOptionalId(
       widget.providerUserId,
     );
 
-    if (supplied != null) {
-      return supplied;
+    if (suppliedId != null) {
+      return _exploreRepository.findUserById(
+        suppliedId,
+      );
     }
 
-    for (final User user in _repository.users) {
-      if (user.name.trim().toLowerCase() ==
-          widget.providerName
-              .trim()
-              .toLowerCase()) {
-        return user.id;
-      }
+    final String targetName =
+    widget.providerName
+        .trim()
+        .toLowerCase();
+
+    if (targetName.isEmpty) {
+      return null;
     }
 
-    return null;
+    final List<User> matches =
+    _exploreRepository.users
+        .where(
+          (User user) =>
+      user.name
+          .trim()
+          .toLowerCase() ==
+          targetName,
+    )
+        .toList();
+
+    if (matches.length != 1) {
+      return null;
+    }
+
+    return matches.single;
   }
+
+  String? get _resolvedProviderUserId =>
+      _resolvedProvider?.id;
 
   // ============================================================
   // RESOLVED LEARN SKILL
@@ -122,44 +250,41 @@ class _CreateSwapRequestScreenState
     );
 
     if (suppliedId != null) {
-      final Skill? byId =
-      _repository.findSkillById(
+      return _exploreRepository.findSkillById(
         suppliedId,
       );
-
-      if (byId != null) {
-        return byId;
-      }
     }
 
-    for (final Skill skill in _repository.skills) {
-      if (skill.title
+    final String targetTitle =
+    widget.skillToLearn
+        .trim()
+        .toLowerCase();
+
+    if (targetTitle.isEmpty) {
+      return null;
+    }
+
+    final List<Skill> matches =
+    _exploreRepository.skills
+        .where(
+          (Skill skill) =>
+      skill.title
           .trim()
           .toLowerCase() ==
-          widget.skillToLearn
-              .trim()
-              .toLowerCase()) {
-        return skill;
-      }
+          targetTitle,
+    )
+        .toList();
+
+    if (matches.length != 1) {
+      return null;
     }
 
-    return null;
+    return matches.single;
   }
 
   // ============================================================
-  // OFFERABLE SKILLS
+  // DISPOSE
   // ============================================================
-
-  List<Skill> get _availableSkillsToOffer {
-    final String? learnId =
-        _resolvedSkillToLearn?.id;
-
-    return _mySkills.where(
-          (skill) {
-        return skill.id != learnId;
-      },
-    ).toList();
-  }
 
   @override
   void dispose() {
@@ -169,219 +294,435 @@ class _CreateSwapRequestScreenState
     super.dispose();
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
       BuildContext context,
       ) {
-    return Scaffold(
-      backgroundColor: background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: _isSending
-              ? null
-              : () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 19,
-            color: primary,
+    return PopScope(
+      canPop: !_isSending,
+      child: Scaffold(
+        backgroundColor: background,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            onPressed: _isSending
+                ? null
+                : () {
+              Navigator.pop(
+                context,
+              );
+            },
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 19,
+              color: _isSending
+                  ? mutedText
+                  : primary,
+            ),
           ),
+          title: const Text(
+            'Request a Skill Swap',
+            style: AppTextStyles.cardTitle,
+          ),
+          centerTitle: false,
         ),
-        title: const Text(
-          'Request a Skill Swap',
-          style: AppTextStyles.cardTitle,
+        body: SafeArea(
+          child: _buildBody(),
         ),
-        centerTitle: false,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics:
-          const BouncingScrollPhysics(),
-          padding:
-          const EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            30,
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: primary,
+              ),
+            ),
+            SizedBox(
+              height: 14,
+            ),
+            Text(
+              'Loading your skills...',
+              style: AppTextStyles.secondary,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return _buildErrorState();
+    }
+
+    if (_resolvedProvider == null) {
+      return _buildUnavailableState(
+        title: 'Provider unavailable',
+        message:
+        'We could not safely identify this provider. Go back to Explore and open their profile again.',
+      );
+    }
+
+    if (_resolvedSkillToLearn == null) {
+      return _buildUnavailableState(
+        title: 'Skill unavailable',
+        message:
+        'We could not safely identify the skill for this request. Go back and select the skill again.',
+      );
+    }
+
+    return SingleChildScrollView(
+      physics:
+      const BouncingScrollPhysics(),
+      padding:
+      const EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        30,
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          _buildIntroduction(),
+
+          const SizedBox(
+            height: 26,
           ),
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+
+          _buildSectionLabel(
+            'You want to learn',
+          ),
+
+          const SizedBox(
+            height: 8,
+          ),
+
+          _buildReadOnlySkill(),
+
+          const SizedBox(
+            height: 22,
+          ),
+
+          _buildSectionLabel(
+            'What can you offer?',
+          ),
+
+          const SizedBox(
+            height: 5,
+          ),
+
+          const Text(
+            'Choose one of your saved skills to teach in exchange.',
+            style:
+            AppTextStyles.secondary,
+          ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
+          _buildSkillDropdown(),
+
+          const SizedBox(
+            height: 22,
+          ),
+
+          _buildSectionLabel(
+            'Preferred schedule',
+          ),
+
+          const SizedBox(
+            height: 5,
+          ),
+
+          const Text(
+            'Suggest a date and time that works for you.',
+            style:
+            AppTextStyles.secondary,
+          ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
+          Row(
             children: [
-              _buildIntroduction(),
-
-              const SizedBox(height: 26),
-
-              _buildSectionLabel(
-                'You want to learn',
+              Expanded(
+                child:
+                _buildDateSelector(),
               ),
-
-              const SizedBox(height: 8),
-
-              _buildReadOnlySkill(),
-
-              const SizedBox(height: 22),
-
-              _buildSectionLabel(
-                'What can you offer?',
+              const SizedBox(
+                width: 10,
               ),
-
-              const SizedBox(height: 5),
-
-              const Text(
-                'Choose one of your skills to teach in exchange.',
-                style:
-                AppTextStyles.secondary,
+              Expanded(
+                child:
+                _buildTimeSelector(),
               ),
+            ],
+          ),
 
-              const SizedBox(height: 10),
+          const SizedBox(
+            height: 22,
+          ),
 
-              _buildSkillDropdown(),
+          _buildSectionLabel(
+            'Session mode',
+          ),
 
-              const SizedBox(height: 22),
+          const SizedBox(
+            height: 5,
+          ),
 
-              _buildSectionLabel(
-                'Preferred schedule',
-              ),
+          const Text(
+            'Choose how you prefer to conduct the skill swap.',
+            style:
+            AppTextStyles.secondary,
+          ),
 
-              const SizedBox(height: 5),
+          const SizedBox(
+            height: 10,
+          ),
 
-              const Text(
-                'Suggest a date and time that works for you.',
-                style:
-                AppTextStyles.secondary,
-              ),
+          _buildModeSelector(),
 
-              const SizedBox(height: 10),
+          const SizedBox(
+            height: 16,
+          ),
 
-              Row(
+          _buildMeetingDetails(),
+
+          const SizedBox(
+            height: 22,
+          ),
+
+          _buildSectionLabel(
+            'Message',
+          ),
+
+          const SizedBox(
+            height: 5,
+          ),
+
+          const Text(
+            'Introduce yourself or add anything the other person should know.',
+            style:
+            AppTextStyles.secondary,
+          ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
+          TextField(
+            controller:
+            _noteController,
+            enabled:
+            !_isSending,
+            maxLines: 4,
+            maxLength: 300,
+            maxLengthEnforcement:
+            MaxLengthEnforcement
+                .enforced,
+            style:
+            AppTextStyles.input,
+            decoration:
+            const InputDecoration(
+              hintText:
+              'Example: Hi! I would love to learn this skill. I can help you with...',
+              hintStyle:
+              AppTextStyles
+                  .inputHint,
+            ),
+          ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
+          _buildRequestSummary(),
+
+          const SizedBox(
+            height: 24,
+          ),
+
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed:
+              _isSending
+                  ? null
+                  : _sendRequest,
+              child: _isSending
+                  ? const Row(
+                mainAxisAlignment:
+                MainAxisAlignment
+                    .center,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 20,
+                    height: 20,
                     child:
-                    _buildDateSelector(),
+                    CircularProgressIndicator(
+                      strokeWidth:
+                      2.2,
+                      color:
+                      Colors.white,
+                    ),
                   ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child:
-                    _buildTimeSelector(),
+                  SizedBox(
+                    width: 10,
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              _buildSectionLabel(
-                'Session mode',
-              ),
-
-              const SizedBox(height: 5),
-
-              const Text(
-                'Choose how you prefer to conduct the skill swap.',
-                style:
-                AppTextStyles.secondary,
-              ),
-
-              const SizedBox(height: 10),
-
-              _buildModeSelector(),
-
-              const SizedBox(height: 16),
-
-              _buildMeetingDetails(),
-
-              const SizedBox(height: 22),
-
-              _buildSectionLabel(
-                'Message',
-              ),
-
-              const SizedBox(height: 5),
-
-              const Text(
-                'Introduce yourself or add anything the other person should know.',
-                style:
-                AppTextStyles.secondary,
-              ),
-
-              const SizedBox(height: 10),
-
-              TextField(
-                controller:
-                _noteController,
-                enabled:
-                !_isSending,
-                maxLines: 4,
-                maxLength: 300,
-                style:
-                AppTextStyles.input,
-                decoration:
-                const InputDecoration(
-                  hintText:
-                  'Example: Hi! I would love to learn this skill. I can help you with...',
-                  hintStyle:
-                  AppTextStyles.inputHint,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              _buildRequestSummary(),
-
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed:
-                  _isSending
-                      ? null
-                      : _sendRequest,
-                  child: _isSending
-                      ? const Row(
-                    mainAxisAlignment:
-                    MainAxisAlignment
-                        .center,
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child:
-                        CircularProgressIndicator(
-                          strokeWidth:
-                          2.2,
-                          color:
-                          Colors.white,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 10,
-                      ),
-                      Text(
-                        'SENDING...',
-                        style:
-                        AppTextStyles
-                            .button,
-                      ),
-                    ],
-                  )
-                      : const Text(
-                    'SEND SWAP REQUEST',
+                  Text(
+                    'SENDING...',
                     style:
                     AppTextStyles
                         .button,
                   ),
-                ),
+                ],
+              )
+                  : const Text(
+                'SEND SWAP REQUEST',
+                style:
+                AppTextStyles
+                    .button,
               ),
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // ERROR / UNAVAILABLE
+  // ============================================================
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding:
+        const EdgeInsets.all(
+          30,
+        ),
+        child: Column(
+          mainAxisSize:
+          MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 42,
+              color: mutedText,
+            ),
+            const SizedBox(
+              height: 14,
+            ),
+            const Text(
+              'Could not load your skills',
+              style:
+              AppTextStyles.cardTitle,
+            ),
+            const SizedBox(
+              height: 7,
+            ),
+            Text(
+              _loadError ??
+                  'Something went wrong.',
+              textAlign:
+              TextAlign.center,
+              style:
+              AppTextStyles.secondary,
+            ),
+            const SizedBox(
+              height: 18,
+            ),
+            ElevatedButton(
+              onPressed:
+              _loadScreenData,
+              child:
+              const Text(
+                'RETRY',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnavailableState({
+    required String title,
+    required String message,
+  }) {
+    return Center(
+      child: Padding(
+        padding:
+        const EdgeInsets.all(
+          30,
+        ),
+        child: Column(
+          mainAxisSize:
+          MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/mascot/tubi_confused.png',
+              width: 95,
+              height: 95,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(
+              height: 14,
+            ),
+            Text(
+              title,
+              textAlign:
+              TextAlign.center,
+              style:
+              AppTextStyles.cardTitle,
+            ),
+            const SizedBox(
+              height: 7,
+            ),
+            Text(
+              message,
+              textAlign:
+              TextAlign.center,
+              style:
+              AppTextStyles.secondary,
+            ),
+            const SizedBox(
+              height: 18,
+            ),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                );
+              },
+              child:
+              const Text(
+                'GO BACK',
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -392,18 +733,30 @@ class _CreateSwapRequestScreenState
   // ============================================================
 
   Widget _buildIntroduction() {
+    final User provider =
+    _resolvedProvider!;
+
     return Container(
       width: double.infinity,
       padding:
-      const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
         color:
-        const Color(0xFFF3F1FF),
+        const Color(
+          0xFFF3F1FF,
+        ),
         borderRadius:
-        BorderRadius.circular(16),
+        BorderRadius.circular(
+          16,
+        ),
         border: Border.all(
           color:
-          const Color(0xFFE4E0FF),
+          const Color(
+            0xFFE4E0FF,
+          ),
         ),
       ),
       child: Row(
@@ -414,26 +767,29 @@ class _CreateSwapRequestScreenState
             height: 65,
             fit: BoxFit.contain,
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(
+            width: 13,
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
               children: [
                 Text(
-                  'Swap with ${widget.providerName}',
+                  'Swap with ${provider.name}',
                   style:
-                  AppTextStyles.cardTitle,
+                  AppTextStyles
+                      .cardTitle,
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(
+                  height: 5,
+                ),
                 Text(
                   'Make a clear request so both of you know what you will learn, teach, and when you are available.',
                   style:
-                  AppTextStyles.secondary
+                  AppTextStyles
+                      .secondary
                       .copyWith(
                     color:
                     const Color(
@@ -471,11 +827,16 @@ class _CreateSwapRequestScreenState
         horizontal: 14,
         vertical: 14,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        const Color(0xFFF7F7FB),
+        const Color(
+          0xFFF7F7FB,
+        ),
         borderRadius:
-        BorderRadius.circular(12),
+        BorderRadius.circular(
+          12,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -487,13 +848,13 @@ class _CreateSwapRequestScreenState
             size: 20,
             color: primary,
           ),
-
-          const SizedBox(width: 10),
-
+          const SizedBox(
+            width: 10,
+          ),
           Expanded(
             child: Text(
-              _resolvedSkillToLearn?.title ??
-                  widget.skillToLearn,
+              _resolvedSkillToLearn!
+                  .title,
               style:
               AppTextStyles.body
                   .copyWith(
@@ -502,7 +863,6 @@ class _CreateSwapRequestScreenState
               ),
             ),
           ),
-
           const Icon(
             Icons.lock_outline_rounded,
             size: 16,
@@ -514,20 +874,69 @@ class _CreateSwapRequestScreenState
   }
 
   // ============================================================
-  // SKILL TO OFFER
+  // OFFER SKILL
   // ============================================================
 
   Widget _buildSkillDropdown() {
-    final List<Skill> skills =
-        _availableSkillsToOffer;
+    if (_mySkills.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding:
+        const EdgeInsets.all(
+          14,
+        ),
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(
+            0xFFFFFAF1,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+          border: Border.all(
+            color:
+            Colors.orange
+                .withValues(
+              alpha: 0.30,
+            ),
+          ),
+        ),
+        child: const Row(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 19,
+              color: Colors.orange,
+            ),
+            SizedBox(
+              width: 9,
+            ),
+            Expanded(
+              child: Text(
+                'You do not have another offered skill available for this swap. Add a skill in My Skills first.',
+                style:
+                AppTextStyles
+                    .secondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return DropdownButtonFormField<Skill>(
       initialValue:
       _selectedSkillToOffer,
       style:
       AppTextStyles.input,
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
+      icon:
+      const Icon(
+        Icons
+            .keyboard_arrow_down_rounded,
         color: primary,
       ),
       decoration:
@@ -537,19 +946,22 @@ class _CreateSwapRequestScreenState
         hintStyle:
         AppTextStyles.inputHint,
       ),
-      items: skills.map(
-            (skill) {
+      items:
+      _mySkills.map(
+            (Skill skill) {
           return DropdownMenuItem<Skill>(
             value: skill,
-            child: Text(
+            child:
+            Text(
               skill.title,
             ),
           );
         },
       ).toList(),
-      onChanged: _isSending
+      onChanged:
+      _isSending
           ? null
-          : (value) {
+          : (Skill? value) {
         setState(() {
           _selectedSkillToOffer =
               value;
@@ -565,7 +977,9 @@ class _CreateSwapRequestScreenState
   Widget _buildDateSelector() {
     return InkWell(
       borderRadius:
-      BorderRadius.circular(12),
+      BorderRadius.circular(
+        12,
+      ),
       onTap:
       _isSending
           ? null
@@ -576,10 +990,13 @@ class _CreateSwapRequestScreenState
         const EdgeInsets.symmetric(
           horizontal: 12,
         ),
-        decoration: BoxDecoration(
+        decoration:
+        BoxDecoration(
           color: Colors.white,
           borderRadius:
-          BorderRadius.circular(12),
+          BorderRadius.circular(
+            12,
+          ),
           border: Border.all(
             color: border,
           ),
@@ -587,22 +1004,25 @@ class _CreateSwapRequestScreenState
         child: Row(
           children: [
             const Icon(
-              Icons.calendar_month_outlined,
+              Icons
+                  .calendar_month_outlined,
               size: 19,
               color: primary,
             ),
-
-            const SizedBox(width: 8),
-
+            const SizedBox(
+              width: 8,
+            ),
             Expanded(
               child: Text(
-                _selectedDate == null
+                _selectedDate ==
+                    null
                     ? 'Select date'
                     : _formatDate(
                   _selectedDate!,
                 ),
                 style:
-                _selectedDate == null
+                _selectedDate ==
+                    null
                     ? AppTextStyles
                     .inputHint
                     : AppTextStyles
@@ -616,28 +1036,48 @@ class _CreateSwapRequestScreenState
   }
 
   Future<void> _selectDate() async {
+    if (_isSending) {
+      return;
+    }
+
     final DateTime now =
     DateTime.now();
+
+    final DateTime today =
+    DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
 
     final DateTime? result =
     await showDatePicker(
       context: context,
-      initialDate: now.add(
-        const Duration(days: 1),
+      initialDate:
+      today.add(
+        const Duration(
+          days: 1,
+        ),
       ),
-      firstDate: now,
-      lastDate: now.add(
-        const Duration(days: 90),
+      firstDate:
+      today,
+      lastDate:
+      today.add(
+        const Duration(
+          days: 90,
+        ),
       ),
     );
 
     if (result == null ||
-        !mounted) {
+        !mounted ||
+        _isSending) {
       return;
     }
 
     setState(() {
-      _selectedDate = result;
+      _selectedDate =
+          result;
     });
   }
 
@@ -648,7 +1088,9 @@ class _CreateSwapRequestScreenState
   Widget _buildTimeSelector() {
     return InkWell(
       borderRadius:
-      BorderRadius.circular(12),
+      BorderRadius.circular(
+        12,
+      ),
       onTap:
       _isSending
           ? null
@@ -659,10 +1101,13 @@ class _CreateSwapRequestScreenState
         const EdgeInsets.symmetric(
           horizontal: 12,
         ),
-        decoration: BoxDecoration(
+        decoration:
+        BoxDecoration(
           color: Colors.white,
           borderRadius:
-          BorderRadius.circular(12),
+          BorderRadius.circular(
+            12,
+          ),
           border: Border.all(
             color: border,
           ),
@@ -674,17 +1119,21 @@ class _CreateSwapRequestScreenState
               size: 19,
               color: primary,
             ),
-
-            const SizedBox(width: 8),
-
+            const SizedBox(
+              width: 8,
+            ),
             Expanded(
               child: Text(
-                _selectedTime == null
+                _selectedTime ==
+                    null
                     ? 'Select time'
                     : _selectedTime!
-                    .format(context),
+                    .format(
+                  context,
+                ),
                 style:
-                _selectedTime == null
+                _selectedTime ==
+                    null
                     ? AppTextStyles
                     .inputHint
                     : AppTextStyles
@@ -698,23 +1147,30 @@ class _CreateSwapRequestScreenState
   }
 
   Future<void> _selectTime() async {
+    if (_isSending) {
+      return;
+    }
+
     final TimeOfDay? result =
     await showTimePicker(
       context: context,
       initialTime:
-      const TimeOfDay(
-        hour: 16,
-        minute: 0,
-      ),
+      _selectedTime ??
+          const TimeOfDay(
+            hour: 16,
+            minute: 0,
+          ),
     );
 
     if (result == null ||
-        !mounted) {
+        !mounted ||
+        _isSending) {
       return;
     }
 
     setState(() {
-      _selectedTime = result;
+      _selectedTime =
+          result;
     });
   }
 
@@ -726,20 +1182,24 @@ class _CreateSwapRequestScreenState
     return Row(
       children: [
         Expanded(
-          child: _buildModeOption(
+          child:
+          _buildModeOption(
             label: 'Online',
             icon:
-            Icons.videocam_outlined,
+            Icons
+                .videocam_outlined,
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
-          child: _buildModeOption(
+          child:
+          _buildModeOption(
             label: 'In-person',
             icon:
-            Icons.people_outline_rounded,
+            Icons
+                .people_outline_rounded,
           ),
         ),
       ],
@@ -751,17 +1211,27 @@ class _CreateSwapRequestScreenState
     required IconData icon,
   }) {
     final bool selected =
-        _selectedMode == label;
+        _selectedMode ==
+            label;
 
     return InkWell(
       borderRadius:
-      BorderRadius.circular(12),
-      onTap: _isSending
+      BorderRadius.circular(
+        12,
+      ),
+      onTap:
+      _isSending
           ? null
           : () {
+        if (_selectedMode ==
+            label) {
+          return;
+        }
+
         setState(() {
           _selectedMode =
               label;
+
           _meetingDetailsController
               .clear();
         });
@@ -772,14 +1242,17 @@ class _CreateSwapRequestScreenState
           milliseconds: 160,
         ),
         height: 62,
-        decoration: BoxDecoration(
+        decoration:
+        BoxDecoration(
           color: selected
               ? const Color(
             0xFFF0EFFF,
           )
               : Colors.white,
           borderRadius:
-          BorderRadius.circular(12),
+          BorderRadius.circular(
+            12,
+          ),
           border: Border.all(
             color: selected
                 ? primary
@@ -801,13 +1274,14 @@ class _CreateSwapRequestScreenState
                   ? primary
                   : mutedText,
             ),
-
-            const SizedBox(width: 7),
-
+            const SizedBox(
+              width: 7,
+            ),
             Text(
               label,
               style:
-              AppTextStyles.secondary
+              AppTextStyles
+                  .secondary
                   .copyWith(
                 color: selected
                     ? primary
@@ -828,7 +1302,8 @@ class _CreateSwapRequestScreenState
 
   Widget _buildMeetingDetails() {
     final bool online =
-        _selectedMode == 'Online';
+        _selectedMode ==
+            'Online';
 
     return Column(
       crossAxisAlignment:
@@ -844,15 +1319,18 @@ class _CreateSwapRequestScreenState
             fontSize: 13,
           ),
         ),
-
-        const SizedBox(height: 8),
-
+        const SizedBox(
+          height: 8,
+        ),
         TextField(
           controller:
           _meetingDetailsController,
           enabled:
           !_isSending,
           maxLength: 150,
+          maxLengthEnforcement:
+          MaxLengthEnforcement
+              .enforced,
           style:
           AppTextStyles.input,
           decoration:
@@ -861,10 +1339,12 @@ class _CreateSwapRequestScreenState
                 ? 'Example: Google Meet or Messenger'
                 : 'Example: DCT campus or a public café',
             hintStyle:
-            AppTextStyles.inputHint,
+            AppTextStyles
+                .inputHint,
             prefixIcon: Icon(
               online
-                  ? Icons.language_rounded
+                  ? Icons
+                  .language_rounded
                   : Icons
                   .location_on_outlined,
               size: 20,
@@ -872,10 +1352,10 @@ class _CreateSwapRequestScreenState
             ),
           ),
         ),
-
         if (!online) ...[
-          const SizedBox(height: 7),
-
+          const SizedBox(
+            height: 7,
+          ),
           const Text(
             'For safety, use a public meeting place. Exact details can be confirmed after the request is accepted.',
             style:
@@ -894,11 +1374,16 @@ class _CreateSwapRequestScreenState
     return Container(
       width: double.infinity,
       padding:
-      const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
-        BorderRadius.circular(14),
+        BorderRadius.circular(
+          14,
+        ),
         border: Border.all(
           color: border,
         ),
@@ -912,31 +1397,30 @@ class _CreateSwapRequestScreenState
             style:
             AppTextStyles.cardTitle,
           ),
-
-          const SizedBox(height: 12),
-
+          const SizedBox(
+            height: 12,
+          ),
           _buildSummaryRow(
             'Learn',
-            _resolvedSkillToLearn
-                ?.title ??
-                widget.skillToLearn,
+            _resolvedSkillToLearn!
+                .title,
           ),
-
           _buildSummaryRow(
             'Offer',
             _selectedSkillToOffer
                 ?.title ??
                 'Not selected',
           ),
-
           _buildSummaryRow(
             'Schedule',
-            _selectedDate == null ||
-                _selectedTime == null
+            _selectedDate ==
+                null ||
+                _selectedTime ==
+                    null
                 ? 'Not selected'
-                : '${_formatDate(_selectedDate!)} • ${_selectedTime!.format(context)}',
+                : '${_formatDate(_selectedDate!)} • '
+                '${_selectedTime!.format(context)}',
           ),
-
           _buildSummaryRow(
             'Mode',
             _selectedMode,
@@ -963,17 +1447,18 @@ class _CreateSwapRequestScreenState
               child: Text(
                 label,
                 style:
-                AppTextStyles.secondary,
+                AppTextStyles
+                    .secondary,
               ),
             ),
-
             Expanded(
               child: Text(
                 value,
                 textAlign:
                 TextAlign.right,
                 style:
-                AppTextStyles.secondary
+                AppTextStyles
+                    .secondary
                     .copyWith(
                   color: darkText,
                   fontWeight:
@@ -983,7 +1468,6 @@ class _CreateSwapRequestScreenState
             ),
           ],
         ),
-
         if (showDivider)
           const Padding(
             padding:
@@ -1004,12 +1488,17 @@ class _CreateSwapRequestScreenState
   // ============================================================
 
   Future<void> _sendRequest() async {
-    if (_isSending) {
+    if (_isSending ||
+        _isLoading) {
       return;
     }
 
     final String requesterUserId =
-        _currentUserService.userId;
+    _currentUserService.userId
+        .trim();
+
+    final User? provider =
+        _resolvedProvider;
 
     final String? providerUserId =
         _resolvedProviderUserId;
@@ -1020,16 +1509,17 @@ class _CreateSwapRequestScreenState
     final Skill? skillToOffer =
         _selectedSkillToOffer;
 
-    if (requesterUserId.trim().isEmpty) {
+    if (requesterUserId.isEmpty) {
       _showError(
         'We could not identify the current user. Please sign in again.',
       );
       return;
     }
 
-    if (providerUserId == null) {
+    if (provider == null ||
+        providerUserId == null) {
       _showError(
-        'We could not identify this provider. Please go back and try again.',
+        'We could not safely identify this provider. Please go back and try again.',
       );
       return;
     }
@@ -1050,8 +1540,29 @@ class _CreateSwapRequestScreenState
     }
 
     if (skillToOffer == null) {
+      if (_mySkills.isEmpty) {
+        _showError(
+          'Add an offered skill in My Skills before creating this request.',
+        );
+      } else {
+        _showError(
+          'Please select a skill you can offer.',
+        );
+      }
+
+      return;
+    }
+
+    final bool stillOwnsOfferedSkill =
+    _mySkills.any(
+          (Skill skill) =>
+      skill.id ==
+          skillToOffer.id,
+    );
+
+    if (!stillOwnsOfferedSkill) {
       _showError(
-        'Please select a skill you can offer.',
+        'The selected offered skill is no longer available. Please reload and try again.',
       );
       return;
     }
@@ -1090,13 +1601,23 @@ class _CreateSwapRequestScreenState
       return;
     }
 
+    if (_selectedMode != 'Online' &&
+        _selectedMode !=
+            'In-person') {
+      _showError(
+        'Please select a valid session mode.',
+      );
+      return;
+    }
+
     final String meetingDetails =
     _meetingDetailsController.text
         .trim();
 
     if (meetingDetails.isEmpty) {
       _showError(
-        _selectedMode == 'Online'
+        _selectedMode ==
+            'Online'
             ? 'Please enter your preferred online platform.'
             : 'Please enter a preferred public meeting area.',
       );
@@ -1112,9 +1633,11 @@ class _CreateSwapRequestScreenState
     }
 
     final String cleanNote =
-    _noteController.text.trim();
+    _noteController.text
+        .trim();
 
-    if (cleanNote.length > 300) {
+    if (cleanNote.length >
+        300) {
       _showError(
         'Message must be 300 characters or less.',
       );
@@ -1126,8 +1649,7 @@ class _CreateSwapRequestScreenState
     });
 
     try {
-      await SwapService.instance
-          .createRequest(
+      await _swapService.createRequest(
         requesterUserId:
         requesterUserId,
 
@@ -1140,14 +1662,16 @@ class _CreateSwapRequestScreenState
         skillToOfferId:
         skillToOffer.id,
 
+        // Use canonical profile data from the resolved user,
+        // not display strings passed through navigation.
         providerName:
-        widget.providerName,
+        provider.name,
 
         providerInitials:
-        widget.providerInitials,
+        provider.initials,
 
         providerCity:
-        widget.providerCity,
+        provider.city,
 
         skillToLearn:
         skillToLearn.title,
@@ -1216,13 +1740,22 @@ class _CreateSwapRequestScreenState
   void _showError(
       String message,
       ) {
-    ScaffoldMessenger.of(context)
+    if (!mounted) {
+      return;
+    }
+
+    final ScaffoldMessengerState messenger =
+    ScaffoldMessenger.of(
+      context,
+    );
+
+    messenger
         .hideCurrentSnackBar();
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
-        content: Text(message),
+        content:
+        Text(message),
         behavior:
         SnackBarBehavior.floating,
       ),
@@ -1233,12 +1766,18 @@ class _CreateSwapRequestScreenState
   // SUCCESS
   // ============================================================
 
-  Future<void>
-  _showSuccessDialog() async {
+  Future<void> _showSuccessDialog() async {
+    if (!mounted) {
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
         return AlertDialog(
           shape:
           RoundedRectangleBorder(
@@ -1247,26 +1786,29 @@ class _CreateSwapRequestScreenState
               18,
             ),
           ),
-          title: const Row(
+          title:
+          const Row(
             children: [
               Icon(
                 Icons
                     .check_circle_rounded,
                 color: primary,
               ),
-
-              SizedBox(width: 9),
-
+              SizedBox(
+                width: 9,
+              ),
               Expanded(
                 child: Text(
                   'Request sent!',
                   style:
-                  AppTextStyles.cardTitle,
+                  AppTextStyles
+                      .cardTitle,
                 ),
               ),
             ],
           ),
-          content: const Text(
+          content:
+          const Text(
             'Your skill swap request was saved successfully and is now Pending.',
             style:
             AppTextStyles.body,
@@ -1278,10 +1820,12 @@ class _CreateSwapRequestScreenState
                   dialogContext,
                 );
               },
-              child: const Text(
+              child:
+              const Text(
                 'DONE',
                 style:
-                AppTextStyles.button,
+                AppTextStyles
+                    .button,
               ),
             ),
           ],
@@ -1311,10 +1855,12 @@ class _CreateSwapRequestScreenState
     return cleaned;
   }
 
+
   String _formatDate(
       DateTime date,
       ) {
-    const List<String> months = [
+    const List<String> months =
+    <String>[
       'Jan',
       'Feb',
       'Mar',
@@ -1329,6 +1875,8 @@ class _CreateSwapRequestScreenState
       'Dec',
     ];
 
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    return '${months[date.month - 1]} '
+        '${date.day}, '
+        '${date.year}';
   }
 }

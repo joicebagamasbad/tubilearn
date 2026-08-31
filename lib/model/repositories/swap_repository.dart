@@ -3,6 +3,15 @@ import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import '../swap_request.dart';
 
+class SwapRepositoryException implements Exception {
+  final String message;
+
+  const SwapRepositoryException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class SwapRepository {
   final AppDatabase _appDatabase =
       AppDatabase.instance;
@@ -17,113 +26,212 @@ class SwapRepository {
     await _appDatabase.database;
 
     final bool hasIdentityColumns =
-    await _hasIdentityColumns(db);
-
-    final List<Map<String, Object?>>
-    rows =
-    await db.query(
-      'swap_requests',
-      orderBy: 'created_at DESC',
+    await _hasIdentityColumns(
+      db,
     );
 
-    return rows.map(
-          (row) {
-        return SwapRequest(
-          id: row['id'] as String,
+    final List<Map<String, Object?>> rows;
 
-          requesterUserId:
-          hasIdentityColumns
-              ? _readNullableString(
-            row[
-            'requester_user_id'],
-          )
-              : null,
+    try {
+      rows = await db.query(
+        'swap_requests',
+        orderBy: 'created_at DESC',
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Stored swap requests could not be read.',
+      );
+    }
 
-          providerUserId:
-          hasIdentityColumns
-              ? _readNullableString(
-            row[
-            'provider_user_id'],
-          )
-              : null,
+    final List<SwapRequest> requests =
+    <SwapRequest>[];
 
-          skillToLearnId:
-          hasIdentityColumns
-              ? _readNullableString(
-            row[
-            'skill_to_learn_id'],
-          )
-              : null,
+    for (final Map<String, Object?> row
+    in rows) {
+      requests.add(
+        _parseSwapRequestRow(
+          row,
+          hasIdentityColumns:
+          hasIdentityColumns,
+        ),
+      );
+    }
 
-          skillToOfferId:
-          hasIdentityColumns
-              ? _readNullableString(
-            row[
-            'skill_to_offer_id'],
-          )
-              : null,
+    return requests;
+  }
 
-          providerName:
-          row['provider_name']
-          as String,
+  // ============================================================
+  // PARSE STORED ROW
+  // ============================================================
 
-          providerInitials:
-          row['provider_initials']
-          as String,
+  SwapRequest _parseSwapRequestRow(
+      Map<String, Object?> row, {
+        required bool hasIdentityColumns,
+      }) {
+    try {
+      final String id =
+      _readRequiredString(
+        row,
+        'id',
+      );
 
-          providerCity:
-          row['provider_city']
-          as String,
+      final String providerName =
+      _readRequiredString(
+        row,
+        'provider_name',
+      );
 
-          skillToLearn:
-          row['skill_to_learn']
-          as String,
+      final String providerInitials =
+      _readRequiredString(
+        row,
+        'provider_initials',
+      );
 
-          skillToOffer:
-          row['skill_to_offer']
-          as String,
+      final String providerCity =
+      _readRequiredString(
+        row,
+        'provider_city',
+      );
 
-          proposedAt:
-          DateTime
-              .fromMillisecondsSinceEpoch(
-            row['proposed_at']
-            as int,
-          ),
+      final String skillToLearn =
+      _readRequiredString(
+        row,
+        'skill_to_learn',
+      );
 
-          mode:
-          row['mode'] as String,
+      final String skillToOffer =
+      _readRequiredString(
+        row,
+        'skill_to_offer',
+      );
 
-          meetingDetails:
-          row['meeting_details']
-          as String?,
+      final String mode =
+      _readRequiredString(
+        row,
+        'mode',
+      );
 
-          note:
-          row['note']
-          as String?,
+      final String statusValue =
+      _readRequiredString(
+        row,
+        'status',
+      );
 
-          status:
-          SwapRequestStatusExtension
-              .fromDatabase(
-            row['status']
-            as String,
-          ),
+      final DateTime proposedAt =
+      _readRequiredDateTime(
+        row,
+        'proposed_at',
+      );
 
-          createdAt:
-          DateTime
-              .fromMillisecondsSinceEpoch(
-            row['created_at']
-            as int,
-          ),
+      final DateTime createdAt =
+      _readRequiredDateTime(
+        row,
+        'created_at',
+      );
 
-          updatedAt:
-          DateTime
-              .fromMillisecondsSinceEpoch(
-            row['updated_at']
-            as int,
-          ),
+      final DateTime updatedAt =
+      _readRequiredDateTime(
+        row,
+        'updated_at',
+      );
+
+      final SwapRequestStatus status;
+
+      try {
+        status =
+            SwapRequestStatusExtension
+                .fromDatabase(
+              statusValue,
+            );
+      } on FormatException {
+        throw SwapRepositoryException(
+          'Swap request "$id" has an invalid stored status.',
         );
-      },
-    ).toList();
+      }
+
+      return SwapRequest(
+        id:
+        id,
+
+        requesterUserId:
+        hasIdentityColumns
+            ? _readNullableString(
+          row[
+          'requester_user_id'],
+        )
+            : null,
+
+        providerUserId:
+        hasIdentityColumns
+            ? _readNullableString(
+          row[
+          'provider_user_id'],
+        )
+            : null,
+
+        skillToLearnId:
+        hasIdentityColumns
+            ? _readNullableString(
+          row[
+          'skill_to_learn_id'],
+        )
+            : null,
+
+        skillToOfferId:
+        hasIdentityColumns
+            ? _readNullableString(
+          row[
+          'skill_to_offer_id'],
+        )
+            : null,
+
+        providerName:
+        providerName,
+
+        providerInitials:
+        providerInitials,
+
+        providerCity:
+        providerCity,
+
+        skillToLearn:
+        skillToLearn,
+
+        skillToOffer:
+        skillToOffer,
+
+        proposedAt:
+        proposedAt,
+
+        mode:
+        mode,
+
+        meetingDetails:
+        _readNullableString(
+          row['meeting_details'],
+        ),
+
+        note:
+        _readNullableString(
+          row['note'],
+        ),
+
+        status:
+        status,
+
+        createdAt:
+        createdAt,
+
+        updatedAt:
+        updatedAt,
+      );
+    } on SwapRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'A stored swap request contains invalid data.',
+      );
+    }
   }
 
   // ============================================================
@@ -136,42 +244,89 @@ class SwapRepository {
     final Database db =
     await _appDatabase.database;
 
-    final bool hasIdentityColumns =
-    await _hasIdentityColumns(db);
+    final String requestId =
+    _requireText(
+      request.id,
+      'Swap request ID',
+    );
 
-    final Map<String, Object?>
-    values =
+    final String providerName =
+    _requireText(
+      request.providerName,
+      'Provider name',
+    );
+
+    final String providerInitials =
+    _requireText(
+      request.providerInitials,
+      'Provider initials',
+    );
+
+    final String providerCity =
+    _requireText(
+      request.providerCity,
+      'Provider city',
+    );
+
+    final String skillToLearn =
+    _requireText(
+      request.skillToLearn,
+      'Skill to learn',
+    );
+
+    final String skillToOffer =
+    _requireText(
+      request.skillToOffer,
+      'Skill to offer',
+    );
+
+    final String mode =
+    _requireText(
+      request.mode,
+      'Session mode',
+    );
+
+    final bool hasIdentityColumns =
+    await _hasIdentityColumns(
+      db,
+    );
+
+    final Map<String, Object?> values =
     <String, Object?>{
       'id':
-      request.id,
+      requestId,
 
       'provider_name':
-      request.providerName,
+      providerName,
 
       'provider_initials':
-      request.providerInitials,
+      providerInitials,
 
       'provider_city':
-      request.providerCity,
+      providerCity,
 
       'skill_to_learn':
-      request.skillToLearn,
+      skillToLearn,
 
       'skill_to_offer':
-      request.skillToOffer,
+      skillToOffer,
 
       'proposed_at':
       request.proposedAt
           .millisecondsSinceEpoch,
 
       'mode':
-      request.mode,
+      mode,
 
       'meeting_details':
-      request.meetingDetails,
+      _normalizeNullable(
+        request.meetingDetails,
+      ),
 
       'note':
-      request.note,
+      _normalizeNullable(
+        request.note,
+      ),
 
       'status':
       request.status.databaseValue,
@@ -186,10 +341,8 @@ class SwapRepository {
     };
 
     // ----------------------------------------------------------
-    // These columns only physically exist starting in DB v4.
-    //
-    // While the database is still v3, we intentionally do not
-    // include them in INSERT statements so SQLite will not fail.
+    // Identity columns physically exist starting with DB v4.
+    // Keep this compatibility guard for older migrated installs.
     // ----------------------------------------------------------
 
     if (hasIdentityColumns) {
@@ -218,12 +371,27 @@ class SwapRepository {
       );
     }
 
-    await db.insert(
-      'swap_requests',
-      values,
-      conflictAlgorithm:
-      ConflictAlgorithm.abort,
-    );
+    try {
+      final int insertedRowId =
+      await db.insert(
+        'swap_requests',
+        values,
+        conflictAlgorithm:
+        ConflictAlgorithm.abort,
+      );
+
+      if (insertedRowId <= 0) {
+        throw const SwapRepositoryException(
+          'Swap request was not saved.',
+        );
+      }
+    } on SwapRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Swap request could not be saved.',
+      );
+    }
   }
 
   // ============================================================
@@ -235,87 +403,135 @@ class SwapRepository {
     required SwapRequestStatus status,
     required DateTime updatedAt,
   }) async {
+    final String cleanRequestId =
+    _requireText(
+      requestId,
+      'Swap request ID',
+    );
+
     final Database db =
     await _appDatabase.database;
 
-    final int affectedRows =
-    await db.update(
-      'swap_requests',
-      {
-        'status':
-        status.databaseValue,
+    final int affectedRows;
 
-        'updated_at':
-        updatedAt
-            .millisecondsSinceEpoch,
-      },
-      where: 'id = ?',
-      whereArgs: [
-        requestId,
-      ],
-    );
+    try {
+      affectedRows =
+      await db.update(
+        'swap_requests',
+        <String, Object?>{
+          'status':
+          status.databaseValue,
+
+          'updated_at':
+          updatedAt
+              .millisecondsSinceEpoch,
+        },
+        where:
+        'id = ?',
+        whereArgs:
+        <Object?>[
+          cleanRequestId,
+        ],
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Swap request status could not be updated.',
+      );
+    }
 
     if (affectedRows != 1) {
-      throw StateError(
-        'Expected to update 1 swap request, but updated $affectedRows.',
+      throw SwapRepositoryException(
+        'Expected to update exactly 1 swap request, but updated $affectedRows.',
       );
     }
   }
 
   // ============================================================
   // DELETE
-  //
-  // Hard delete is not normal cancellation behavior.
-  // Normal user cancellation should use status = cancelled.
   // ============================================================
 
   Future<void> deleteSwapRequest(
       String requestId,
       ) async {
+    final String cleanRequestId =
+    _requireText(
+      requestId,
+      'Swap request ID',
+    );
+
     final Database db =
     await _appDatabase.database;
 
-    final int affectedRows =
-    await db.delete(
-      'swap_requests',
-      where: 'id = ?',
-      whereArgs: [
-        requestId,
-      ],
-    );
+    final int affectedRows;
+
+    try {
+      affectedRows =
+      await db.delete(
+        'swap_requests',
+        where:
+        'id = ?',
+        whereArgs:
+        <Object?>[
+          cleanRequestId,
+        ],
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Swap request could not be deleted.',
+      );
+    }
 
     if (affectedRows != 1) {
-      throw StateError(
-        'Expected to delete 1 swap request, but deleted $affectedRows.',
+      throw SwapRepositoryException(
+        'Expected to delete exactly 1 swap request, but deleted $affectedRows.',
       );
     }
   }
 
   // ============================================================
   // SCHEMA DETECTION
-  //
-  // Transitional protection while users may still have a v3 DB.
-  // Once DB v4 is fully established, these identity columns will
-  // always exist.
   // ============================================================
 
   Future<bool> _hasIdentityColumns(
       Database db,
       ) async {
     final List<Map<String, Object?>>
-    columns =
-    await db.rawQuery(
-      'PRAGMA table_info(swap_requests)',
-    );
+    columns;
+
+    try {
+      columns =
+      await db.rawQuery(
+        'PRAGMA table_info(swap_requests)',
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Swap request database schema could not be read.',
+      );
+    }
 
     final Set<String> columnNames =
-    columns
-        .map(
-          (column) =>
-      column['name']
-      as String,
-    )
-        .toSet();
+    <String>{};
+
+    for (final Map<String, Object?>
+    column in columns) {
+      final Object? rawName =
+      column['name'];
+
+      if (rawName == null) {
+        continue;
+      }
+
+      final String name =
+      rawName
+          .toString()
+          .trim();
+
+      if (name.isNotEmpty) {
+        columnNames.add(
+          name,
+        );
+      }
+    }
 
     return columnNames.contains(
       'requester_user_id',
@@ -332,8 +548,115 @@ class SwapRepository {
   }
 
   // ============================================================
+  // REQUIRED STRING READER
+  // ============================================================
+
+  String _readRequiredString(
+      Map<String, Object?> row,
+      String key,
+      ) {
+    if (!row.containsKey(key)) {
+      throw SwapRepositoryException(
+        'Stored swap request is missing "$key".',
+      );
+    }
+
+    final Object? value =
+    row[key];
+
+    if (value == null) {
+      throw SwapRepositoryException(
+        'Stored swap request has no value for "$key".',
+      );
+    }
+
+    final String normalized =
+    value
+        .toString()
+        .trim();
+
+    if (normalized.isEmpty) {
+      throw SwapRepositoryException(
+        'Stored swap request has an empty "$key".',
+      );
+    }
+
+    return normalized;
+  }
+
+  // ============================================================
+  // TIMESTAMP READER
+  // ============================================================
+
+  DateTime _readRequiredDateTime(
+      Map<String, Object?> row,
+      String key,
+      ) {
+    if (!row.containsKey(key)) {
+      throw SwapRepositoryException(
+        'Stored swap request is missing "$key".',
+      );
+    }
+
+    final Object? value =
+    row[key];
+
+    final int? milliseconds;
+
+    if (value is int) {
+      milliseconds =
+          value;
+    } else if (value is num) {
+      milliseconds =
+          value.toInt();
+    } else if (value != null) {
+      milliseconds =
+          int.tryParse(
+            value.toString(),
+          );
+    } else {
+      milliseconds =
+      null;
+    }
+
+    if (milliseconds == null ||
+        milliseconds < 0) {
+      throw SwapRepositoryException(
+        'Stored swap request has an invalid "$key".',
+      );
+    }
+
+    try {
+      return DateTime
+          .fromMillisecondsSinceEpoch(
+        milliseconds,
+      );
+    } catch (_) {
+      throw SwapRepositoryException(
+        'Stored swap request has an invalid "$key".',
+      );
+    }
+  }
+
+  // ============================================================
   // VALUE HELPERS
   // ============================================================
+
+  String _requireText(
+      String value,
+      String fieldName,
+      ) {
+    final String normalized =
+    value.trim();
+
+    if (normalized.isEmpty) {
+      throw SwapRepositoryException(
+        '$fieldName is required.',
+      );
+    }
+
+    return normalized;
+  }
 
   String? _readNullableString(
       Object? value,
@@ -343,7 +666,9 @@ class SwapRepository {
     }
 
     final String normalized =
-    value.toString().trim();
+    value
+        .toString()
+        .trim();
 
     if (normalized.isEmpty) {
       return null;
