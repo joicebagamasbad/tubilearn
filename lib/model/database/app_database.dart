@@ -12,19 +12,89 @@ class AppDatabase {
   static const String _databaseName =
       'tubilearn.db';
 
-  static const int _databaseVersion = 9;
+  static const int _databaseVersion = 10;
 
   Database? _database;
 
+  Future<Database>? _openingFuture;
+  Future<void>? _closingFuture;
+
+  // ============================================================
+  // DATABASE ACCESS
+  // ============================================================
+
   Future<Database> get database async {
-    if (_database != null) {
-      return _database!;
+    final Future<void>? closing =
+        _closingFuture;
+
+    if (closing != null) {
+      await closing;
     }
 
-    _database =
+    final Database? existingDatabase =
+        _database;
+
+    if (existingDatabase != null &&
+        existingDatabase.isOpen) {
+      return existingDatabase;
+    }
+
+    final Future<Database>? existingOpening =
+        _openingFuture;
+
+    if (existingOpening != null) {
+      return existingOpening;
+    }
+
+    late final Future<Database> opening;
+
+    opening =
+        _openAndValidateDatabase();
+
+    _openingFuture =
+        opening;
+
+    try {
+      final Database openedDatabase =
+      await opening;
+
+      _database =
+          openedDatabase;
+
+      return openedDatabase;
+    } finally {
+      if (identical(
+        _openingFuture,
+        opening,
+      )) {
+        _openingFuture =
+        null;
+      }
+    }
+  }
+
+  // ============================================================
+  // OPEN + VALIDATE DATABASE
+  // ============================================================
+
+  Future<Database>
+  _openAndValidateDatabase() async {
+    final Database db =
     await _openDatabase();
 
-    return _database!;
+    try {
+      await _verifyDatabaseIntegrity(
+        db,
+      );
+
+      return db;
+    } catch (_) {
+      if (db.isOpen) {
+        await db.close();
+      }
+
+      rethrow;
+    }
   }
 
   Future<Database> _openDatabase() async {
@@ -39,7 +109,10 @@ class AppDatabase {
     return openDatabase(
       path,
       version: _databaseVersion,
-      onConfigure: (db) async {
+
+      onConfigure: (
+          db,
+          ) async {
         await db.execute(
           'PRAGMA foreign_keys = ON',
         );
@@ -78,6 +151,10 @@ class AppDatabase {
         );
 
         await _createConversationIndexesV8(
+          db,
+        );
+
+        await _createUserVisibilityTablesV10(
           db,
         );
       },
@@ -138,8 +215,450 @@ class AppDatabase {
             db,
           );
         }
+
+        if (oldVersion < 10) {
+          await _migrateToVersion10(
+            db,
+          );
+        }
       },
     );
+  }
+
+  // ============================================================
+  // DATABASE INTEGRITY VERIFICATION
+  // ============================================================
+
+  Future<void> _verifyDatabaseIntegrity(
+      Database db,
+      ) async {
+    await _verifyForeignKeysEnabled(
+      db,
+    );
+
+    await _verifyDatabaseVersion(
+      db,
+    );
+
+    await _verifyRequiredTables(
+      db,
+    );
+
+    await _verifyCriticalColumns(
+      db,
+    );
+
+    await _verifyCriticalIndexes(
+      db,
+    );
+
+    await _verifyForeignKeyIntegrity(
+      db,
+    );
+
+    await _verifyQuickCheck(
+      db,
+    );
+  }
+
+  // ============================================================
+  // FOREIGN KEYS
+  // ============================================================
+
+  Future<void> _verifyForeignKeysEnabled(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> rows =
+    await db.rawQuery(
+      'PRAGMA foreign_keys',
+    );
+
+    if (rows.length != 1 ||
+        rows.first.isEmpty) {
+      throw StateError(
+        'Could not verify SQLite foreign-key enforcement.',
+      );
+    }
+
+    final int? value =
+    _readExactDatabaseInteger(
+      rows.first.values.first,
+    );
+
+    if (value != 1) {
+      throw StateError(
+        'SQLite foreign-key enforcement is disabled.',
+      );
+    }
+  }
+
+  // ============================================================
+  // DATABASE VERSION
+  // ============================================================
+
+  Future<void> _verifyDatabaseVersion(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> rows =
+    await db.rawQuery(
+      'PRAGMA user_version',
+    );
+
+    if (rows.length != 1 ||
+        rows.first.isEmpty) {
+      throw StateError(
+        'Could not verify the database version.',
+      );
+    }
+
+    final int? version =
+    _readExactDatabaseInteger(
+      rows.first.values.first,
+    );
+
+    if (version != _databaseVersion) {
+      throw StateError(
+        'Unexpected database version. '
+            'Expected $_databaseVersion but found $version.',
+      );
+    }
+  }
+
+  // ============================================================
+  // REQUIRED TABLES
+  // ============================================================
+
+  Future<void> _verifyRequiredTables(
+      Database db,
+      ) async {
+    const Set<String> requiredTables =
+    <String>{
+      'users',
+      'skills',
+      'skill_learnings',
+      'user_skills',
+      'conversations',
+      'messages',
+      'swap_requests',
+      'conversation_user_visibility',
+      'swap_request_user_visibility',
+    };
+
+    final List<Map<String, Object?>> rows =
+    await db.rawQuery(
+      '''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+      ''',
+    );
+
+    final Set<String> actualTables =
+    <String>{};
+
+    for (final Map<String, Object?> row
+    in rows) {
+      final Object? rawName =
+      row['name'];
+
+      if (rawName is String) {
+        final String name =
+        rawName.trim();
+
+        if (name.isNotEmpty) {
+          actualTables.add(
+            name,
+          );
+        }
+      }
+    }
+
+    final Set<String> missingTables =
+    requiredTables.difference(
+      actualTables,
+    );
+
+    if (missingTables.isNotEmpty) {
+      throw StateError(
+        'Database schema is missing required tables: '
+            '${missingTables.join(', ')}.',
+      );
+    }
+  }
+
+  // ============================================================
+  // CRITICAL COLUMNS
+  // ============================================================
+
+  Future<void> _verifyCriticalColumns(
+      Database db,
+      ) async {
+    const Map<String, Set<String>>
+    requiredColumns =
+    <String, Set<String>>{
+      'users': <String>{
+        'id',
+        'name',
+      },
+
+      'skills': <String>{
+        'id',
+        'owner_user_id',
+        'title',
+      },
+
+      'skill_learnings': <String>{
+        'skill_id',
+        'position',
+        'text',
+      },
+
+      'user_skills': <String>{
+        'id',
+        'user_id',
+        'skill_id',
+        'type',
+      },
+
+      'conversations': <String>{
+        'id',
+        'participant_user_id',
+        'user_name',
+      },
+
+      'messages': <String>{
+        'id',
+        'conversation_id',
+        'text',
+        'sender_user_id',
+        'sent_at',
+      },
+
+      'swap_requests': <String>{
+        'id',
+        'requester_user_id',
+        'provider_user_id',
+        'skill_to_learn_id',
+        'skill_to_offer_id',
+        'status',
+      },
+
+      'conversation_user_visibility':
+      <String>{
+        'conversation_id',
+        'user_id',
+        'is_hidden',
+        'hidden_at',
+      },
+
+      'swap_request_user_visibility':
+      <String>{
+        'swap_request_id',
+        'user_id',
+        'is_hidden',
+        'hidden_at',
+      },
+    };
+
+    for (final MapEntry<String, Set<String>>
+    entry
+    in requiredColumns.entries) {
+      final List<Map<String, Object?>> rows =
+      await db.rawQuery(
+        'PRAGMA table_info(${entry.key})',
+      );
+
+      if (rows.isEmpty) {
+        throw StateError(
+          'Could not inspect table "${entry.key}".',
+        );
+      }
+
+      final Set<String> actualColumns =
+      <String>{};
+
+      for (final Map<String, Object?> row
+      in rows) {
+        final Object? rawName =
+        row['name'];
+
+        if (rawName is! String) {
+          throw StateError(
+            'Table "${entry.key}" contains '
+                'an invalid column definition.',
+          );
+        }
+
+        final String name =
+        rawName.trim();
+
+        if (name.isEmpty) {
+          throw StateError(
+            'Table "${entry.key}" contains '
+                'an empty column name.',
+          );
+        }
+
+        actualColumns.add(
+          name,
+        );
+      }
+
+      final Set<String> missingColumns =
+      entry.value.difference(
+        actualColumns,
+      );
+
+      if (missingColumns.isNotEmpty) {
+        throw StateError(
+          'Table "${entry.key}" is missing '
+              'required columns: '
+              '${missingColumns.join(', ')}.',
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // CRITICAL INDEXES
+  // ============================================================
+
+  Future<void> _verifyCriticalIndexes(
+      Database db,
+      ) async {
+    const Set<String> requiredIndexes =
+    <String>{
+      'idx_messages_conversation',
+      'idx_messages_sender_user',
+      'idx_swap_requests_requester',
+      'idx_swap_requests_provider',
+      'idx_swap_requests_unique_active_exchange',
+      'idx_skills_owner_user',
+      'idx_conversations_participant_user',
+      'idx_conversation_visibility_user_hidden',
+      'idx_swap_visibility_user_hidden',
+    };
+
+    final List<Map<String, Object?>> rows =
+    await db.rawQuery(
+      '''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'index'
+      ''',
+    );
+
+    final Set<String> actualIndexes =
+    <String>{};
+
+    for (final Map<String, Object?> row
+    in rows) {
+      final Object? rawName =
+      row['name'];
+
+      if (rawName is String) {
+        final String name =
+        rawName.trim();
+
+        if (name.isNotEmpty) {
+          actualIndexes.add(
+            name,
+          );
+        }
+      }
+    }
+
+    final Set<String> missingIndexes =
+    requiredIndexes.difference(
+      actualIndexes,
+    );
+
+    if (missingIndexes.isNotEmpty) {
+      throw StateError(
+        'Database schema is missing required indexes: '
+            '${missingIndexes.join(', ')}.',
+      );
+    }
+  }
+
+  // ============================================================
+  // FOREIGN KEY DATA CHECK
+  // ============================================================
+
+  Future<void> _verifyForeignKeyIntegrity(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>>
+    violations =
+    await db.rawQuery(
+      'PRAGMA foreign_key_check',
+    );
+
+    if (violations.isNotEmpty) {
+      throw StateError(
+        'Database contains invalid foreign-key relationships.',
+      );
+    }
+  }
+
+  // ============================================================
+  // SQLITE QUICK CHECK
+  // ============================================================
+
+  Future<void> _verifyQuickCheck(
+      Database db,
+      ) async {
+    final List<Map<String, Object?>> rows =
+    await db.rawQuery(
+      'PRAGMA quick_check',
+    );
+
+    if (rows.length != 1 ||
+        rows.first.isEmpty) {
+      throw StateError(
+        'SQLite database integrity could not be verified.',
+      );
+    }
+
+    final Object? rawResult =
+        rows.first.values.first;
+
+    if (rawResult is! String ||
+        rawResult.trim().toLowerCase() !=
+            'ok') {
+      throw StateError(
+        'SQLite database integrity check failed.',
+      );
+    }
+  }
+
+  int? _readExactDatabaseInteger(
+      Object? value,
+      ) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      final double number =
+      value.toDouble();
+
+      if (!number.isFinite ||
+          number !=
+              number.truncateToDouble()) {
+        return null;
+      }
+
+      return number.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(
+        value.trim(),
+      );
+    }
+
+    return null;
   }
 
   // ============================================================
@@ -461,10 +980,6 @@ class AppDatabase {
 
   // ============================================================
   // CONVERSATION TABLES
-  //
-  // Originally introduced in v3.
-  //
-  // Fresh v9 installs use stable participant and sender IDs.
   // ============================================================
 
   Future<void> _createConversationTablesV3(
@@ -722,10 +1237,6 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATE MESSAGES TO V3
-  //
-  // Historical migration. Keep is_me here because databases
-  // upgrading from old versions still need to pass through
-  // the original v3 structure before reaching v9.
   // ============================================================
 
   Future<void> _migrateMessagesToV3(
@@ -857,7 +1368,8 @@ class AppDatabase {
     );
   }
 
-  Future<void> _createSwapTablesV3WithoutIndexes(
+  Future<void>
+  _createSwapTablesV3WithoutIndexes(
       Database db,
       ) async {
     await db.execute(
@@ -951,29 +1463,20 @@ class AppDatabase {
       '''
       INSERT INTO swap_requests (
         id,
-
         requester_user_id,
         provider_user_id,
-
         skill_to_learn_id,
         skill_to_offer_id,
-
         provider_name,
         provider_initials,
         provider_city,
-
         skill_to_learn,
         skill_to_offer,
-
         proposed_at,
-
         mode,
-
         meeting_details,
         note,
-
         status,
-
         created_at,
         updated_at
       )
@@ -985,99 +1488,70 @@ class AppDatabase {
         CASE lower(trim(provider_name))
           WHEN 'mika santos'
             THEN 'user_mika_santos'
-
           WHEN 'paolo reyes'
             THEN 'user_paolo_reyes'
-
           WHEN 'alex rivera'
             THEN 'user_alex_rivera'
-
           WHEN 'bea mendoza'
             THEN 'user_bea_mendoza'
-
           WHEN 'carlo dela cruz'
             THEN 'user_carlo_dela_cruz'
-
           WHEN 'jamie garcia'
             THEN 'user_jamie_garcia'
-
           WHEN 'nico villanueva'
             THEN 'user_nico_villanueva'
-
           WHEN 'joshua lim'
             THEN 'user_joshua_lim'
-
           WHEN 'andrea flores'
             THEN 'user_andrea_flores'
-
           ELSE NULL
         END,
 
         CASE lower(trim(skill_to_learn))
           WHEN 'graphic design'
             THEN 'skill_graphic_design'
-
           WHEN 'photography'
             THEN 'skill_photography'
-
           WHEN 'video editing'
             THEN 'skill_video_editing'
-
           WHEN 'ui/ux design'
             THEN 'skill_ui_ux_design'
-
           WHEN 'basic web development'
             THEN 'skill_basic_web_development'
-
           WHEN 'english conversation'
             THEN 'skill_english_conversation'
-
           WHEN 'basic excel'
             THEN 'skill_basic_excel'
-
           WHEN 'public speaking'
             THEN 'skill_public_speaking'
-
           WHEN 'basic guitar'
             THEN 'skill_basic_guitar'
-
           WHEN 'canva design'
             THEN 'skill_canva_design'
-
           ELSE NULL
         END,
 
         CASE lower(trim(skill_to_offer))
           WHEN 'graphic design'
             THEN 'skill_graphic_design'
-
           WHEN 'photography'
             THEN 'skill_photography'
-
           WHEN 'video editing'
             THEN 'skill_video_editing'
-
           WHEN 'ui/ux design'
             THEN 'skill_ui_ux_design'
-
           WHEN 'basic web development'
             THEN 'skill_basic_web_development'
-
           WHEN 'english conversation'
             THEN 'skill_english_conversation'
-
           WHEN 'basic excel'
             THEN 'skill_basic_excel'
-
           WHEN 'public speaking'
             THEN 'skill_public_speaking'
-
           WHEN 'basic guitar'
             THEN 'skill_basic_guitar'
-
           WHEN 'canva design'
             THEN 'skill_canva_design'
-
           ELSE NULL
         END,
 
@@ -1119,7 +1593,8 @@ class AppDatabase {
   // VERSION 4 TABLE WITHOUT INDEXES
   // ============================================================
 
-  Future<void> _createSwapTablesV4WithoutIndexes(
+  Future<void>
+  _createSwapTablesV4WithoutIndexes(
       Database db,
       ) async {
     await db.execute(
@@ -1324,12 +1799,6 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATION TO VERSION 8
-  //
-  // Adds stable participant identity to conversations.
-  //
-  // Existing conversations are preserved.
-  // Known seeded users are matched by the legacy display name.
-  // Unknown/ambiguous legacy conversations remain NULL.
   // ============================================================
 
   Future<void> _migrateToVersion8(
@@ -1360,13 +1829,6 @@ class AppDatabase {
       );
     }
 
-    // ----------------------------------------------------------
-    // Backfill only identities we can deterministically map.
-    //
-    // We never delete or merge conversations during migration.
-    // Unknown names remain NULL.
-    // ----------------------------------------------------------
-
     await db.execute(
       '''
       UPDATE conversations
@@ -1374,31 +1836,22 @@ class AppDatabase {
         CASE lower(trim(user_name))
           WHEN 'mika santos'
             THEN 'user_mika_santos'
-
           WHEN 'paolo reyes'
             THEN 'user_paolo_reyes'
-
           WHEN 'alex rivera'
             THEN 'user_alex_rivera'
-
           WHEN 'bea mendoza'
             THEN 'user_bea_mendoza'
-
           WHEN 'carlo dela cruz'
             THEN 'user_carlo_dela_cruz'
-
           WHEN 'jamie garcia'
             THEN 'user_jamie_garcia'
-
           WHEN 'nico villanueva'
             THEN 'user_nico_villanueva'
-
           WHEN 'joshua lim'
             THEN 'user_joshua_lim'
-
           WHEN 'andrea flores'
             THEN 'user_andrea_flores'
-
           ELSE participant_user_id
         END
       WHERE participant_user_id IS NULL
@@ -1412,15 +1865,6 @@ class AppDatabase {
 
   // ============================================================
   // MIGRATION TO VERSION 9
-  //
-  // Replaces legacy is_me with stable sender_user_id.
-  //
-  // Existing messages are preserved.
-  //
-  // Legacy mapping:
-  // - is_me = 1 -> current local user
-  // - is_me = 0 -> conversation participant
-  // - unknown participant -> NULL instead of guessing
   // ============================================================
 
   Future<void> _migrateToVersion9(
@@ -1463,7 +1907,9 @@ class AppDatabase {
     }
 
     await db.transaction(
-          (txn) async {
+          (
+          txn,
+          ) async {
         await txn.execute(
           '''
           ALTER TABLE messages
@@ -1555,9 +2001,166 @@ class AppDatabase {
   }
 
   // ============================================================
+  // VERSION 10 - PER-USER VISIBILITY
+  // ============================================================
+
+  Future<void> _migrateToVersion10(
+      Database db,
+      ) async {
+    await _createUserVisibilityTablesV10(
+      db,
+    );
+  }
+
+  Future<void> _createUserVisibilityTablesV10(
+      Database db,
+      ) async {
+    // ----------------------------------------------------------
+    // CONVERSATION VISIBILITY
+    //
+    // A conversation remains stored globally, but each user may
+    // hide it independently.
+    //
+    // This is intentionally separate from the conversation row.
+    // One participant hiding a conversation must never erase
+    // another participant's history.
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE IF NOT EXISTS
+      conversation_user_visibility (
+        conversation_id TEXT NOT NULL
+          CHECK(length(trim(conversation_id)) > 0),
+
+        user_id TEXT NOT NULL
+          CHECK(length(trim(user_id)) > 0),
+
+        is_hidden INTEGER NOT NULL DEFAULT 0
+          CHECK(is_hidden IN (0, 1)),
+
+        hidden_at INTEGER
+          CHECK(
+            hidden_at IS NULL
+            OR hidden_at > 0
+          ),
+
+        PRIMARY KEY (
+          conversation_id,
+          user_id
+        ),
+
+        CHECK(
+          (
+            is_hidden = 0
+            AND hidden_at IS NULL
+          )
+          OR
+          (
+            is_hidden = 1
+            AND hidden_at IS NOT NULL
+          )
+        ),
+
+        FOREIGN KEY (conversation_id)
+        REFERENCES conversations(id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+      )
+      ''',
+    );
+
+    // ----------------------------------------------------------
+    // SWAP VISIBILITY
+    //
+    // Swap records remain preserved for history/auditing.
+    // Participants may hide the record from their own UI without
+    // globally deleting the underlying swap.
+    // ----------------------------------------------------------
+
+    await db.execute(
+      '''
+      CREATE TABLE IF NOT EXISTS
+      swap_request_user_visibility (
+        swap_request_id TEXT NOT NULL
+          CHECK(length(trim(swap_request_id)) > 0),
+
+        user_id TEXT NOT NULL
+          CHECK(length(trim(user_id)) > 0),
+
+        is_hidden INTEGER NOT NULL DEFAULT 0
+          CHECK(is_hidden IN (0, 1)),
+
+        hidden_at INTEGER
+          CHECK(
+            hidden_at IS NULL
+            OR hidden_at > 0
+          ),
+
+        PRIMARY KEY (
+          swap_request_id,
+          user_id
+        ),
+
+        CHECK(
+          (
+            is_hidden = 0
+            AND hidden_at IS NULL
+          )
+          OR
+          (
+            is_hidden = 1
+            AND hidden_at IS NOT NULL
+          )
+        ),
+
+        FOREIGN KEY (swap_request_id)
+        REFERENCES swap_requests(id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+      )
+      ''',
+    );
+
+    await _createUserVisibilityIndexesV10(
+      db,
+    );
+  }
+
+  Future<void> _createUserVisibilityIndexesV10(
+      Database db,
+      ) async {
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_conversation_visibility_user_hidden
+      ON conversation_user_visibility(
+        user_id,
+        is_hidden
+      )
+      ''',
+    );
+
+    await db.execute(
+      '''
+      CREATE INDEX IF NOT EXISTS
+      idx_swap_visibility_user_hidden
+      ON swap_request_user_visibility(
+        user_id,
+        is_hidden
+      )
+      ''',
+    );
+  }
+
+  // ============================================================
   // MESSAGE INDEXES
-  //
-  // These indexes are safe for legacy message schemas too.
   // ============================================================
 
   Future<void> _createMessageIndexes(
@@ -1582,9 +2185,6 @@ class AppDatabase {
 
   // ============================================================
   // VERSION 9 MESSAGE SENDER INDEX
-  //
-  // Kept separate from legacy indexes because old message
-  // schemas do not have sender_user_id yet.
   // ============================================================
 
   Future<void> _createMessageSenderIndexV9(
@@ -1746,14 +2346,57 @@ class AppDatabase {
   // CLOSE DATABASE
   // ============================================================
 
-  Future<void> close() async {
+  Future<void> close() {
+    final Future<void>? existingClose =
+        _closingFuture;
+
+    if (existingClose != null) {
+      return existingClose;
+    }
+
+    late final Future<void> closing;
+
+    closing =
+        _closeInternal();
+
+    _closingFuture =
+        closing;
+
+    return closing.whenComplete(
+          () {
+        if (identical(
+          _closingFuture,
+          closing,
+        )) {
+          _closingFuture =
+          null;
+        }
+      },
+    );
+  }
+
+  Future<void> _closeInternal() async {
+    final Future<Database>? opening =
+        _openingFuture;
+
+    if (opening != null) {
+      try {
+        await opening;
+      } catch (_) {
+        // Failed database opening already cleans up
+        // its partially opened connection.
+      }
+    }
+
     final Database? db =
         _database;
 
-    if (db != null) {
-      await db.close();
+    _database =
+    null;
 
-      _database = null;
+    if (db != null &&
+        db.isOpen) {
+      await db.close();
     }
   }
 }

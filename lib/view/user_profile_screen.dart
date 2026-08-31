@@ -7,6 +7,12 @@ import '../services/chat_service.dart';
 import '../theme/app_theme.dart';
 import 'create_swap_request_screen.dart';
 
+enum _PreviousConversationAction {
+  cancel,
+  restore,
+  startNew,
+}
+
 class UserProfileScreen extends StatefulWidget {
   final User user;
 
@@ -20,12 +26,22 @@ class UserProfileScreen extends StatefulWidget {
       _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
-  static const Color primary = AppTheme.primary;
-  static const Color darkText = AppTheme.darkText;
-  static const Color mutedText = AppTheme.mutedText;
-  static const Color background = AppTheme.background;
-  static const Color border = AppTheme.border;
+class _UserProfileScreenState
+    extends State<UserProfileScreen> {
+  static const Color primary =
+      AppTheme.primary;
+
+  static const Color darkText =
+      AppTheme.darkText;
+
+  static const Color mutedText =
+      AppTheme.mutedText;
+
+  static const Color background =
+      AppTheme.background;
+
+  static const Color border =
+      AppTheme.border;
 
   static final ExploreRepository _repository =
   ExploreRepository();
@@ -33,7 +49,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isOpeningConversation = false;
   bool _isOpeningSwapRequest = false;
 
-  User get user => widget.user;
+  User get user =>
+      widget.user;
 
   bool get _hasPendingAction =>
       _isOpeningConversation ||
@@ -48,14 +65,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _getWantedSkills();
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      background,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
 
             Expanded(
-              child: SingleChildScrollView(
+              child:
+              SingleChildScrollView(
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
@@ -130,7 +149,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         children:
                         offeredSkills.map(
                               (
-                              skill,
+                              Skill skill,
                               ) {
                             return _skillChip(
                               skill.title,
@@ -170,7 +189,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         children:
                         wantedSkills.map(
                               (
-                              skill,
+                              Skill skill,
                               ) {
                             return _skillChip(
                               skill.title,
@@ -240,7 +259,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 context,
               );
             },
-            icon: const Icon(
+            icon:
+            const Icon(
               Icons
                   .arrow_back_ios_new_rounded,
               size: 18,
@@ -263,7 +283,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             _hasPendingAction
                 ? null
                 : () {},
-            icon: const Icon(
+            icon:
+            const Icon(
               Icons.more_horiz_rounded,
               color: mutedText,
             ),
@@ -288,7 +309,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             color: Color(
               0xFFFFB45E,
             ),
-            shape: BoxShape.circle,
+            shape:
+            BoxShape.circle,
           ),
           alignment:
           Alignment.center,
@@ -299,7 +321,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               fontSize: 20,
               fontWeight:
               FontWeight.w800,
-              color: Colors.white,
+              color:
+              Colors.white,
             ),
           ),
         ),
@@ -329,7 +352,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     Icons
                         .location_on_outlined,
                     size: 15,
-                    color: mutedText,
+                    color:
+                    mutedText,
                   ),
 
                   const SizedBox(
@@ -372,7 +396,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     style:
                     AppTextStyles.secondary
                         .copyWith(
-                      color: darkText,
+                      color:
+                      darkText,
                       fontWeight:
                       FontWeight.w700,
                     ),
@@ -451,14 +476,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         vertical: 14,
         horizontal: 8,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.white,
         borderRadius:
         BorderRadius.circular(
           14,
         ),
-        border: Border.all(
-          color: border,
+        border:
+        Border.all(
+          color:
+          border,
         ),
       ),
       child: Column(
@@ -486,7 +515,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   // ============================================================
-  // INFO CARD
+  // INFO
   // ============================================================
 
   Widget _buildInfoCard() {
@@ -495,14 +524,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       const EdgeInsets.all(
         14,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.white,
         borderRadius:
         BorderRadius.circular(
           16,
         ),
-        border: Border.all(
-          color: border,
+        border:
+        Border.all(
+          color:
+          border,
         ),
       ),
       child: Column(
@@ -562,7 +595,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         Icon(
           icon,
           size: 18,
-          color: primary,
+          color:
+          primary,
         ),
 
         const SizedBox(
@@ -589,7 +623,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 style:
                 AppTextStyles.secondary
                     .copyWith(
-                  color: darkText,
+                  color:
+                  darkText,
                   fontWeight:
                   FontWeight.w600,
                 ),
@@ -602,7 +637,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   // ============================================================
-  // SKILL CHIP
+  // SKILLS
   // ============================================================
 
   Widget _skillChip(
@@ -616,8 +651,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         horizontal: 11,
         vertical: 7,
       ),
-      decoration: BoxDecoration(
-        color: backgroundColor,
+      decoration:
+      BoxDecoration(
+        color:
+        backgroundColor,
         borderRadius:
         BorderRadius.circular(
           20,
@@ -628,7 +665,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         style:
         AppTextStyles.secondary
             .copyWith(
-          color: textColor,
+          color:
+          textColor,
           fontWeight:
           FontWeight.w600,
         ),
@@ -636,27 +674,66 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  List<Skill> _getOfferedSkills() {
+    return _repository
+        .getOfferedSkillsForUser(
+      user.id,
+    )
+        .map(
+          (
+          relationship,
+          ) =>
+          _repository.findSkillById(
+            relationship.skillId,
+          ),
+    )
+        .whereType<Skill>()
+        .toList();
+  }
+
+  List<Skill> _getWantedSkills() {
+    return _repository
+        .getWantedSkillsForUser(
+      user.id,
+    )
+        .map(
+          (
+          relationship,
+          ) =>
+          _repository.findSkillById(
+            relationship.skillId,
+          ),
+    )
+        .whereType<Skill>()
+        .toList();
+  }
+
   // ============================================================
-  // TRUST CARD
+  // TRUST
   // ============================================================
 
   Widget _buildTrustCard() {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
-      decoration: BoxDecoration(
-        color: const Color(
+      decoration:
+      BoxDecoration(
+        color:
+        const Color(
           0xFFF3FBF6,
         ),
         borderRadius:
         BorderRadius.circular(
           15,
         ),
-        border: Border.all(
-          color: const Color(
+        border:
+        Border.all(
+          color:
+          const Color(
             0xFFD9F0E0,
           ),
         ),
@@ -714,7 +791,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         const Icon(
           Icons.check_circle_rounded,
           size: 16,
-          color: Color(
+          color:
+          Color(
             0xFF47A568,
           ),
         ),
@@ -729,52 +807,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             style:
             AppTextStyles.secondary
                 .copyWith(
-              color: darkText,
+              color:
+              darkText,
             ),
           ),
         ),
       ],
     );
-  }
-
-  // ============================================================
-  // SKILLS
-  // ============================================================
-
-  List<Skill> _getOfferedSkills() {
-    return _repository
-        .getOfferedSkillsForUser(
-      user.id,
-    )
-        .map(
-          (
-          relationship,
-          ) =>
-          _repository
-              .findSkillById(
-            relationship.skillId,
-          ),
-    )
-        .whereType<Skill>()
-        .toList();
-  }
-
-  List<Skill> _getWantedSkills() {
-    return _repository
-        .getWantedSkillsForUser(
-      user.id,
-    )
-        .map(
-          (
-          relationship,
-          ) =>
-          _repository
-              .findSkillById(
-            relationship.skillId,
-          ),
-    )
-        .whereType<Skill>()
-        .toList();
   }
 
   // ============================================================
@@ -825,10 +864,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               style:
               OutlinedButton.styleFrom(
-                foregroundColor: primary,
+                foregroundColor:
+                primary,
                 disabledForegroundColor:
                 mutedText,
-                side: BorderSide(
+                side:
+                BorderSide(
                   color:
                   _hasPendingAction
                       ? border
@@ -880,7 +921,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     .swap_horiz_rounded,
                 size: 17,
               ),
-              label: Text(
+              label:
+              Text(
                 _isOpeningSwapRequest
                     ? 'OPENING...'
                     : 'REQUEST SWAP',
@@ -889,7 +931,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               style:
               ElevatedButton.styleFrom(
-                backgroundColor: primary,
+                backgroundColor:
+                primary,
                 foregroundColor:
                 Colors.white,
                 disabledBackgroundColor:
@@ -930,37 +973,123 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
 
     setState(() {
-      _isOpeningConversation = true;
+      _isOpeningConversation =
+      true;
     });
+
+    final String skillWanted =
+    offeredSkills.isEmpty
+        ? 'Skill'
+        : offeredSkills
+        .first.title;
+
+    final String skillOffered =
+    wantedSkills.isEmpty
+        ? 'Skill'
+        : wantedSkills
+        .first.title;
 
     try {
       final conversation =
       await ChatService.instance
           .getOrCreateConversation(
-        userId: user.id,
-        userName: user.name,
-        initials: user.initials,
-        city: user.city,
+        userId:
+        user.id,
+        userName:
+        user.name,
+        initials:
+        user.initials,
+        city:
+        user.city,
         skillWanted:
-        offeredSkills.isEmpty
-            ? 'Skill'
-            : offeredSkills
-            .first.title,
+        skillWanted,
         skillOffered:
-        wantedSkills.isEmpty
-            ? 'Skill'
-            : wantedSkills
-            .first.title,
+        skillOffered,
       );
 
       if (!mounted) {
         return;
       }
 
-      await Navigator.pushNamed(
-        context,
-        '/conversation',
-        arguments:
+      await _openConversationRoute(
+        conversation.id,
+      );
+    } on HiddenConversationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final _PreviousConversationAction action =
+      await _showPreviousConversationDialog();
+
+      if (!mounted) {
+        return;
+      }
+
+      switch (action) {
+        case _PreviousConversationAction.cancel:
+          return;
+
+        case _PreviousConversationAction.restore:
+          await _restoreConversation(
+            error.conversationId,
+          );
+          return;
+
+        case _PreviousConversationAction.startNew:
+          await _startNewConversation(
+            skillWanted:
+            skillWanted,
+            skillOffered:
+            skillOffered,
+          );
+          return;
+      }
+    } on ChatServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Conversation could not be opened. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningConversation =
+          false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // RESTORE OLD CHAT
+  // ============================================================
+
+  Future<void> _restoreConversation(
+      String conversationId,
+      ) async {
+    try {
+      final conversation =
+      await ChatService.instance
+          .restoreConversation(
+        conversationId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _openConversationRoute(
         conversation.id,
       );
     } on ChatServiceException catch (error) {
@@ -968,49 +1097,298 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      )
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content:
-            Text(
-              error.message,
-            ),
-            behavior:
-            SnackBarBehavior.floating,
-          ),
-        );
+      _showMessage(
+        error.message,
+      );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      )
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Conversation could not be opened. Please try again.',
-            ),
-            behavior:
-            SnackBarBehavior.floating,
-          ),
-        );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isOpeningConversation = false;
-        });
-      }
+      _showMessage(
+        'Conversation could not be restored. Please try again.',
+      );
     }
   }
 
   // ============================================================
-  // CREATE SWAP REQUEST
+  // START NEW CHAT
+  // ============================================================
+
+  Future<void> _startNewConversation({
+    required String skillWanted,
+    required String skillOffered,
+  }) async {
+    try {
+      final conversation =
+      await ChatService.instance
+          .startNewConversation(
+        userId:
+        user.id,
+        userName:
+        user.name,
+        initials:
+        user.initials,
+        city:
+        user.city,
+        skillWanted:
+        skillWanted,
+        skillOffered:
+        skillOffered,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _openConversationRoute(
+        conversation.id,
+      );
+    } on ChatServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'A new conversation could not be created. Please try again.',
+      );
+    }
+  }
+
+  Future<void> _openConversationRoute(
+      String conversationId,
+      ) async {
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      '/conversation',
+      arguments:
+      conversationId,
+    );
+  }
+
+  // ============================================================
+  // PREVIOUS CONVERSATION DIALOG
+  // ============================================================
+
+  Future<_PreviousConversationAction>
+  _showPreviousConversationDialog() async {
+    if (!mounted) {
+      return _PreviousConversationAction.cancel;
+    }
+
+    final _PreviousConversationAction? result =
+    await showDialog<
+        _PreviousConversationAction>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              18,
+            ),
+          ),
+          title:
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration:
+                const BoxDecoration(
+                  color:
+                  Color(
+                    0xFFF0EFFF,
+                  ),
+                  shape:
+                  BoxShape.circle,
+                ),
+                child:
+                const Icon(
+                  Icons
+                      .history_rounded,
+                  color:
+                  primary,
+                  size: 21,
+                ),
+              ),
+
+              const SizedBox(
+                width: 12,
+              ),
+
+              const Expanded(
+                child:
+                Text(
+                  'Previous chat found',
+                  style:
+                  AppTextStyles.cardTitle,
+                ),
+              ),
+            ],
+          ),
+          content:
+          Text(
+            'You previously removed your conversation with ${user.name}. '
+                'You can restore that chat and its messages, or start a fresh conversation.',
+            style:
+            AppTextStyles.bodyMuted,
+          ),
+          actionsPadding:
+          const EdgeInsets.fromLTRB(
+            16,
+            4,
+            16,
+            14,
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(
+                  _PreviousConversationAction.cancel,
+                );
+              },
+              child:
+              Text(
+                'CANCEL',
+                style:
+                AppTextStyles.button
+                    .copyWith(
+                  color:
+                  mutedText,
+                ),
+              ),
+            ),
+
+            TextButton.icon(
+              onPressed:
+                  () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(
+                  _PreviousConversationAction.restore,
+                );
+              },
+              icon:
+              const Icon(
+                Icons.restore_rounded,
+                size: 17,
+              ),
+              label:
+              const Text(
+                'RESTORE',
+                style:
+                AppTextStyles.button,
+              ),
+              style:
+              TextButton.styleFrom(
+                foregroundColor:
+                primary,
+              ),
+            ),
+
+            ElevatedButton.icon(
+              onPressed:
+                  () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(
+                  _PreviousConversationAction.startNew,
+                );
+              },
+              icon:
+              const Icon(
+                Icons
+                    .add_comment_outlined,
+                size: 17,
+              ),
+              label:
+              const Text(
+                'NEW CHAT',
+                style:
+                AppTextStyles.button,
+              ),
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                primary,
+                foregroundColor:
+                Colors.white,
+                elevation: 0,
+                minimumSize:
+                const Size(
+                  0,
+                  42,
+                ),
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    11,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ??
+        _PreviousConversationAction.cancel;
+  }
+
+  // ============================================================
+  // MESSAGE FEEDBACK
+  // ============================================================
+
+  void _showMessage(
+      String message,
+      ) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  // ============================================================
+  // SWAP REQUEST
   // ============================================================
 
   Future<void> _openSwapRequest(
@@ -1021,25 +1399,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
 
     if (offeredSkills.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      )
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'This user has no offered skill available for swap.',
-            ),
-            behavior:
-            SnackBarBehavior.floating,
-          ),
-        );
+      _showMessage(
+        'This user has no offered skill available for swap.',
+      );
 
       return;
     }
 
     setState(() {
-      _isOpeningSwapRequest = true;
+      _isOpeningSwapRequest =
+      true;
     });
 
     try {
@@ -1050,7 +1419,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (
+          builder:
+              (
               BuildContext routeContext,
               ) =>
               CreateSwapRequestScreen(
@@ -1074,43 +1444,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         return;
       }
 
-      if (requestCreated == true) {
-        ScaffoldMessenger.of(
-          context,
-        )
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                'Your request to ${user.name} is now Pending.',
-              ),
-              behavior:
-              SnackBarBehavior.floating,
-            ),
-          );
+      if (requestCreated ==
+          true) {
+        _showMessage(
+          'Your request to ${user.name} is now Pending.',
+        );
       }
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      )
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Swap request screen could not be opened. Please try again.',
-            ),
-            behavior:
-            SnackBarBehavior.floating,
-          ),
-        );
+      _showMessage(
+        'Swap request screen could not be opened. Please try again.',
+      );
     } finally {
       if (mounted) {
         setState(() {
-          _isOpeningSwapRequest = false;
+          _isOpeningSwapRequest =
+          false;
         });
       }
     }

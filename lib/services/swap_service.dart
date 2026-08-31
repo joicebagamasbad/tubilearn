@@ -1,10 +1,13 @@
 import '../model/repositories/swap_repository.dart';
 import '../model/swap_request.dart';
+import 'current_user_service.dart';
 
 class SwapServiceException implements Exception {
   final String message;
 
-  const SwapServiceException(this.message);
+  const SwapServiceException(
+      this.message,
+      );
 
   @override
   String toString() => message;
@@ -19,29 +22,38 @@ class SwapService {
   final SwapRepository _repository =
   SwapRepository();
 
-  final List<SwapRequest> _requests = [];
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
+  final List<SwapRequest> _requests =
+  <SwapRequest>[];
 
   Future<void>? _initializingFuture;
 
   final Map<String, Future<SwapRequest>>
-  _pendingCreations = {};
+  _pendingCreations =
+  <String, Future<SwapRequest>>{};
 
   final Map<String, Future<void>>
-  _pendingStatusChanges = {};
+  _pendingStatusChanges =
+  <String, Future<void>>{};
 
   final Map<String, Future<void>>
-  _pendingDeletions = {};
+  _pendingHides =
+  <String, Future<void>>{};
+
+  final Map<String, Future<void>>
+  _pendingRestores =
+  <String, Future<void>>{};
 
   int _lastRequestIdMicros = 0;
 
   bool _initialized = false;
 
   List<SwapRequest> get requests =>
-      List.unmodifiable(_requests);
-
-  // ============================================================
-  // INITIALIZE
-  // ============================================================
+      List<SwapRequest>.unmodifiable(
+        _requests,
+      );
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -75,11 +87,19 @@ class SwapService {
   }
 
   Future<void> _initializeInternal() async {
-    late final List<SwapRequest> savedRequests;
+    final String currentUserId =
+    _requireCurrentLocalUser();
+
+    late final List<SwapRequest>
+    savedRequests;
 
     try {
       savedRequests =
-      await _repository.getAllSwapRequests();
+      await _repository
+          .getAllSwapRequests(
+        userId:
+        currentUserId,
+      );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
         'Could not load your swap requests. Please try again.',
@@ -96,7 +116,9 @@ class SwapService {
 
     _requests
       ..clear()
-      ..addAll(savedRequests);
+      ..addAll(
+        savedRequests,
+      );
 
     _syncRequestIdCounter(
       savedRequests,
@@ -104,15 +126,6 @@ class SwapService {
 
     _initialized = true;
   }
-
-  // ============================================================
-  // LOADED DATA VALIDATION
-  //
-  // Repository parsing confirms that individual database values
-  // can be read. This layer validates domain consistency across
-  // the complete saved request collection before it becomes
-  // trusted in-memory state.
-  // ============================================================
 
   void _validateLoadedRequests(
       List<SwapRequest> requests,
@@ -123,10 +136,8 @@ class SwapService {
     final Set<String> activeStableKeys =
     <String>{};
 
-    final Set<String> activeLegacyKeys =
-    <String>{};
-
-    for (final SwapRequest request in requests) {
+    for (final SwapRequest request
+    in requests) {
       _validateLoadedRequest(
         request,
       );
@@ -146,45 +157,31 @@ class SwapService {
         continue;
       }
 
-      if (request.hasStableIdentity) {
-        final String stableKey =
-        _stableRequestIdentityKey(
-          requesterUserId:
-          request.requesterUserId!,
-          providerUserId:
-          request.providerUserId!,
-          skillToLearnId:
-          request.skillToLearnId!,
-          skillToOfferId:
-          request.skillToOfferId!,
+      if (!request.hasStableIdentity ||
+          !request
+              .hasStructurallyValidIdentityGroup) {
+        throw const SwapServiceException(
+          'An active saved swap request has incomplete identity data.',
         );
-
-        if (!activeStableKeys.add(
-          stableKey,
-        )) {
-          throw const SwapServiceException(
-            'Saved swap data contains duplicate active requests.',
-          );
-        }
-
-        continue;
       }
 
-      final String legacyKey =
-      _legacyRequestIdentityKey(
-        providerName:
-        request.providerName,
-        skillToLearn:
-        request.skillToLearn,
-        skillToOffer:
-        request.skillToOffer,
+      final String stableKey =
+      _stableRequestIdentityKey(
+        requesterUserId:
+        request.requesterUserId!,
+        providerUserId:
+        request.providerUserId!,
+        skillToLearnId:
+        request.skillToLearnId!,
+        skillToOfferId:
+        request.skillToOfferId!,
       );
 
-      if (!activeLegacyKeys.add(
-        legacyKey,
+      if (!activeStableKeys.add(
+        stableKey,
       )) {
         throw const SwapServiceException(
-          'Saved swap data contains duplicate active legacy requests.',
+          'Saved swap data contains duplicate active requests.',
         );
       }
     }
@@ -227,33 +224,13 @@ class SwapService {
       request.note,
     );
 
-    if (providerName.isEmpty) {
+    if (providerName.isEmpty ||
+        providerInitials.isEmpty ||
+        providerCity.isEmpty ||
+        skillToLearn.isEmpty ||
+        skillToOffer.isEmpty) {
       throw const SwapServiceException(
-        'Saved swap data contains a request without a provider name.',
-      );
-    }
-
-    if (providerInitials.isEmpty) {
-      throw const SwapServiceException(
-        'Saved swap data contains a request without provider initials.',
-      );
-    }
-
-    if (providerCity.isEmpty) {
-      throw const SwapServiceException(
-        'Saved swap data contains a request without a provider city.',
-      );
-    }
-
-    if (skillToLearn.isEmpty) {
-      throw const SwapServiceException(
-        'Saved swap data contains a request without a skill to learn.',
-      );
-    }
-
-    if (skillToOffer.isEmpty) {
-      throw const SwapServiceException(
-        'Saved swap data contains a request without a skill to offer.',
+        'Saved swap data contains incomplete snapshot data.',
       );
     }
 
@@ -278,15 +255,10 @@ class SwapService {
       );
     }
 
-    if (meetingDetails == null) {
+    if (meetingDetails == null ||
+        meetingDetails.length > 150) {
       throw const SwapServiceException(
-        'Saved swap data contains missing meeting details.',
-      );
-    }
-
-    if (meetingDetails.length > 150) {
-      throw const SwapServiceException(
-        'Saved swap data contains meeting details that are too long.',
+        'Saved swap data contains invalid meeting details.',
       );
     }
 
@@ -294,6 +266,20 @@ class SwapService {
         note.length > 300) {
       throw const SwapServiceException(
         'Saved swap data contains a message that is too long.',
+      );
+    }
+
+    if (request.createdAt
+        .millisecondsSinceEpoch <=
+        0 ||
+        request.updatedAt
+            .millisecondsSinceEpoch <=
+            0 ||
+        request.proposedAt
+            .millisecondsSinceEpoch <=
+            0) {
+      throw const SwapServiceException(
+        'Saved swap data contains an invalid timestamp.',
       );
     }
 
@@ -334,12 +320,25 @@ class SwapService {
       skillToLearnId,
       skillToOfferId:
       skillToOfferId,
+      allowNoIdentity:
+      request.status.isTerminal,
     );
-  }
 
-  // ============================================================
-  // CREATE REQUEST
-  // ============================================================
+    if (request.status.isTerminal &&
+        !request.hasStableIdentity &&
+        !request.canRemainAsHistory) {
+      throw const SwapServiceException(
+        'Saved historical swap data is incomplete.',
+      );
+    }
+
+    if (request.status.isActive &&
+        !request.isActionableStableRequest) {
+      throw const SwapServiceException(
+        'Saved active swap data does not have stable identity.',
+      );
+    }
+  }
 
   Future<SwapRequest> createRequest({
     String? requesterUserId,
@@ -357,6 +356,9 @@ class SwapService {
     String? note,
   }) async {
     await initialize();
+
+    final String currentUserId =
+    _requireCurrentLocalUser();
 
     final String? cleanRequesterUserId =
     _cleanNullableText(
@@ -415,17 +417,26 @@ class SwapService {
       cleanSkillToLearnId,
       skillToOfferId:
       cleanSkillToOfferId,
+      allowNoIdentity:
+      false,
     );
+
+    if (cleanRequesterUserId !=
+        currentUserId) {
+      throw const SwapServiceException(
+        'New swap requests must belong to the active local user.',
+      );
+    }
 
     _validateCreateRequest(
       requesterUserId:
-      cleanRequesterUserId,
+      cleanRequesterUserId!,
       providerUserId:
-      cleanProviderUserId,
+      cleanProviderUserId!,
       skillToLearnId:
-      cleanSkillToLearnId,
+      cleanSkillToLearnId!,
       skillToOfferId:
-      cleanSkillToOfferId,
+      cleanSkillToOfferId!,
       providerName:
       cleanProviderName,
       providerInitials:
@@ -447,7 +458,7 @@ class SwapService {
     );
 
     final String creationKey =
-    _createPendingCreationKey(
+    _stableRequestIdentityKey(
       requesterUserId:
       cleanRequesterUserId,
       providerUserId:
@@ -456,12 +467,6 @@ class SwapService {
       cleanSkillToLearnId,
       skillToOfferId:
       cleanSkillToOfferId,
-      providerName:
-      cleanProviderName,
-      skillToLearn:
-      cleanSkillToLearn,
-      skillToOffer:
-      cleanSkillToOffer,
     );
 
     final Future<SwapRequest>? pending =
@@ -524,10 +529,10 @@ class SwapService {
   }
 
   Future<SwapRequest> _createRequestInternal({
-    required String? requesterUserId,
-    required String? providerUserId,
-    required String? skillToLearnId,
-    required String? skillToOfferId,
+    required String requesterUserId,
+    required String providerUserId,
+    required String skillToLearnId,
+    required String skillToOfferId,
     required String providerName,
     required String providerInitials,
     required String providerCity,
@@ -547,12 +552,6 @@ class SwapService {
       skillToLearnId,
       skillToOfferId:
       skillToOfferId,
-      providerName:
-      providerName,
-      skillToLearn:
-      skillToLearn,
-      skillToOffer:
-      skillToOffer,
     );
 
     final DateTime now =
@@ -600,7 +599,7 @@ class SwapService {
       await _repository.saveSwapRequest(
         request,
       );
-    } catch (_) {
+    } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
         'Could not save the swap request. Please try again.',
       );
@@ -614,157 +613,135 @@ class SwapService {
     return request;
   }
 
-  // ============================================================
-  // ACCEPT
-  // ============================================================
-
   Future<void> acceptRequest({
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
-
-    final SwapRequest request =
-    _requireRequest(
+    await _performActorTransition(
+      requestId:
       requestId,
-    );
-
-    final String actor =
-    _requireActorUserId(
+      actorUserId:
       actorUserId,
-    );
-
-    if (!request.canAccept(
-      actor,
-    )) {
-      throw const SwapServiceException(
-        'You are not allowed to accept this swap request.',
-      );
-    }
-
-    await _changeStatus(
-      request:
-      request,
-      nextStatus:
+      target:
       SwapRequestStatus.accepted,
+      permission:
+          (
+          request,
+          actor,
+          ) =>
+          request.canAccept(
+            actor,
+          ),
+      permissionError:
+      'You are not allowed to accept this swap request.',
     );
   }
-
-  // ============================================================
-  // DECLINE
-  // ============================================================
 
   Future<void> declineRequest({
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
-
-    final SwapRequest request =
-    _requireRequest(
+    await _performActorTransition(
+      requestId:
       requestId,
-    );
-
-    final String actor =
-    _requireActorUserId(
+      actorUserId:
       actorUserId,
-    );
-
-    if (!request.canDecline(
-      actor,
-    )) {
-      throw const SwapServiceException(
-        'You are not allowed to decline this swap request.',
-      );
-    }
-
-    await _changeStatus(
-      request:
-      request,
-      nextStatus:
+      target:
       SwapRequestStatus.declined,
+      permission:
+          (
+          request,
+          actor,
+          ) =>
+          request.canDecline(
+            actor,
+          ),
+      permissionError:
+      'You are not allowed to decline this swap request.',
     );
   }
-
-  // ============================================================
-  // CANCEL
-  // ============================================================
 
   Future<void> cancelRequest({
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
-
-    final SwapRequest request =
-    _requireRequest(
+    await _performActorTransition(
+      requestId:
       requestId,
-    );
-
-    final String actor =
-    _requireActorUserId(
+      actorUserId:
       actorUserId,
-    );
-
-    if (!request.canCancel(
-      actor,
-    )) {
-      throw const SwapServiceException(
-        'You are not allowed to cancel this swap request.',
-      );
-    }
-
-    await _changeStatus(
-      request:
-      request,
-      nextStatus:
+      target:
       SwapRequestStatus.cancelled,
+      permission:
+          (
+          request,
+          actor,
+          ) =>
+          request.canCancel(
+            actor,
+          ),
+      permissionError:
+      'You are not allowed to cancel this swap request.',
     );
   }
-
-  // ============================================================
-  // SCHEDULE
-  // ============================================================
 
   Future<void> scheduleRequest({
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
-
-    final SwapRequest request =
-    _requireRequest(
+    await _performActorTransition(
+      requestId:
       requestId,
-    );
-
-    final String actor =
-    _requireActorUserId(
+      actorUserId:
       actorUserId,
-    );
-
-    if (!request.canSchedule(
-      actor,
-    )) {
-      throw const SwapServiceException(
-        'You are not allowed to schedule this swap request.',
-      );
-    }
-
-    await _changeStatus(
-      request:
-      request,
-      nextStatus:
+      target:
       SwapRequestStatus.scheduled,
+      permission:
+          (
+          request,
+          actor,
+          ) =>
+          request.canSchedule(
+            actor,
+          ),
+      permissionError:
+      'You are not allowed to schedule this swap request.',
     );
   }
-
-  // ============================================================
-  // COMPLETE
-  // ============================================================
 
   Future<void> completeRequest({
     required String requestId,
     required String actorUserId,
+  }) async {
+    await _performActorTransition(
+      requestId:
+      requestId,
+      actorUserId:
+      actorUserId,
+      target:
+      SwapRequestStatus.completed,
+      permission:
+          (
+          request,
+          actor,
+          ) =>
+          request.canComplete(
+            actor,
+          ),
+      permissionError:
+      'You are not allowed to complete this swap request.',
+    );
+  }
+
+  Future<void> _performActorTransition({
+    required String requestId,
+    required String actorUserId,
+    required SwapRequestStatus target,
+    required bool Function(
+        SwapRequest request,
+        String actor,
+        ) permission,
+    required String permissionError,
   }) async {
     await initialize();
 
@@ -774,15 +751,20 @@ class SwapService {
     );
 
     final String actor =
-    _requireActorUserId(
+    _requireCurrentActor(
       actorUserId,
     );
 
-    if (!request.canComplete(
+    _requireActiveStableRequest(
+      request,
+    );
+
+    if (!permission(
+      request,
       actor,
     )) {
-      throw const SwapServiceException(
-        'You are not allowed to complete this swap request.',
+      throw SwapServiceException(
+        permissionError,
       );
     }
 
@@ -790,13 +772,9 @@ class SwapService {
       request:
       request,
       nextStatus:
-      SwapRequestStatus.completed,
+      target,
     );
   }
-
-  // ============================================================
-  // STATUS CHANGE
-  // ============================================================
 
   Future<void> _changeStatus({
     required SwapRequest request,
@@ -805,40 +783,27 @@ class SwapService {
     final String requestId =
     request.id.trim();
 
-    final Future<void>? pendingDeletion =
-    _pendingDeletions[
-    requestId
-    ];
-
-    if (pendingDeletion != null) {
-      throw const SwapServiceException(
-        'This swap request is being deleted.',
-      );
-    }
+    _throwIfRequestHidingOrRestoring(
+      requestId,
+    );
 
     while (true) {
-      final Future<void>? pendingStatusChange =
+      final Future<void>? pending =
       _pendingStatusChanges[
       requestId
       ];
 
-      if (pendingStatusChange == null) {
+      if (pending == null) {
         break;
       }
 
       try {
-        await pendingStatusChange;
-      } catch (_) {
-        // Previous caller receives its own error.
-      }
+        await pending;
+      } catch (_) {}
 
-      if (_pendingDeletions.containsKey(
+      _throwIfRequestHidingOrRestoring(
         requestId,
-      )) {
-        throw const SwapServiceException(
-          'This swap request is being deleted.',
-        );
-      }
+      );
     }
 
     final Future<void> operation =
@@ -878,10 +843,9 @@ class SwapService {
       requestId,
     );
 
-    if (request.status ==
-        nextStatus) {
-      return;
-    }
+    _requireActiveStableRequest(
+      request,
+    );
 
     if (!request.status.canTransitionTo(
       nextStatus,
@@ -905,7 +869,7 @@ class SwapService {
         updatedAt:
         updatedAt,
       );
-    } catch (_) {
+    } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
         'Could not update the swap request. Please try again.',
       );
@@ -918,10 +882,6 @@ class SwapService {
         updatedAt;
   }
 
-  // ============================================================
-  // DELETE
-  // ============================================================
-
   Future<void> deleteRequest({
     required String requestId,
     required String actorUserId,
@@ -933,135 +893,142 @@ class SwapService {
       requestId,
     );
 
-    final Future<void>? pendingDeletion =
-    _pendingDeletions[
-    cleanRequestId
-    ];
-
-    if (pendingDeletion != null) {
-      await pendingDeletion;
-      return;
-    }
-
     final String actor =
-    _requireActorUserId(
+    _requireCurrentActor(
       actorUserId,
     );
 
-    final Future<void> deletion =
-    _deleteRequestInternal(
-      requestId:
-      cleanRequestId,
-      actorUserId:
-      actor,
-    );
-
-    _pendingDeletions[
-    cleanRequestId
-    ] = deletion;
-
-    try {
-      await deletion;
-    } finally {
-      if (identical(
-        _pendingDeletions[
-        cleanRequestId
-        ],
-        deletion,
-      )) {
-        _pendingDeletions.remove(
-          cleanRequestId,
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteRequestInternal({
-    required String requestId,
-    required String actorUserId,
-  }) async {
-    final Future<void>? pendingStatusChange =
-    _pendingStatusChanges[
-    requestId
-    ];
-
-    if (pendingStatusChange != null) {
-      try {
-        await pendingStatusChange;
-      } catch (_) {
-        // Continue with fresh state after failed status update.
-      }
-    }
-
     final SwapRequest request =
     _requireRequest(
-      requestId,
+      cleanRequestId,
     );
-
-    if (!request.hasStableIdentity) {
-      throw const SwapServiceException(
-        'This legacy swap request cannot be safely deleted because participant identity is incomplete.',
-      );
-    }
-
-    final bool isRequester =
-        request.requesterUserId ==
-            actorUserId;
-
-    final bool isProvider =
-        request.providerUserId ==
-            actorUserId;
-
-    if (!isRequester &&
-        !isProvider) {
-      throw const SwapServiceException(
-        'You are not allowed to delete this swap request.',
-      );
-    }
 
     if (request.status.isActive) {
       throw const SwapServiceException(
-        'Active swap requests cannot be deleted. Cancel or finish the request first.',
+        'Active swap requests cannot be hidden. Cancel or finish the request first.',
+      );
+    }
+
+    if (!request.hasStableIdentity ||
+        !request.involvesUser(
+          actor,
+        )) {
+      throw const SwapServiceException(
+        'You are not allowed to remove this swap request from your history.',
       );
     }
 
     try {
-      await _repository.deleteSwapRequest(
+      await _repository.hideSwapRequest(
+        requestId:
         request.id,
+        userId:
+        actor,
       );
-    } catch (_) {
+    } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
-        'Could not delete the swap request. Please try again.',
+        'Could not hide the swap request. Please try again.',
       );
     }
 
     _requests.removeWhere(
           (
-          SwapRequest item,
+          item,
           ) =>
       item.id ==
           request.id,
     );
   }
 
-  // ============================================================
-  // FIND
-  // ============================================================
+  Future<SwapRequest> restoreRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    await initialize();
+
+    final String cleanRequestId =
+    _requireRequestId(
+      requestId,
+    );
+
+    final String actor =
+    _requireCurrentActor(
+      actorUserId,
+    );
+
+    late final List<SwapRequest>
+    allRequests;
+
+    try {
+      allRequests =
+      await _repository
+          .getAllSwapRequests(
+        includeHidden:
+        true,
+      );
+    } on SwapRepositoryException catch (_) {
+      throw const SwapServiceException(
+        'Could not load hidden swap history.',
+      );
+    }
+
+    final List<SwapRequest> matches =
+    allRequests.where(
+          (
+          request,
+          ) =>
+      request.id ==
+          cleanRequestId,
+    ).toList();
+
+    if (matches.length != 1) {
+      throw const SwapServiceException(
+        'Hidden swap request could not be found.',
+      );
+    }
+
+    final SwapRequest request =
+        matches.single;
+
+    if (!request.hasStableIdentity ||
+        !request.involvesUser(
+          actor,
+        )) {
+      throw const SwapServiceException(
+        'You are not allowed to restore this swap request.',
+      );
+    }
+
+    await _repository.unhideSwapRequest(
+      requestId:
+      request.id,
+      userId:
+      actor,
+    );
+
+    _requests.add(
+      request,
+    );
+
+    _sortRequests();
+
+    return request;
+  }
 
   SwapRequest? findById(
       String requestId,
       ) {
-    final String cleanRequestId =
+    final String clean =
     requestId.trim();
 
-    if (cleanRequestId.isEmpty) {
+    if (clean.isEmpty) {
       return null;
     }
 
     for (final SwapRequest request
     in _requests) {
       if (request.id ==
-          cleanRequestId) {
+          clean) {
         return request;
       }
     }
@@ -1069,36 +1036,14 @@ class SwapService {
     return null;
   }
 
-  // ============================================================
-  // REQUIRE
-  // ============================================================
-
-  String _requireRequestId(
-      String requestId,
-      ) {
-    final String cleanRequestId =
-    requestId.trim();
-
-    if (cleanRequestId.isEmpty) {
-      throw const SwapServiceException(
-        'Swap request ID is required.',
-      );
-    }
-
-    return cleanRequestId;
-  }
-
   SwapRequest _requireRequest(
       String requestId,
       ) {
-    final String cleanRequestId =
-    _requireRequestId(
-      requestId,
-    );
-
     final SwapRequest? request =
     findById(
-      cleanRequestId,
+      _requireRequestId(
+        requestId,
+      ),
     );
 
     if (request == null) {
@@ -1110,45 +1055,116 @@ class SwapService {
     return request;
   }
 
-  String _requireActorUserId(
+  String _requireRequestId(
+      String requestId,
+      ) {
+    final String clean =
+    requestId.trim();
+
+    if (clean.isEmpty) {
+      throw const SwapServiceException(
+        'Swap request ID is required.',
+      );
+    }
+
+    return clean;
+  }
+
+  void _requireActiveStableRequest(
+      SwapRequest request,
+      ) {
+    if (!request.status.isActive ||
+        !request.hasStableIdentity ||
+        !request
+            .hasStructurallyValidIdentityGroup) {
+      throw const SwapServiceException(
+        'This active swap request does not have valid stable identity.',
+      );
+    }
+  }
+
+  String _requireCurrentLocalUser() {
+    try {
+      return _currentUserService
+          .requireUserId();
+    } on CurrentUserServiceException catch (_) {
+      throw const SwapServiceException(
+        'Current user identity is unavailable.',
+      );
+    }
+  }
+
+  String _requireCurrentActor(
       String actorUserId,
       ) {
-    final String cleanActorUserId =
+    final String clean =
     actorUserId.trim();
 
-    if (cleanActorUserId.isEmpty) {
+    if (clean.isEmpty) {
       throw const SwapServiceException(
         'Current user identity is required.',
       );
     }
 
-    return cleanActorUserId;
+    final String current =
+    _requireCurrentLocalUser();
+
+    if (clean != current) {
+      throw const SwapServiceException(
+        'This action can only be performed by the active local user.',
+      );
+    }
+
+    return current;
   }
 
-  // ============================================================
-  // IDENTITY VALIDATION
-  // ============================================================
+  void _throwIfRequestHidingOrRestoring(
+      String requestId,
+      ) {
+    if (_pendingHides.containsKey(
+      requestId,
+    ) ||
+        _pendingRestores.containsKey(
+          requestId,
+        )) {
+      throw const SwapServiceException(
+        'This swap request is currently unavailable.',
+      );
+    }
+  }
 
   void _validateIdentityGroup({
     required String? requesterUserId,
     required String? providerUserId,
     required String? skillToLearnId,
     required String? skillToOfferId,
+    required bool allowNoIdentity,
   }) {
-    final bool hasAnyIdentity =
-        requesterUserId != null ||
-            providerUserId != null ||
-            skillToLearnId != null ||
-            skillToOfferId != null;
+    final int present =
+        <String?>[
+          requesterUserId,
+          providerUserId,
+          skillToLearnId,
+          skillToOfferId,
+        ].where(
+              (
+              value,
+              ) =>
+          value != null &&
+              value.trim().isNotEmpty,
+        ).length;
 
-    if (!hasAnyIdentity) {
-      return;
+    if (present == 0) {
+      if (allowNoIdentity) {
+        return;
+      }
+
+      throw const SwapServiceException(
+        'Stable swap request identity is required.',
+      );
     }
 
-    if (requesterUserId == null ||
-        providerUserId == null ||
-        skillToLearnId == null ||
-        skillToOfferId == null) {
+    if (present != 4) {
       throw const SwapServiceException(
         'Incomplete swap request identity.',
       );
@@ -1164,20 +1180,16 @@ class SwapService {
     if (skillToLearnId ==
         skillToOfferId) {
       throw const SwapServiceException(
-        'The skill you want to learn and the skill you offer must be different.',
+        'The two skills must be different.',
       );
     }
   }
 
-  // ============================================================
-  // CREATE VALIDATION
-  // ============================================================
-
   void _validateCreateRequest({
-    required String? requesterUserId,
-    required String? providerUserId,
-    required String? skillToLearnId,
-    required String? skillToOfferId,
+    required String requesterUserId,
+    required String providerUserId,
+    required String skillToLearnId,
+    required String skillToOfferId,
     required String providerName,
     required String providerInitials,
     required String providerCity,
@@ -1188,40 +1200,13 @@ class SwapService {
     required String? meetingDetails,
     required String? note,
   }) {
-    if (providerName.isEmpty) {
+    if (providerName.isEmpty ||
+        providerInitials.isEmpty ||
+        providerCity.isEmpty ||
+        skillToLearn.isEmpty ||
+        skillToOffer.isEmpty) {
       throw const SwapServiceException(
-        'Provider name is required.',
-      );
-    }
-
-    if (providerInitials.isEmpty) {
-      throw const SwapServiceException(
-        'Provider initials are required.',
-      );
-    }
-
-    if (providerCity.isEmpty) {
-      throw const SwapServiceException(
-        'Provider city is required.',
-      );
-    }
-
-    if (skillToLearn.isEmpty) {
-      throw const SwapServiceException(
-        'Skill to learn is required.',
-      );
-    }
-
-    if (skillToOffer.isEmpty) {
-      throw const SwapServiceException(
-        'Skill to offer is required.',
-      );
-    }
-
-    if (skillToLearn.toLowerCase() ==
-        skillToOffer.toLowerCase()) {
-      throw const SwapServiceException(
-        'The skill you want to learn and the skill you offer must be different.',
+        'Required swap request details are missing.',
       );
     }
 
@@ -1233,33 +1218,17 @@ class SwapService {
       );
     }
 
-    const Set<String> allowedModes =
-    <String>{
-      'Online',
-      'In-person',
-    };
-
-    if (!allowedModes.contains(
-      mode,
-    )) {
+    if (mode != 'Online' &&
+        mode != 'In-person') {
       throw const SwapServiceException(
         'Invalid session mode.',
       );
     }
 
     if (meetingDetails == null ||
-        meetingDetails.isEmpty) {
-      throw SwapServiceException(
-        mode == 'Online'
-            ? 'Preferred online platform is required.'
-            : 'Preferred public meeting area is required.',
-      );
-    }
-
-    if (meetingDetails.length >
-        150) {
+        meetingDetails.length > 150) {
       throw const SwapServiceException(
-        'Meeting details are too long.',
+        'Valid meeting details are required.',
       );
     }
 
@@ -1269,47 +1238,16 @@ class SwapService {
         'Message must be 300 characters or less.',
       );
     }
-
-    final bool hasStableIdentity =
-        requesterUserId != null &&
-            providerUserId != null &&
-            skillToLearnId != null &&
-            skillToOfferId != null;
-
-    if (hasStableIdentity) {
-      if (requesterUserId.isEmpty ||
-          providerUserId.isEmpty ||
-          skillToLearnId.isEmpty ||
-          skillToOfferId.isEmpty) {
-        throw const SwapServiceException(
-          'Swap request identity contains an invalid value.',
-        );
-      }
-    }
   }
 
-  // ============================================================
-  // DUPLICATE PREVENTION
-  // ============================================================
-
   void _preventDuplicateActiveRequest({
-    required String? requesterUserId,
-    required String? providerUserId,
-    required String? skillToLearnId,
-    required String? skillToOfferId,
-    required String providerName,
-    required String skillToLearn,
-    required String skillToOffer,
+    required String requesterUserId,
+    required String providerUserId,
+    required String skillToLearnId,
+    required String skillToOfferId,
   }) {
-    final bool incomingHasStableIdentity =
-        requesterUserId != null &&
-            providerUserId != null &&
-            skillToLearnId != null &&
-            skillToOfferId != null;
-
-    final String stableIncomingKey =
-    incomingHasStableIdentity
-        ? _stableRequestIdentityKey(
+    final String incoming =
+    _stableRequestIdentityKey(
       requesterUserId:
       requesterUserId,
       providerUserId:
@@ -1318,71 +1256,34 @@ class SwapService {
       skillToLearnId,
       skillToOfferId:
       skillToOfferId,
-    )
-        : '';
-
-    final String legacyIncomingKey =
-    _legacyRequestIdentityKey(
-      providerName:
-      providerName,
-      skillToLearn:
-      skillToLearn,
-      skillToOffer:
-      skillToOffer,
     );
 
     for (final SwapRequest request
     in _requests) {
-      if (!request.status.isActive) {
+      if (!request.status.isActive ||
+          !request.hasStableIdentity) {
         continue;
       }
 
-      if (incomingHasStableIdentity &&
-          request.hasStableIdentity) {
-        final String existingStableKey =
-        _stableRequestIdentityKey(
-          requesterUserId:
-          request.requesterUserId!,
-          providerUserId:
-          request.providerUserId!,
-          skillToLearnId:
-          request.skillToLearnId!,
-          skillToOfferId:
-          request.skillToOfferId!,
-        );
-
-        if (existingStableKey ==
-            stableIncomingKey) {
-          throw const SwapServiceException(
-            'You already have an active swap request with this user for the same skill exchange.',
-          );
-        }
-
-        continue;
-      }
-
-      final String existingLegacyKey =
-      _legacyRequestIdentityKey(
-        providerName:
-        request.providerName,
-        skillToLearn:
-        request.skillToLearn,
-        skillToOffer:
-        request.skillToOffer,
+      final String existing =
+      _stableRequestIdentityKey(
+        requesterUserId:
+        request.requesterUserId!,
+        providerUserId:
+        request.providerUserId!,
+        skillToLearnId:
+        request.skillToLearnId!,
+        skillToOfferId:
+        request.skillToOfferId!,
       );
 
-      if (existingLegacyKey ==
-          legacyIncomingKey) {
+      if (existing == incoming) {
         throw const SwapServiceException(
           'You already have an active swap request with this user for the same skill exchange.',
         );
       }
     }
   }
-
-  // ============================================================
-  // IDENTITY KEYS
-  // ============================================================
 
   String _stableRequestIdentityKey({
     required String requesterUserId,
@@ -1398,67 +1299,6 @@ class SwapService {
     ].join('|');
   }
 
-  String _legacyRequestIdentityKey({
-    required String providerName,
-    required String skillToLearn,
-    required String skillToOffer,
-  }) {
-    return <String>[
-      providerName
-          .trim()
-          .toLowerCase(),
-      skillToLearn
-          .trim()
-          .toLowerCase(),
-      skillToOffer
-          .trim()
-          .toLowerCase(),
-    ].join('|');
-  }
-
-  // ============================================================
-  // PENDING CREATE KEY
-  // ============================================================
-
-  String _createPendingCreationKey({
-    required String? requesterUserId,
-    required String? providerUserId,
-    required String? skillToLearnId,
-    required String? skillToOfferId,
-    required String providerName,
-    required String skillToLearn,
-    required String skillToOffer,
-  }) {
-    if (requesterUserId != null &&
-        providerUserId != null &&
-        skillToLearnId != null &&
-        skillToOfferId != null) {
-      return _stableRequestIdentityKey(
-        requesterUserId:
-        requesterUserId,
-        providerUserId:
-        providerUserId,
-        skillToLearnId:
-        skillToLearnId,
-        skillToOfferId:
-        skillToOfferId,
-      );
-    }
-
-    return _legacyRequestIdentityKey(
-      providerName:
-      providerName,
-      skillToLearn:
-      skillToLearn,
-      skillToOffer:
-      skillToOffer,
-    );
-  }
-
-  // ============================================================
-  // REQUEST IDS
-  // ============================================================
-
   void _syncRequestIdCounter(
       List<SwapRequest> requests,
       ) {
@@ -1467,25 +1307,22 @@ class SwapService {
 
     for (final SwapRequest request
     in requests) {
-      final int createdMicros =
+      final int micros =
           request.createdAt
               .microsecondsSinceEpoch;
 
-      if (createdMicros >
-          highest) {
-        highest =
-            createdMicros;
+      if (micros > highest) {
+        highest = micros;
       }
 
-      final int? parsedId =
+      final int? id =
       int.tryParse(
         request.id.trim(),
       );
 
-      if (parsedId != null &&
-          parsedId > highest) {
-        highest =
-            parsedId;
+      if (id != null &&
+          id > highest) {
+        highest = id;
       }
     }
 
@@ -1510,9 +1347,17 @@ class SwapService {
     return candidate.toString();
   }
 
-  // ============================================================
-  // TEXT
-  // ============================================================
+  void _sortRequests() {
+    _requests.sort(
+          (
+          a,
+          b,
+          ) =>
+          b.createdAt.compareTo(
+            a.createdAt,
+          ),
+    );
+  }
 
   String? _cleanNullableText(
       String? value,
@@ -1524,10 +1369,8 @@ class SwapService {
     final String cleaned =
     value.trim();
 
-    if (cleaned.isEmpty) {
-      return null;
-    }
-
-    return cleaned;
+    return cleaned.isEmpty
+        ? null
+        : cleaned;
   }
 }

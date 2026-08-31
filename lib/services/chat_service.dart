@@ -8,22 +8,44 @@ import 'current_user_service.dart';
 class ChatServiceException implements Exception {
   final String message;
 
-  const ChatServiceException(this.message);
+  const ChatServiceException(
+      this.message,
+      );
 
   @override
   String toString() => message;
 }
 
+class HiddenConversationException
+    extends ChatServiceException {
+  final String conversationId;
+  final String participantUserId;
+
+  const HiddenConversationException({
+    required this.conversationId,
+    required this.participantUserId,
+  }) : super(
+    'You previously removed this conversation.',
+  );
+}
+
 class ChatService {
   ChatService._();
 
-  static final ChatService instance = ChatService._();
+  static final ChatService instance =
+  ChatService._();
 
-  final ChatRepository _repository = ChatRepository();
-  final ExploreRepository _exploreRepository = ExploreRepository.instance;
-  final CurrentUserService _currentUserService = CurrentUserService.instance;
+  final ChatRepository _repository =
+  ChatRepository();
 
-  final List<Conversation> _conversations = [];
+  final ExploreRepository _exploreRepository =
+      ExploreRepository.instance;
+
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
+  final List<Conversation> _conversations =
+  <Conversation>[];
 
   static const int _maxUserNameLength = 80;
   static const int _maxInitialsLength = 10;
@@ -35,22 +57,30 @@ class ChatService {
   Future<void>? _initializingFuture;
 
   final Map<String, Future<Conversation>>
-  _pendingConversationCreations = {};
+  _pendingConversationCreations =
+  <String, Future<Conversation>>{};
 
   final Map<String, Future<void>>
-  _pendingConversationDeletions = {};
+  _pendingConversationHides =
+  <String, Future<void>>{};
 
   final Map<String, Future<void>>
-  _pendingMessageSends = {};
+  _pendingMessageSends =
+  <String, Future<void>>{};
 
   final Map<String, Future<Conversation>>
-  _pendingConversationMetadataWrites = {};
+  _pendingConversationMetadataWrites =
+  <String, Future<Conversation>>{};
 
   int _lastMessageIdMicros = 0;
+  int _lastConversationIdMicros = 0;
+
   bool _initialized = false;
 
   List<Conversation> get conversations =>
-      List.unmodifiable(_conversations);
+      List<Conversation>.unmodifiable(
+        _conversations,
+      );
 
   // ============================================================
   // INITIALIZE
@@ -61,16 +91,19 @@ class ChatService {
       return;
     }
 
-    final pendingInitialization = _initializingFuture;
+    final Future<void>? pendingInitialization =
+        _initializingFuture;
 
     if (pendingInitialization != null) {
       await pendingInitialization;
       return;
     }
 
-    final Future<void> initialization = _initializeInternal();
+    final Future<void> initialization =
+    _initializeInternal();
 
-    _initializingFuture = initialization;
+    _initializingFuture =
+        initialization;
 
     try {
       await initialization;
@@ -85,27 +118,118 @@ class ChatService {
   }
 
   Future<void> _initializeInternal() async {
-    final List<Conversation> savedConversations =
-    await _repository.getAllConversations();
+    try {
+      await _exploreRepository.refresh();
+    } on ExploreRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Chat reference data could not be loaded. Please try again.',
+      );
+    } catch (_) {
+      throw const ChatServiceException(
+        'Chat reference data could not be loaded. Please try again.',
+      );
+    }
 
-    if (savedConversations.isEmpty) {
+    final String currentUserId =
+    _requireCurrentUserId();
+
+    late final List<Conversation>
+    allConversations;
+
+    late final List<Conversation>
+    visibleConversations;
+
+    try {
+      allConversations =
+      await _repository.getAllConversations(
+        userId: currentUserId,
+        includeHidden: true,
+      );
+
+      visibleConversations =
+      await _repository.getAllConversations(
+        userId: currentUserId,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Your conversations could not be loaded. Please try again.',
+      );
+    } catch (_) {
+      throw const ChatServiceException(
+        'Your conversations could not be loaded. Please try again.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // BRAND-NEW DATABASE ONLY
+    //
+    // Empty visible chats does NOT mean there are no chats.
+    // Everything may simply be archived.
+    // ----------------------------------------------------------
+
+    if (allConversations.isEmpty) {
+      _conversations.clear();
+
       await _createInitialData();
+
       _syncMessageIdCounterFromLoadedData(
         _conversations,
       );
-    } else {
-      _validateLoadedConversations(
-        savedConversations,
+
+      _syncConversationIdCounterFromLoadedData(
+        _conversations,
       );
 
-      _syncMessageIdCounterFromLoadedData(
-        savedConversations,
-      );
-
-      _conversations
-        ..clear()
-        ..addAll(savedConversations);
+      _initialized = true;
+      return;
     }
+
+    // ----------------------------------------------------------
+    // ALL STORED HISTORY
+    //
+    // Multiple archived threads for the same participant are
+    // valid.
+    // ----------------------------------------------------------
+
+    _validateLoadedConversations(
+      allConversations,
+      requireUniqueParticipants: false,
+    );
+
+    // ----------------------------------------------------------
+    // VISIBLE THREADS
+    //
+    // There may only be one visible/current conversation with
+    // the same participant.
+    // ----------------------------------------------------------
+
+    _validateLoadedConversations(
+      visibleConversations,
+      requireUniqueParticipants: true,
+    );
+
+    _syncMessageIdCounterFromLoadedData(
+      allConversations,
+    );
+
+    _syncConversationIdCounterFromLoadedData(
+      allConversations,
+    );
+
+    final List<Conversation> mutableCopies =
+    visibleConversations
+        .map(
+      _mutableConversationCopy,
+    )
+        .toList(
+      growable: false,
+    );
+
+    _conversations
+      ..clear()
+      ..addAll(
+        mutableCopies,
+      );
 
     _initialized = true;
   }
@@ -115,19 +239,32 @@ class ChatService {
   // ============================================================
 
   void _validateLoadedConversations(
-      List<Conversation> conversations,
-      ) {
-    final Set<String> conversationIds = <String>{};
-    final Set<String> stableParticipants = <String>{};
-    final Set<String> messageIds = <String>{};
+      List<Conversation> conversations, {
+        required bool requireUniqueParticipants,
+      }) {
+    final Set<String> conversationIds =
+    <String>{};
 
-    for (final Conversation conversation in conversations) {
-      final String conversationId = _requireStoredText(
+    final Set<String> stableParticipants =
+    <String>{};
+
+    final Set<String> messageIds =
+    <String>{};
+
+    final String currentUserId =
+    _requireCurrentUserId();
+
+    for (final Conversation conversation
+    in conversations) {
+      final String conversationId =
+      _requireStoredText(
         conversation.id,
         'Stored conversation ID',
       );
 
-      if (!conversationIds.add(conversationId)) {
+      if (!conversationIds.add(
+        conversationId,
+      )) {
         throw const ChatServiceException(
           'Duplicate stored conversation IDs were found.',
         );
@@ -170,12 +307,13 @@ class ChatService {
       );
 
       final String? participantUserId =
-      conversation.participantUserId?.trim();
+      _cleanOptionalText(
+        conversation.participantUserId,
+      );
 
-      if (participantUserId != null &&
-          participantUserId.isNotEmpty) {
+      if (participantUserId != null) {
         if (participantUserId ==
-            _currentUserService.userId) {
+            currentUserId) {
           throw const ChatServiceException(
             'Stored conversation cannot point to the current user.',
           );
@@ -190,24 +328,35 @@ class ChatService {
           );
         }
 
-        if (!stableParticipants.add(
-          participantUserId,
-        )) {
+        if (requireUniqueParticipants &&
+            !stableParticipants.add(
+              participantUserId,
+            )) {
           throw const ChatServiceException(
-            'Duplicate conversations were found for the same user.',
+            'Multiple visible conversations were found for the same user.',
+          );
+        }
+
+        if (!requireUniqueParticipants) {
+          stableParticipants.add(
+            participantUserId,
           );
         }
       }
 
       DateTime? previousMessageTime;
 
-      for (final Message message in conversation.messages) {
-        final String messageId = _requireStoredText(
+      for (final Message message
+      in conversation.messages) {
+        final String messageId =
+        _requireStoredText(
           message.id,
           'Stored message ID',
         );
 
-        if (!messageIds.add(messageId)) {
+        if (!messageIds.add(
+          messageId,
+        )) {
           throw const ChatServiceException(
             'Duplicate stored message IDs were found.',
           );
@@ -220,13 +369,14 @@ class ChatService {
         );
 
         final String? senderUserId =
-        message.senderUserId?.trim();
+        _cleanOptionalText(
+          message.senderUserId,
+        );
 
-        if (senderUserId != null &&
-            senderUserId.isNotEmpty) {
+        if (senderUserId != null) {
           final bool isCurrentUser =
               senderUserId ==
-                  _currentUserService.userId;
+                  currentUserId;
 
           final bool isParticipant =
               participantUserId != null &&
@@ -241,6 +391,14 @@ class ChatService {
           }
         }
 
+        if (message.sentAt
+            .millisecondsSinceEpoch <=
+            0) {
+          throw const ChatServiceException(
+            'Stored message has an invalid timestamp.',
+          );
+        }
+
         if (previousMessageTime != null &&
             message.sentAt.isBefore(
               previousMessageTime,
@@ -250,37 +408,73 @@ class ChatService {
           );
         }
 
-        previousMessageTime = message.sentAt;
+        previousMessageTime =
+            message.sentAt;
       }
     }
   }
 
   // ============================================================
-  // MESSAGE ID COUNTER RESTORE
+  // MUTABLE COPY
+  // ============================================================
+
+  Conversation _mutableConversationCopy(
+      Conversation conversation,
+      ) {
+    return Conversation(
+      id: conversation.id,
+      participantUserId:
+      conversation.participantUserId,
+      userName:
+      conversation.userName,
+      initials:
+      conversation.initials,
+      city:
+      conversation.city,
+      skillWanted:
+      conversation.skillWanted,
+      skillOffered:
+      conversation.skillOffered,
+      status:
+      conversation.status,
+      messages:
+      List<Message>.of(
+        conversation.messages,
+        growable: true,
+      ),
+    );
+  }
+
+  // ============================================================
+  // MESSAGE ID COUNTER
   // ============================================================
 
   void _syncMessageIdCounterFromLoadedData(
       List<Conversation> conversations,
       ) {
-    int highest = _lastMessageIdMicros;
+    int highest =
+        _lastMessageIdMicros;
 
-    for (final Conversation conversation in conversations) {
-      for (final Message message in conversation.messages) {
+    for (final Conversation conversation
+    in conversations) {
+      for (final Message message
+      in conversation.messages) {
         final int sentMicros =
-            message.sentAt.microsecondsSinceEpoch;
+            message.sentAt
+                .microsecondsSinceEpoch;
 
         if (sentMicros > highest) {
-          highest = sentMicros;
+          highest =
+              sentMicros;
         }
 
-        final String id = message.id.trim();
-
-        if (!id.startsWith('message_')) {
-          continue;
-        }
+        final String id =
+        message.id.trim();
 
         final int lastUnderscore =
-        id.lastIndexOf('_');
+        id.lastIndexOf(
+          '_',
+        );
 
         if (lastUnderscore < 0 ||
             lastUnderscore ==
@@ -297,12 +491,58 @@ class ChatService {
 
         if (storedCounter != null &&
             storedCounter > highest) {
-          highest = storedCounter;
+          highest =
+              storedCounter;
         }
       }
     }
 
-    _lastMessageIdMicros = highest;
+    _lastMessageIdMicros =
+        highest;
+  }
+
+  // ============================================================
+  // CONVERSATION ID COUNTER
+  // ============================================================
+
+  void _syncConversationIdCounterFromLoadedData(
+      List<Conversation> conversations,
+      ) {
+    int highest =
+        _lastConversationIdMicros;
+
+    for (final Conversation conversation
+    in conversations) {
+      final String id =
+      conversation.id.trim();
+
+      final int lastUnderscore =
+      id.lastIndexOf(
+        '_',
+      );
+
+      if (lastUnderscore < 0 ||
+          lastUnderscore ==
+              id.length - 1) {
+        continue;
+      }
+
+      final int? suffix =
+      int.tryParse(
+        id.substring(
+          lastUnderscore + 1,
+        ),
+      );
+
+      if (suffix != null &&
+          suffix > highest) {
+        highest =
+            suffix;
+      }
+    }
+
+    _lastConversationIdMicros =
+        highest;
   }
 
   // ============================================================
@@ -310,47 +550,68 @@ class ChatService {
   // ============================================================
 
   Future<void> _createInitialData() async {
-    final DateTime now = DateTime.now();
+    final String currentUserId =
+    _requireCurrentUserId();
+
+    final User? alex =
+    _exploreRepository.findUserById(
+      'user_alex_rivera',
+    );
+
+    if (alex == null) {
+      throw const ChatServiceException(
+        'Initial chat participant could not be found.',
+      );
+    }
+
+    final DateTime now =
+    DateTime.now();
 
     final Conversation alexConversation =
     Conversation(
-      id: _createConversationIdForUser(
-        'user_alex_rivera',
+      id:
+      _createLegacyConversationIdForUser(
+        alex.id,
       ),
       participantUserId:
-      'user_alex_rivera',
+      alex.id,
       userName:
-      'Alex Rivera',
+      alex.name,
       initials:
-      'AR',
+      alex.initials,
       city:
-      'Mabalacat City',
+      alex.city,
       skillWanted:
       'Photography',
       skillOffered:
       'Graphic Design',
       status:
       'Planning',
-      messages: [
+      messages:
+      <Message>[
         Message(
-          id: 'alex-initial-1',
+          id:
+          'alex-initial-1',
           text:
           'Hi! I saw that you offer Photography. I’m interested in learning the basics.',
           senderUserId:
-          _currentUserService.userId,
-          sentAt: now.subtract(
+          currentUserId,
+          sentAt:
+          now.subtract(
             const Duration(
               minutes: 20,
             ),
           ),
         ),
         Message(
-          id: 'alex-initial-2',
+          id:
+          'alex-initial-2',
           text:
           'Sure! I usually start with the practical basics first before going into more advanced topics.',
           senderUserId:
-          'user_alex_rivera',
-          sentAt: now.subtract(
+          alex.id,
+          sentAt:
+          now.subtract(
             const Duration(
               minutes: 17,
             ),
@@ -359,14 +620,16 @@ class ChatService {
       ],
     );
 
-    bool conversationSaved = false;
+    bool conversationSaved =
+    false;
 
     try {
       await _repository.saveConversation(
         alexConversation,
       );
 
-      conversationSaved = true;
+      conversationSaved =
+      true;
 
       for (final Message message
       in alexConversation.messages) {
@@ -377,15 +640,27 @@ class ChatService {
           message,
         );
       }
+    } on ChatRepositoryException catch (_) {
+      if (conversationSaved) {
+        try {
+          await _repository
+              .deleteConversationPermanently(
+            alexConversation.id,
+          );
+        } catch (_) {}
+      }
+
+      throw const ChatServiceException(
+        'Initial chat data could not be created. Please try again.',
+      );
     } catch (_) {
       if (conversationSaved) {
         try {
-          await _repository.deleteConversation(
+          await _repository
+              .deleteConversationPermanently(
             alexConversation.id,
           );
-        } catch (_) {
-          // Cleanup is best-effort.
-        }
+        } catch (_) {}
       }
 
       throw const ChatServiceException(
@@ -394,12 +669,14 @@ class ChatService {
     }
 
     _conversations.add(
-      alexConversation,
+      _mutableConversationCopy(
+        alexConversation,
+      ),
     );
   }
 
   // ============================================================
-  // GET / CREATE
+  // GET OR CREATE
   // ============================================================
 
   Future<Conversation> getOrCreateConversation({
@@ -412,6 +689,130 @@ class ChatService {
   }) async {
     await initialize();
 
+    final _ValidatedParticipantInput input =
+    _validateParticipantInput(
+      userId: userId,
+      userName: userName,
+      initials: initials,
+      city: city,
+      skillWanted: skillWanted,
+      skillOffered: skillOffered,
+    );
+
+    final Conversation? existingConversation =
+    findConversationByUserId(
+      input.userId,
+    );
+
+    if (existingConversation != null) {
+      return _refreshConversationProfile(
+        conversation:
+        existingConversation,
+        participant:
+        input.participant,
+      );
+    }
+
+    final Conversation? latestHidden =
+    await _findLatestHiddenConversationForUser(
+      input.userId,
+    );
+
+    if (latestHidden != null) {
+      throw HiddenConversationException(
+        conversationId:
+        latestHidden.id,
+        participantUserId:
+        input.userId,
+      );
+    }
+
+    return _runParticipantCreation(
+      participantUserId:
+      input.userId,
+      operation:
+          () {
+        return _createConversationInternal(
+          input:
+          input,
+          useFreshUniqueId:
+          false,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // START NEW CONVERSATION
+  //
+  // Used only after the user explicitly chooses "Start new chat"
+  // instead of restoring archived history.
+  // ============================================================
+
+  Future<Conversation> startNewConversation({
+    required String userId,
+    required String userName,
+    required String initials,
+    required String city,
+    required String skillWanted,
+    required String skillOffered,
+  }) async {
+    await initialize();
+
+    final _ValidatedParticipantInput input =
+    _validateParticipantInput(
+      userId: userId,
+      userName: userName,
+      initials: initials,
+      city: city,
+      skillWanted: skillWanted,
+      skillOffered: skillOffered,
+    );
+
+    final Conversation? visible =
+    findConversationByUserId(
+      input.userId,
+    );
+
+    if (visible != null) {
+      return _refreshConversationProfile(
+        conversation:
+        visible,
+        participant:
+        input.participant,
+      );
+    }
+
+    return _runParticipantCreation(
+      participantUserId:
+      input.userId,
+      operation:
+          () {
+        return _createConversationInternal(
+          input:
+          input,
+          useFreshUniqueId:
+          true,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // PARTICIPANT INPUT
+  // ============================================================
+
+  _ValidatedParticipantInput _validateParticipantInput({
+    required String userId,
+    required String userName,
+    required String initials,
+    required String city,
+    required String skillWanted,
+    required String skillOffered,
+  }) {
+    final String currentUserId =
+    _requireCurrentUserId();
+
     final String cleanUserId =
     _requireText(
       userId,
@@ -419,7 +820,7 @@ class ChatService {
     );
 
     if (cleanUserId ==
-        _currentUserService.userId) {
+        currentUserId) {
       throw const ChatServiceException(
         'You cannot start a conversation with yourself.',
       );
@@ -468,244 +869,217 @@ class ChatService {
       );
     }
 
-    final String canonicalUserName =
-    _requireTextWithLimit(
-      participant.name,
-      'User name',
-      _maxUserNameLength,
-    );
-
-    final String canonicalInitials =
-    _requireTextWithLimit(
-      participant.initials,
-      'Initials',
-      _maxInitialsLength,
-    );
-
-    final String canonicalCity =
-    _requireTextWithLimit(
-      participant.city,
-      'City',
-      _maxCityLength,
-    );
-
-    final Conversation? existingConversation =
-    findConversationByUserId(
-      cleanUserId,
-    );
-
-    if (existingConversation != null) {
-      final Future<void>? pendingDeletion =
-      _pendingConversationDeletions[
-      existingConversation.id];
-
-      if (pendingDeletion != null) {
-        try {
-          await pendingDeletion;
-        } catch (_) {
-          throw const ChatServiceException(
-            'Conversation is currently unavailable. Please try again.',
-          );
-        }
-
-        final Conversation? afterDeletion =
-        findConversationByUserId(
-          cleanUserId,
-        );
-
-        if (afterDeletion != null) {
-          return _refreshConversationProfile(
-            conversation:
-            afterDeletion,
-            participant:
-            participant,
-          );
-        }
-      } else {
-        return _refreshConversationProfile(
-          conversation:
-          existingConversation,
-          participant:
-          participant,
-        );
-      }
-    }
-
-    final Future<Conversation>? pendingCreation =
-    _pendingConversationCreations[
-    cleanUserId];
-
-    if (pendingCreation != null) {
-      return pendingCreation;
-    }
-
-    final Future<Conversation> creation =
-    _createConversationInternal(
+    return _ValidatedParticipantInput(
       userId:
       cleanUserId,
+      participant:
+      participant,
       userName:
-      canonicalUserName,
+      _requireTextWithLimit(
+        participant.name,
+        'User name',
+        _maxUserNameLength,
+      ),
       initials:
-      canonicalInitials,
+      _requireTextWithLimit(
+        participant.initials,
+        'Initials',
+        _maxInitialsLength,
+      ),
       city:
-      canonicalCity,
+      _requireTextWithLimit(
+        participant.city,
+        'City',
+        _maxCityLength,
+      ),
       skillWanted:
       cleanSkillWanted,
       skillOffered:
       cleanSkillOffered,
-      participant:
-      participant,
     );
+  }
+
+  // ============================================================
+  // SERIALIZE CREATION PER PARTICIPANT
+  // ============================================================
+
+  Future<Conversation> _runParticipantCreation({
+    required String participantUserId,
+    required Future<Conversation> Function()
+    operation,
+  }) async {
+    final Future<Conversation>? pending =
+    _pendingConversationCreations[
+    participantUserId
+    ];
+
+    if (pending != null) {
+      return pending;
+    }
+
+    final Future<Conversation> creation =
+    operation();
 
     _pendingConversationCreations[
-    cleanUserId] = creation;
+    participantUserId
+    ] = creation;
 
     try {
       return await creation;
     } finally {
       if (identical(
         _pendingConversationCreations[
-        cleanUserId],
+        participantUserId
+        ],
         creation,
       )) {
         _pendingConversationCreations.remove(
-          cleanUserId,
+          participantUserId,
         );
       }
     }
   }
 
-  Future<Conversation>
-  _createConversationInternal({
-    required String userId,
-    required String userName,
-    required String initials,
-    required String city,
-    required String skillWanted,
-    required String skillOffered,
-    required User participant,
-  }) async {
-    final List<Conversation> legacyMatches =
-    _conversations.where(
-          (
-          Conversation conversation,
-          ) {
-        if (conversation.participantUserId !=
-            null) {
-          return false;
-        }
+  // ============================================================
+  // LATEST HIDDEN THREAD
+  // ============================================================
 
-        return conversation.userName
-            .trim()
-            .toLowerCase() ==
-            userName.toLowerCase();
-      },
-    ).toList();
+  Future<Conversation?>
+  _findLatestHiddenConversationForUser(
+      String participantUserId,
+      ) async {
+    final String currentUserId =
+    _requireCurrentUserId();
 
-    if (legacyMatches.length > 1) {
+    try {
+      return await _repository
+          .getLatestHiddenConversationForParticipant(
+        userId:
+        currentUserId,
+        participantUserId:
+        participantUserId,
+      );
+    } on ChatRepositoryException catch (_) {
       throw const ChatServiceException(
-        'Multiple legacy conversations match this user. Automatic migration is unsafe.',
+        'Conversation history could not be checked.',
+      );
+    } catch (_) {
+      throw const ChatServiceException(
+        'Conversation history could not be checked.',
       );
     }
+  }
 
-    if (legacyMatches.length == 1) {
-      final Conversation legacy =
-          legacyMatches.single;
+  // ============================================================
+  // CREATE INTERNAL
+  // ============================================================
 
-      final Future<void>? pendingDeletion =
-      _pendingConversationDeletions[
-      legacy.id];
-
-      if (pendingDeletion != null) {
-        try {
-          await pendingDeletion;
-        } catch (_) {
-          throw const ChatServiceException(
-            'Conversation is currently unavailable. Please try again.',
-          );
-        }
-      } else {
-        return _adoptLegacyConversation(
-          legacyConversation:
-          legacy,
-          participant:
-          participant,
-        );
-      }
-    }
-
-    final Conversation? existingConversation =
+  Future<Conversation> _createConversationInternal({
+    required _ValidatedParticipantInput input,
+    required bool useFreshUniqueId,
+  }) async {
+    final Conversation? visible =
     findConversationByUserId(
-      userId,
+      input.userId,
     );
 
-    if (existingConversation != null) {
+    if (visible != null) {
       return _refreshConversationProfile(
         conversation:
-        existingConversation,
+        visible,
         participant:
-        participant,
+        input.participant,
       );
+    }
+
+    // ----------------------------------------------------------
+    // LEGACY ADOPTION
+    //
+    // Only applies when creating the first/current thread.
+    // A deliberate "Start New Chat" must never adopt an old
+    // legacy thread.
+    // ----------------------------------------------------------
+
+    if (!useFreshUniqueId) {
+      final List<Conversation> legacyMatches =
+      _conversations.where(
+            (
+            Conversation conversation,
+            ) {
+          final String? participantId =
+          _cleanOptionalText(
+            conversation.participantUserId,
+          );
+
+          if (participantId != null) {
+            return false;
+          }
+
+          return conversation.userName
+              .trim()
+              .toLowerCase() ==
+              input.userName
+                  .trim()
+                  .toLowerCase();
+        },
+      ).toList(
+        growable: false,
+      );
+
+      if (legacyMatches.length > 1) {
+        throw const ChatServiceException(
+          'Multiple legacy conversations match this user. Automatic migration is unsafe.',
+        );
+      }
+
+      if (legacyMatches.length == 1) {
+        return _adoptLegacyConversation(
+          legacyConversation:
+          legacyMatches.single,
+          participant:
+          input.participant,
+        );
+      }
     }
 
     final String conversationId =
-    _createConversationIdForUser(
-      userId,
+    useFreshUniqueId
+        ? await _createFreshConversationId(
+      input.userId,
+    )
+        : _createLegacyConversationIdForUser(
+      input.userId,
     );
-
-    final Future<void>? pendingDeletion =
-    _pendingConversationDeletions[
-    conversationId];
-
-    if (pendingDeletion != null) {
-      try {
-        await pendingDeletion;
-      } catch (_) {
-        throw const ChatServiceException(
-          'Conversation is currently unavailable. Please try again.',
-        );
-      }
-    }
-
-    final Conversation? afterDeletion =
-    findConversationByUserId(
-      userId,
-    );
-
-    if (afterDeletion != null) {
-      return _refreshConversationProfile(
-        conversation:
-        afterDeletion,
-        participant:
-        participant,
-      );
-    }
 
     final Conversation newConversation =
     Conversation(
       id:
       conversationId,
       participantUserId:
-      userId,
+      input.userId,
       userName:
-      userName,
+      input.userName,
       initials:
-      initials,
+      input.initials,
       city:
-      city,
+      input.city,
       skillWanted:
-      skillWanted,
+      input.skillWanted,
       skillOffered:
-      skillOffered,
+      input.skillOffered,
       status:
       'New',
       messages:
-      [],
+      <Message>[],
     );
 
     try {
       await _repository.saveConversation(
         newConversation,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Conversation could not be created. Please try again.',
       );
     } catch (_) {
       throw const ChatServiceException(
@@ -713,20 +1087,84 @@ class ChatService {
       );
     }
 
-    final Conversation? conversationAfterSave =
-    findConversationByUserId(
-      userId,
-    );
-
-    if (conversationAfterSave != null) {
-      return conversationAfterSave;
-    }
-
-    _conversations.add(
+    final Conversation mutable =
+    _mutableConversationCopy(
       newConversation,
     );
 
-    return newConversation;
+    _replaceConversationInMemory(
+      mutable,
+    );
+
+    return mutable;
+  }
+
+  // ============================================================
+  // FRESH UNIQUE CONVERSATION ID
+  // ============================================================
+
+  Future<String> _createFreshConversationId(
+      String userId,
+      ) async {
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
+    final String currentUserId =
+    _requireCurrentUserId();
+
+    late final List<Conversation>
+    allConversations;
+
+    try {
+      allConversations =
+      await _repository.getAllConversations(
+        userId:
+        currentUserId,
+        includeHidden:
+        true,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Conversation history could not be checked before creating a new chat.',
+      );
+    }
+
+    final Set<String> existingIds =
+    allConversations
+        .map(
+          (
+          Conversation conversation,
+          ) =>
+      conversation.id,
+    )
+        .toSet();
+
+    while (true) {
+      int candidate =
+          DateTime.now()
+              .microsecondsSinceEpoch;
+
+      if (candidate <=
+          _lastConversationIdMicros) {
+        candidate =
+            _lastConversationIdMicros + 1;
+      }
+
+      _lastConversationIdMicros =
+          candidate;
+
+      final String id =
+          'conversation_${cleanUserId}_$candidate';
+
+      if (!existingIds.contains(
+        id,
+      )) {
+        return id;
+      }
+    }
   }
 
   // ============================================================
@@ -740,8 +1178,9 @@ class ChatService {
     return _runMetadataWrite(
       conversationId:
       conversation.id,
-      operation: () async {
-        _throwIfConversationDeleting(
+      operation:
+          () async {
+        _throwIfConversationHiding(
           conversation.id,
         );
 
@@ -803,18 +1242,17 @@ class ChatService {
           status:
           current.status,
           messages:
-          current.messages,
-        );
-
-        _throwIfConversationDeleting(
-          current.id,
+          List<Message>.of(
+            current.messages,
+            growable: true,
+          ),
         );
 
         try {
           await _repository.saveConversation(
             refreshed,
           );
-        } catch (_) {
+        } on ChatRepositoryException catch (_) {
           throw const ChatServiceException(
             'Conversation profile could not be refreshed.',
           );
@@ -840,22 +1278,20 @@ class ChatService {
     return _runMetadataWrite(
       conversationId:
       legacyConversation.id,
-      operation: () async {
-        _throwIfConversationDeleting(
-          legacyConversation.id,
-        );
-
+      operation:
+          () async {
         final Conversation current =
             findConversation(
               legacyConversation.id,
             ) ??
                 legacyConversation;
 
-        if (current.participantUserId !=
-            null &&
-            current.participantUserId!
-                .trim()
-                .isNotEmpty) {
+        final String? existingParticipant =
+        _cleanOptionalText(
+          current.participantUserId,
+        );
+
+        if (existingParticipant != null) {
           return current;
         }
 
@@ -890,18 +1326,17 @@ class ChatService {
           status:
           current.status,
           messages:
-          current.messages,
-        );
-
-        _throwIfConversationDeleting(
-          current.id,
+          List<Message>.of(
+            current.messages,
+            growable: true,
+          ),
         );
 
         try {
           await _repository.saveConversation(
             adopted,
           );
-        } catch (_) {
+        } on ChatRepositoryException catch (_) {
           throw const ChatServiceException(
             'Legacy conversation could not be upgraded safely.',
           );
@@ -916,6 +1351,10 @@ class ChatService {
     );
   }
 
+  // ============================================================
+  // SERIALIZED METADATA WRITE
+  // ============================================================
+
   Future<Conversation> _runMetadataWrite({
     required String conversationId,
     required Future<Conversation> Function()
@@ -924,7 +1363,8 @@ class ChatService {
     while (true) {
       final Future<Conversation>? pending =
       _pendingConversationMetadataWrites[
-      conversationId];
+      conversationId
+      ];
 
       if (pending == null) {
         break;
@@ -932,16 +1372,14 @@ class ChatService {
 
       try {
         await pending;
-      } catch (_) {
-        // The previous caller receives its own error.
-      }
+      } catch (_) {}
 
-      _throwIfConversationDeleting(
+      _throwIfConversationHiding(
         conversationId,
       );
     }
 
-    _throwIfConversationDeleting(
+    _throwIfConversationHiding(
       conversationId,
     );
 
@@ -949,14 +1387,16 @@ class ChatService {
     operation();
 
     _pendingConversationMetadataWrites[
-    conversationId] = write;
+    conversationId
+    ] = write;
 
     try {
       return await write;
     } finally {
       if (identical(
         _pendingConversationMetadataWrites[
-        conversationId],
+        conversationId
+        ],
         write,
       )) {
         _pendingConversationMetadataWrites.remove(
@@ -969,6 +1409,25 @@ class ChatService {
   void _replaceConversationInMemory(
       Conversation replacement,
       ) {
+    final String? participantId =
+    _cleanOptionalText(
+      replacement.participantUserId,
+    );
+
+    if (participantId != null) {
+      _conversations.removeWhere(
+            (
+            Conversation conversation,
+            ) =>
+        conversation.id !=
+            replacement.id &&
+            _cleanOptionalText(
+              conversation.participantUserId,
+            ) ==
+                participantId,
+      );
+    }
+
     final int index =
     _conversations.indexWhere(
           (
@@ -1012,14 +1471,15 @@ class ChatService {
       _maxMessageLength,
     );
 
-    _throwIfConversationDeleting(
+    _throwIfConversationHiding(
       cleanConversationId,
     );
 
     while (true) {
       final Future<void>? pendingSend =
       _pendingMessageSends[
-      cleanConversationId];
+      cleanConversationId
+      ];
 
       if (pendingSend == null) {
         break;
@@ -1027,11 +1487,9 @@ class ChatService {
 
       try {
         await pendingSend;
-      } catch (_) {
-        // Previous caller handles its own persistence failure.
-      }
+      } catch (_) {}
 
-      _throwIfConversationDeleting(
+      _throwIfConversationHiding(
         cleanConversationId,
       );
     }
@@ -1045,15 +1503,16 @@ class ChatService {
     );
 
     _pendingMessageSends[
-    cleanConversationId] =
-        sendOperation;
+    cleanConversationId
+    ] = sendOperation;
 
     try {
       await sendOperation;
     } finally {
       if (identical(
         _pendingMessageSends[
-        cleanConversationId],
+        cleanConversationId
+        ],
         sendOperation,
       )) {
         _pendingMessageSends.remove(
@@ -1067,7 +1526,7 @@ class ChatService {
     required String conversationId,
     required String text,
   }) async {
-    _throwIfConversationDeleting(
+    _throwIfConversationHiding(
       conversationId,
     );
 
@@ -1083,18 +1542,21 @@ class ChatService {
     }
 
     final String? participantUserId =
-    conversation.participantUserId
-        ?.trim();
+    _cleanOptionalText(
+      conversation.participantUserId,
+    );
 
-    if (participantUserId == null ||
-        participantUserId.isEmpty) {
+    if (participantUserId == null) {
       throw const ChatServiceException(
         'This conversation needs a verified participant before messaging.',
       );
     }
 
+    final String currentUserId =
+    _requireCurrentUserId();
+
     if (participantUserId ==
-        _currentUserService.userId) {
+        currentUserId) {
       throw const ChatServiceException(
         'You cannot send messages to yourself.',
       );
@@ -1109,17 +1571,16 @@ class ChatService {
       );
     }
 
-    final DateTime now = DateTime.now();
-
-    final Message message = Message(
+    final Message message =
+    Message(
       id:
       _createMessageId(),
       text:
       text,
       senderUserId:
-      _currentUserService.userId,
+      currentUserId,
       sentAt:
-      now,
+      DateTime.now(),
     );
 
     conversation.messages.add(
@@ -1132,6 +1593,18 @@ class ChatService {
         conversationId,
         message:
         message,
+      );
+    } on ChatRepositoryException catch (_) {
+      conversation.messages.removeWhere(
+            (
+            Message existingMessage,
+            ) =>
+        existingMessage.id ==
+            message.id,
+      );
+
+      throw const ChatServiceException(
+        'Message could not be saved. Please try again.',
       );
     } catch (_) {
       conversation.messages.removeWhere(
@@ -1183,23 +1656,35 @@ class ChatService {
       return null;
     }
 
+    Conversation? result;
+
     for (final Conversation conversation
     in _conversations) {
       final String? participantUserId =
-      conversation.participantUserId
-          ?.trim();
+      _cleanOptionalText(
+        conversation.participantUserId,
+      );
 
-      if (participantUserId ==
+      if (participantUserId !=
           cleanUserId) {
-        return conversation;
+        continue;
       }
+
+      if (result != null) {
+        throw const ChatServiceException(
+          'Multiple visible conversations exist for the same user.',
+        );
+      }
+
+      result =
+          conversation;
     }
 
-    return null;
+    return result;
   }
 
   // ============================================================
-  // DELETE
+  // USER DELETE = HIDE
   // ============================================================
 
   Future<void> deleteConversation(
@@ -1213,18 +1698,15 @@ class ChatService {
       'Conversation ID',
     );
 
-    final Future<void>? pendingDeletion =
-    _pendingConversationDeletions[
-    cleanConversationId];
+    final Future<void>? pendingHide =
+    _pendingConversationHides[
+    cleanConversationId
+    ];
 
-    if (pendingDeletion != null) {
-      await pendingDeletion;
+    if (pendingHide != null) {
+      await pendingHide;
       return;
     }
-
-    await _waitForPendingCreationForConversation(
-      cleanConversationId,
-    );
 
     final Conversation? conversation =
     findConversation(
@@ -1237,121 +1719,216 @@ class ChatService {
       );
     }
 
-    late final Future<void> deletion;
+    final Future<void> hide =
+    _hideConversationInternal(
+      cleanConversationId,
+    );
 
-    deletion =
-        _deleteConversationInternal(
-          cleanConversationId,
-        );
-
-    _pendingConversationDeletions[
-    cleanConversationId] =
-        deletion;
+    _pendingConversationHides[
+    cleanConversationId
+    ] = hide;
 
     try {
-      await deletion;
+      await hide;
     } finally {
       if (identical(
-        _pendingConversationDeletions[
-        cleanConversationId],
-        deletion,
+        _pendingConversationHides[
+        cleanConversationId
+        ],
+        hide,
       )) {
-        _pendingConversationDeletions.remove(
+        _pendingConversationHides.remove(
           cleanConversationId,
         );
       }
     }
   }
 
-  Future<void> _waitForPendingCreationForConversation(
-      String conversationId,
-      ) async {
-    const String prefix = 'conversation_';
-
-    if (!conversationId.startsWith(prefix)) {
-      return;
-    }
-
-    final String userId =
-    conversationId.substring(
-      prefix.length,
-    );
-
-    if (userId.isEmpty) {
-      return;
-    }
-
-    final Future<Conversation>? pendingCreation =
-    _pendingConversationCreations[
-    userId];
-
-    if (pendingCreation == null) {
-      return;
-    }
-
-    try {
-      await pendingCreation;
-    } catch (_) {
-      // The create caller receives the original failure.
-      // Delete will perform its normal existence check afterward.
-    }
-  }
-
-  Future<void> _deleteConversationInternal(
+  Future<void> _hideConversationInternal(
       String conversationId,
       ) async {
     final Future<void>? pendingSend =
     _pendingMessageSends[
-    conversationId];
+    conversationId
+    ];
 
     if (pendingSend != null) {
       try {
         await pendingSend;
-      } catch (_) {
-        // Failed send already rolls back from memory.
-      }
+      } catch (_) {}
     }
 
-    final Future<Conversation>? pendingMetadataWrite =
+    final Future<Conversation>?
+    pendingMetadataWrite =
     _pendingConversationMetadataWrites[
-    conversationId];
+    conversationId
+    ];
 
     if (pendingMetadataWrite != null) {
       try {
         await pendingMetadataWrite;
-      } catch (_) {
-        // Failed metadata writes leave persisted conversation intact.
-      }
+      } catch (_) {}
     }
 
+    if (findConversation(
+      conversationId,
+    ) ==
+        null) {
+      throw const ChatServiceException(
+        'Conversation not found.',
+      );
+    }
+
+    final String currentUserId =
+    _requireCurrentUserId();
+
     try {
-      await _repository.deleteConversation(
+      await _repository.hideConversation(
+        conversationId:
         conversationId,
+        userId:
+        currentUserId,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Conversation could not be hidden. Please try again.',
       );
     } catch (_) {
       throw const ChatServiceException(
-        'Conversation could not be deleted. Please try again.',
+        'Conversation could not be hidden. Please try again.',
       );
     }
 
     _conversations.removeWhere(
           (
-          Conversation existingConversation,
+          Conversation conversation,
           ) =>
-      existingConversation.id ==
+      conversation.id ==
           conversationId,
     );
   }
 
-  void _throwIfConversationDeleting(
+  // ============================================================
+  // EXPLICIT RESTORE
+  // ============================================================
+
+  Future<Conversation> restoreConversation(
+      String conversationId,
+      ) async {
+    await initialize();
+
+    final String cleanConversationId =
+    _requireText(
+      conversationId,
+      'Conversation ID',
+    );
+
+    final Conversation? alreadyVisible =
+    findConversation(
+      cleanConversationId,
+    );
+
+    if (alreadyVisible != null) {
+      return alreadyVisible;
+    }
+
+    final String currentUserId =
+    _requireCurrentUserId();
+
+    late final List<Conversation>
+    allConversations;
+
+    try {
+      allConversations =
+      await _repository.getAllConversations(
+        userId:
+        currentUserId,
+        includeHidden:
+        true,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Conversation history could not be loaded.',
+      );
+    }
+
+    final List<Conversation> matches =
+    allConversations.where(
+          (
+          Conversation conversation,
+          ) =>
+      conversation.id ==
+          cleanConversationId,
+    ).toList(
+      growable: false,
+    );
+
+    if (matches.length != 1) {
+      throw const ChatServiceException(
+        'Conversation could not be found.',
+      );
+    }
+
+    final Conversation target =
+        matches.single;
+
+    final String? participantUserId =
+    _cleanOptionalText(
+      target.participantUserId,
+    );
+
+    if (participantUserId == null) {
+      throw const ChatServiceException(
+        'Archived conversation has no verified participant.',
+      );
+    }
+
+    final Conversation? currentVisible =
+    findConversationByUserId(
+      participantUserId,
+    );
+
+    if (currentVisible != null &&
+        currentVisible.id !=
+            target.id) {
+      throw const ChatServiceException(
+        'A newer conversation with this user is already active.',
+      );
+    }
+
+    try {
+      await _repository.unhideConversation(
+        conversationId:
+        cleanConversationId,
+        userId:
+        currentUserId,
+      );
+    } on ChatRepositoryException catch (_) {
+      throw const ChatServiceException(
+        'Conversation could not be restored.',
+      );
+    }
+
+    final Conversation mutable =
+    _mutableConversationCopy(
+      target,
+    );
+
+    _replaceConversationInMemory(
+      mutable,
+    );
+
+    return mutable;
+  }
+
+  void _throwIfConversationHiding(
       String conversationId,
       ) {
-    if (_pendingConversationDeletions
-        .containsKey(
+    if (_pendingConversationHides.containsKey(
       conversationId,
     )) {
       throw const ChatServiceException(
-        'This conversation is being deleted.',
+        'This conversation is being hidden.',
       );
     }
   }
@@ -1360,10 +1937,16 @@ class ChatService {
   // IDS
   // ============================================================
 
-  String _createConversationIdForUser(
+  String _createLegacyConversationIdForUser(
       String userId,
       ) {
-    return 'conversation_$userId';
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
+    return 'conversation_$cleanUserId';
   }
 
   String _createMessageId() {
@@ -1377,13 +1960,29 @@ class ChatService {
           _lastMessageIdMicros + 1;
     }
 
-    _lastMessageIdMicros = candidate;
+    _lastMessageIdMicros =
+        candidate;
 
-    return 'message_${_currentUserService.userId}_$candidate';
+    return 'message_${_requireCurrentUserId()}_$candidate';
   }
 
   // ============================================================
-  // INPUT VALIDATION
+  // CURRENT USER
+  // ============================================================
+
+  String _requireCurrentUserId() {
+    try {
+      return _currentUserService
+          .requireUserId();
+    } on CurrentUserServiceException catch (_) {
+      throw const ChatServiceException(
+        'Current user identity is unavailable.',
+      );
+    }
+  }
+
+  // ============================================================
+  // VALIDATION
   // ============================================================
 
   String _requireText(
@@ -1413,7 +2012,8 @@ class ChatService {
       fieldName,
     );
 
-    if (cleaned.length > maxLength) {
+    if (cleaned.length >
+        maxLength) {
       throw ChatServiceException(
         '$fieldName must be $maxLength characters or fewer.',
       );
@@ -1449,10 +2049,48 @@ class ChatService {
       fieldName,
     );
 
-    if (cleaned.length > maxLength) {
+    if (cleaned.length >
+        maxLength) {
       throw ChatServiceException(
         '$fieldName exceeds the allowed length.',
       );
     }
   }
+
+  String? _cleanOptionalText(
+      String? value,
+      ) {
+    if (value == null) {
+      return null;
+    }
+
+    final String cleaned =
+    value.trim();
+
+    if (cleaned.isEmpty) {
+      return null;
+    }
+
+    return cleaned;
+  }
+}
+
+class _ValidatedParticipantInput {
+  final String userId;
+  final User participant;
+  final String userName;
+  final String initials;
+  final String city;
+  final String skillWanted;
+  final String skillOffered;
+
+  const _ValidatedParticipantInput({
+    required this.userId,
+    required this.participant,
+    required this.userName,
+    required this.initials,
+    required this.city,
+    required this.skillWanted,
+    required this.skillOffered,
+  });
 }

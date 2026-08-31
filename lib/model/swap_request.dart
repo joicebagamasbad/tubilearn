@@ -7,10 +7,6 @@ enum SwapRequestStatus {
   cancelled,
 }
 
-// ============================================================
-// REQUEST DIRECTION
-// ============================================================
-
 enum SwapRequestDirection {
   outgoing,
   incoming,
@@ -32,10 +28,6 @@ on SwapRequestDirection {
     }
   }
 }
-
-// ============================================================
-// STATUS
-// ============================================================
 
 extension SwapRequestStatusExtension
 on SwapRequestStatus {
@@ -90,24 +82,17 @@ on SwapRequestStatus {
       ) {
     switch (this) {
       case SwapRequestStatus.pending:
-        return next ==
-            SwapRequestStatus.accepted ||
-            next ==
-                SwapRequestStatus.declined ||
-            next ==
-                SwapRequestStatus.cancelled;
+        return next == SwapRequestStatus.accepted ||
+            next == SwapRequestStatus.declined ||
+            next == SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.accepted:
-        return next ==
-            SwapRequestStatus.scheduled ||
-            next ==
-                SwapRequestStatus.cancelled;
+        return next == SwapRequestStatus.scheduled ||
+            next == SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.scheduled:
-        return next ==
-            SwapRequestStatus.completed ||
-            next ==
-                SwapRequestStatus.cancelled;
+        return next == SwapRequestStatus.completed ||
+            next == SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.declined:
       case SwapRequestStatus.completed:
@@ -122,7 +107,7 @@ on SwapRequestStatus {
     final String cleanValue =
     value.trim();
 
-    for (final status
+    for (final SwapRequestStatus status
     in SwapRequestStatus.values) {
       if (status.name == cleanValue) {
         return status;
@@ -134,10 +119,6 @@ on SwapRequestStatus {
     );
   }
 }
-
-// ============================================================
-// SWAP REQUEST
-// ============================================================
 
 class SwapRequest {
   final String id;
@@ -170,48 +151,35 @@ class SwapRequest {
 
   SwapRequest({
     required this.id,
-
     this.requesterUserId,
     this.providerUserId,
     this.skillToLearnId,
     this.skillToOfferId,
-
     required this.providerName,
     required this.providerInitials,
     required this.providerCity,
-
     required this.skillToLearn,
     required this.skillToOffer,
-
     required this.proposedAt,
-
     required this.mode,
-
     this.meetingDetails,
     this.note,
-
     required this.status,
-
     required this.createdAt,
     required this.updatedAt,
   });
 
-  // ==========================================================
-  // STABLE IDENTITY
-  // ==========================================================
-
   bool get hasStableIdentity {
+    return hasParticipantIdentity &&
+        hasSkillIdentity;
+  }
+
+  bool get hasParticipantIdentity {
     return _hasValue(
       requesterUserId,
     ) &&
         _hasValue(
           providerUserId,
-        ) &&
-        _hasValue(
-          skillToLearnId,
-        ) &&
-        _hasValue(
-          skillToOfferId,
         );
   }
 
@@ -236,9 +204,42 @@ class SwapRequest {
         );
   }
 
-  // ==========================================================
-  // USER RELATIONSHIP
-  // ==========================================================
+  bool get hasPartialStableIdentity {
+    final int presentValues =
+        <String?>[
+          requesterUserId,
+          providerUserId,
+          skillToLearnId,
+          skillToOfferId,
+        ].where(
+              (
+              String? value,
+              ) =>
+              _hasValue(
+                value,
+              ),
+        ).length;
+
+    return presentValues > 0 &&
+        presentValues < 4;
+  }
+
+  bool get requiresStableIdentityForActions =>
+      status.isActive;
+
+  bool get canUseHistoricalSnapshot =>
+      status.isTerminal;
+
+  bool get hasStructurallyValidIdentityGroup =>
+      !hasPartialStableIdentity;
+
+  bool get hasUsableHistoricalSnapshot {
+    return providerName.trim().isNotEmpty &&
+        providerInitials.trim().isNotEmpty &&
+        providerCity.trim().isNotEmpty &&
+        skillToLearn.trim().isNotEmpty &&
+        skillToOffer.trim().isNotEmpty;
+  }
 
   bool isRequester(
       String userId,
@@ -271,22 +272,26 @@ class SwapRequest {
   bool involvesUser(
       String userId,
       ) {
-    return isRequester(userId) ||
-        isProvider(userId);
+    return isRequester(
+      userId,
+    ) ||
+        isProvider(
+          userId,
+        );
   }
-
-  // ==========================================================
-  // DIRECTION
-  // ==========================================================
 
   SwapRequestDirection directionFor(
       String userId,
       ) {
-    if (isRequester(userId)) {
+    if (isRequester(
+      userId,
+    )) {
       return SwapRequestDirection.outgoing;
     }
 
-    if (isProvider(userId)) {
+    if (isProvider(
+      userId,
+    )) {
       return SwapRequestDirection.incoming;
     }
 
@@ -296,32 +301,38 @@ class SwapRequest {
   bool isOutgoingFor(
       String userId,
       ) {
-    return directionFor(userId) ==
+    return directionFor(
+      userId,
+    ) ==
         SwapRequestDirection.outgoing;
   }
 
   bool isIncomingFor(
       String userId,
       ) {
-    return directionFor(userId) ==
+    return directionFor(
+      userId,
+    ) ==
         SwapRequestDirection.incoming;
   }
-
-  // ==========================================================
-  // PERMISSIONS
-  // ==========================================================
 
   bool canCancel(
       String userId,
       ) {
-    return isRequester(userId) &&
+    return hasStableIdentity &&
+        isRequester(
+          userId,
+        ) &&
         status.canBeCancelled;
   }
 
   bool canAccept(
       String userId,
       ) {
-    return isProvider(userId) &&
+    return hasStableIdentity &&
+        isProvider(
+          userId,
+        ) &&
         status ==
             SwapRequestStatus.pending;
   }
@@ -329,7 +340,10 @@ class SwapRequest {
   bool canDecline(
       String userId,
       ) {
-    return isProvider(userId) &&
+    return hasStableIdentity &&
+        isProvider(
+          userId,
+        ) &&
         status ==
             SwapRequestStatus.pending;
   }
@@ -337,66 +351,75 @@ class SwapRequest {
   bool canRespond(
       String userId,
       ) {
-    return canAccept(userId) ||
-        canDecline(userId);
+    return canAccept(
+      userId,
+    ) ||
+        canDecline(
+          userId,
+        );
   }
-
-  // ----------------------------------------------------------
-  // Scheduling
-  //
-  // For the current local product rule, either participant may
-  // confirm an accepted swap as scheduled.
-  // ----------------------------------------------------------
 
   bool canSchedule(
       String userId,
       ) {
-    return involvesUser(userId) &&
+    return hasStableIdentity &&
+        involvesUser(
+          userId,
+        ) &&
         status ==
             SwapRequestStatus.accepted;
   }
 
-  // ----------------------------------------------------------
-  // Completion
-  //
-  // Either participant may mark a scheduled swap completed.
-  //
-  // This keeps the existing behavior but moves the permission
-  // rule into the domain model instead of duplicating it inside
-  // SwapService.
-  // ----------------------------------------------------------
-
   bool canComplete(
       String userId,
       ) {
-    return involvesUser(userId) &&
+    return hasStableIdentity &&
+        involvesUser(
+          userId,
+        ) &&
         status ==
             SwapRequestStatus.scheduled;
   }
 
-  // ==========================================================
-  // SECURITY / ACCESS
-  // ==========================================================
-
   bool canViewAsParticipant(
       String userId,
       ) {
-    return involvesUser(userId);
+    return involvesUser(
+      userId,
+    );
   }
 
   bool canModify(
       String userId,
       ) {
-    return canCancel(userId) ||
-        canAccept(userId) ||
-        canDecline(userId) ||
-        canSchedule(userId) ||
-        canComplete(userId);
+    return canCancel(
+      userId,
+    ) ||
+        canAccept(
+          userId,
+        ) ||
+        canDecline(
+          userId,
+        ) ||
+        canSchedule(
+          userId,
+        ) ||
+        canComplete(
+          userId,
+        );
   }
 
-  // ==========================================================
-  // HELPERS
-  // ==========================================================
+  bool get canRemainAsHistory {
+    return status.isTerminal &&
+        hasUsableHistoricalSnapshot &&
+        hasStructurallyValidIdentityGroup;
+  }
+
+  bool get isActionableStableRequest {
+    return status.isActive &&
+        hasStableIdentity &&
+        hasStructurallyValidIdentityGroup;
+  }
 
   static bool _hasValue(
       String? value,

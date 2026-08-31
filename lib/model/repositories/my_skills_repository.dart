@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../../services/current_user_service.dart';
 import '../database/app_database.dart';
 import '../skill.dart';
 import '../user_skill.dart';
@@ -46,6 +47,9 @@ class MySkillsRepository {
   static final MySkillsRepository instance =
   MySkillsRepository._();
 
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
   int _lastGeneratedIdValue = 0;
 
   // ============================================================
@@ -56,9 +60,8 @@ class MySkillsRepository {
       String userId,
       ) async {
     final String cleanUserId =
-    _requireText(
+    _requireCurrentLocalUser(
       userId,
-      'User ID',
     );
 
     try {
@@ -70,8 +73,100 @@ class MySkillsRepository {
         cleanUserId,
       );
 
+      if (relationships.isEmpty) {
+        return const <ManagedSkill>[];
+      }
+
       final Database db =
       await AppDatabase.instance.database;
+
+      // --------------------------------------------------------
+      // LOAD ALL SKILL OWNERS IN ONE QUERY
+      //
+      // Previous implementation queried the skills table once
+      // per relationship. This keeps reads bounded as the user's
+      // skill list grows.
+      // --------------------------------------------------------
+
+      final Set<String> relationshipSkillIds =
+      relationships
+          .map(
+            (
+            UserSkill relationship,
+            ) =>
+            relationship.skillId.trim(),
+      )
+          .where(
+            (
+            String id,
+            ) =>
+        id.isNotEmpty,
+      )
+          .toSet();
+
+      if (relationshipSkillIds.length !=
+          relationships.length) {
+        throw const MySkillsRepositoryException(
+          'Saved skill relationships contain invalid or duplicate skill references.',
+        );
+      }
+
+      final String placeholders =
+      List<String>.filled(
+        relationshipSkillIds.length,
+        '?',
+      ).join(',');
+
+      final List<Map<String, Object?>> skillRows =
+      await db.rawQuery(
+        '''
+        SELECT
+          id,
+          owner_user_id
+        FROM skills
+        WHERE id IN ($placeholders)
+        ''',
+        relationshipSkillIds
+            .cast<Object?>()
+            .toList(
+          growable: false,
+        ),
+      );
+
+      final Map<String, String?> ownersBySkillId =
+      <String, String?>{};
+
+      for (final Map<String, Object?> row
+      in skillRows) {
+        final String skillId =
+        _requireRowString(
+          row,
+          'id',
+          'Skill ID',
+        );
+
+        if (ownersBySkillId.containsKey(
+          skillId,
+        )) {
+          throw const MySkillsRepositoryException(
+            'Stored skill data contains duplicate IDs.',
+          );
+        }
+
+        ownersBySkillId[skillId] =
+            _readOptionalString(
+              row,
+              'owner_user_id',
+              'Skill owner',
+            );
+      }
+
+      if (ownersBySkillId.length !=
+          relationshipSkillIds.length) {
+        throw const MySkillsRepositoryException(
+          'One or more saved skills could not be found.',
+        );
+      }
 
       final List<ManagedSkill> results =
       <ManagedSkill>[];
@@ -90,37 +185,20 @@ class MySkillsRepository {
           );
         }
 
-        final List<Map<String, Object?>>
-        skillRows = await db.query(
-          'skills',
-          columns: <String>[
-            'owner_user_id',
-          ],
-          where: 'id = ?',
-          whereArgs: <Object?>[
-            skill.id,
-          ],
-          limit: 1,
-        );
-
-        if (skillRows.isEmpty) {
+        if (!ownersBySkillId.containsKey(
+          skill.id,
+        )) {
           throw const MySkillsRepositoryException(
-            'Skill details could not be found.',
+            'Skill ownership details could not be found.',
           );
         }
-
-        final String? ownerUserId =
-        _readOptionalString(
-          skillRows.first,
-          'owner_user_id',
-          'Skill owner',
-        );
 
         results.add(
           ManagedSkill(
             skill: skill,
             userSkill: relationship,
-            ownerUserId: ownerUserId,
+            ownerUserId:
+            ownersBySkillId[skill.id],
           ),
         );
       }
@@ -138,7 +216,9 @@ class MySkillsRepository {
             ),
       );
 
-      return results;
+      return List<ManagedSkill>.unmodifiable(
+        results,
+      );
     } on MySkillsRepositoryException {
       rethrow;
     } on ExploreRepositoryException catch (_) {
@@ -169,9 +249,8 @@ class MySkillsRepository {
     required String availability,
   }) async {
     final String cleanUserId =
-    _requireText(
+    _requireCurrentLocalUser(
       userId,
-      'User ID',
     );
 
     final String cleanTitle =
@@ -217,11 +296,11 @@ class MySkillsRepository {
             Transaction txn,
             ) async {
           // ----------------------------------------------------
-          // CURRENT USER MUST EXIST
+          // CURRENT LOCAL USER MUST EXIST
           // ----------------------------------------------------
 
-          final List<Map<String, Object?>>
-          userRows = await txn.query(
+          final List<Map<String, Object?>> userRows =
+          await txn.query(
             'users',
             columns: <String>[
               'id',
@@ -233,14 +312,14 @@ class MySkillsRepository {
             limit: 1,
           );
 
-          if (userRows.isEmpty) {
+          if (userRows.length != 1) {
             throw const MySkillsRepositoryException(
               'Current user profile could not be found.',
             );
           }
 
           // ----------------------------------------------------
-          // EXISTING CATALOG SKILL
+          // EXISTING CATALOG / CUSTOM SKILL
           // ----------------------------------------------------
 
           final List<Map<String, Object?>>
@@ -253,12 +332,18 @@ class MySkillsRepository {
             FROM skills
             WHERE lower(trim(title)) =
                   lower(trim(?))
-            LIMIT 1
+            LIMIT 2
             ''',
             <Object?>[
               cleanTitle,
             ],
           );
+
+          if (existingSkills.length > 1) {
+            throw const MySkillsRepositoryException(
+              'Multiple stored skills use the same normalized name.',
+            );
+          }
 
           late final String skillId;
 
@@ -271,7 +356,7 @@ class MySkillsRepository {
                 );
           } else {
             // --------------------------------------------------
-            // CREATE CUSTOM SKILL
+            // CREATE CUSTOM SKILL OWNED BY CURRENT USER
             // --------------------------------------------------
 
             skillId =
@@ -283,16 +368,13 @@ class MySkillsRepository {
             await txn.insert(
               'skills',
               <String, Object?>{
-                'id':
-                skillId,
+                'id': skillId,
                 'owner_user_id':
                 cleanUserId,
-                'title':
-                cleanTitle,
+                'title': cleanTitle,
                 'category':
                 cleanCategory,
-                'level':
-                cleanLevel,
+                'level': cleanLevel,
                 'icon_code_point':
                 _iconForCategory(
                   cleanCategory,
@@ -303,11 +385,12 @@ class MySkillsRepository {
                 'Online / In-person',
                 'language':
                 'Filipino / English',
-                'prerequisite':
-                '',
+                'prerequisite': '',
                 'description':
                 cleanDescription,
               },
+              conflictAlgorithm:
+              ConflictAlgorithm.abort,
             );
 
             if (insertedSkillRowId <= 0) {
@@ -369,6 +452,8 @@ class MySkillsRepository {
               'availability':
               cleanAvailability,
             },
+            conflictAlgorithm:
+            ConflictAlgorithm.abort,
           );
 
           if (insertedRelationshipRowId <= 0) {
@@ -407,9 +492,8 @@ class MySkillsRepository {
     required String availability,
   }) async {
     final String cleanUserId =
-    _requireText(
+    _requireCurrentLocalUser(
       userId,
-      'User ID',
     );
 
     final String cleanUserSkillId =
@@ -494,8 +578,8 @@ class MySkillsRepository {
             'Skill ID',
           );
 
-          final List<Map<String, Object?>>
-          skillRows = await txn.query(
+          final List<Map<String, Object?>> skillRows =
+          await txn.query(
             'skills',
             columns: <String>[
               'id',
@@ -577,9 +661,13 @@ class MySkillsRepository {
                 'description':
                 cleanDescription,
               },
-              where: 'id = ?',
+              where: '''
+                id = ?
+                AND owner_user_id = ?
+              ''',
               whereArgs: <Object?>[
                 skillId,
+                cleanUserId,
               ],
             );
 
@@ -677,9 +765,8 @@ class MySkillsRepository {
     required String userSkillId,
   }) async {
     final String cleanUserId =
-    _requireText(
+    _requireCurrentLocalUser(
       userId,
-      'User ID',
     );
 
     final String cleanUserSkillId =
@@ -730,8 +817,8 @@ class MySkillsRepository {
             'Skill ID',
           );
 
-          final List<Map<String, Object?>>
-          skillRows = await txn.query(
+          final List<Map<String, Object?>> skillRows =
+          await txn.query(
             'skills',
             columns: <String>[
               'owner_user_id',
@@ -779,6 +866,10 @@ class MySkillsRepository {
 
           // ----------------------------------------------------
           // CLEAN UP UNUSED CUSTOM SKILL
+          //
+          // Only the current user's custom metadata is eligible
+          // for cleanup, and only when no relationships anywhere
+          // still reference it.
           // ----------------------------------------------------
 
           if (ownerUserId ==
@@ -843,6 +934,34 @@ class MySkillsRepository {
   }
 
   // ============================================================
+  // CURRENT LOCAL USER BOUNDARY
+  // ============================================================
+
+  String _requireCurrentLocalUser(
+      String userId,
+      ) {
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
+    try {
+      _currentUserService.requireCurrentUser(
+        cleanUserId,
+        message:
+        'You can only modify skills for the active local user.',
+      );
+    } on CurrentUserServiceException catch (_) {
+      throw const MySkillsRepositoryException(
+        'You can only modify skills for the active local user.',
+      );
+    }
+
+    return cleanUserId;
+  }
+
+  // ============================================================
   // REFRESH AFTER WRITE
   // ============================================================
 
@@ -858,9 +977,6 @@ class MySkillsRepository {
 
   // ============================================================
   // ID GENERATION
-  //
-  // Keeps IDs monotonic even if multiple IDs are requested during
-  // the same microsecond.
   // ============================================================
 
   String _generateId(
@@ -954,6 +1070,14 @@ class MySkillsRepository {
       String key,
       String label,
       ) {
+    if (!row.containsKey(
+      key,
+    )) {
+      throw MySkillsRepositoryException(
+        '$label is missing.',
+      );
+    }
+
     final Object? value =
     row[key];
 
@@ -980,6 +1104,14 @@ class MySkillsRepository {
       String key,
       String label,
       ) {
+    if (!row.containsKey(
+      key,
+    )) {
+      throw MySkillsRepositoryException(
+        '$label is missing.',
+      );
+    }
+
     final Object? value =
     row[key];
 
