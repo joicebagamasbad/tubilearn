@@ -42,9 +42,9 @@ class SwapService {
   _pendingHides =
   <String, Future<void>>{};
 
-  final Map<String, Future<void>>
+  final Map<String, Future<SwapRequest>>
   _pendingRestores =
-  <String, Future<void>>{};
+  <String, Future<SwapRequest>>{};
 
   int _lastRequestIdMicros = 0;
 
@@ -54,6 +54,10 @@ class SwapService {
       List<SwapRequest>.unmodifiable(
         _requests,
       );
+
+  // ============================================================
+  // INITIALIZE
+  // ============================================================
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -120,12 +124,18 @@ class SwapService {
         savedRequests,
       );
 
+    _sortRequests();
+
     _syncRequestIdCounter(
       savedRequests,
     );
 
     _initialized = true;
   }
+
+  // ============================================================
+  // LOADED DATA VALIDATION
+  // ============================================================
 
   void _validateLoadedRequests(
       List<SwapRequest> requests,
@@ -339,6 +349,10 @@ class SwapService {
       );
     }
   }
+
+  // ============================================================
+  // CREATE
+  // ============================================================
 
   Future<SwapRequest> createRequest({
     String? requesterUserId,
@@ -610,8 +624,14 @@ class SwapService {
       request,
     );
 
+    _sortRequests();
+
     return request;
   }
+
+  // ============================================================
+  // STATUS ACTIONS
+  // ============================================================
 
   Future<void> acceptRequest({
     required String requestId,
@@ -745,14 +765,23 @@ class SwapService {
   }) async {
     await initialize();
 
-    final SwapRequest request =
-    _requireRequest(
+    final String cleanRequestId =
+    _requireRequestId(
       requestId,
     );
 
     final String actor =
     _requireCurrentActor(
       actorUserId,
+    );
+
+    _throwIfRequestHidingOrRestoring(
+      cleanRequestId,
+    );
+
+    final SwapRequest request =
+    _requireRequest(
+      cleanRequestId,
     );
 
     _requireActiveStableRequest(
@@ -880,9 +909,15 @@ class SwapService {
 
     request.updatedAt =
         updatedAt;
+
+    _sortRequests();
   }
 
-  Future<void> deleteRequest({
+  // ============================================================
+  // REMOVE FROM HISTORY
+  // ============================================================
+
+  Future<void> removeFromHistory({
     required String requestId,
     required String actorUserId,
   }) async {
@@ -898,20 +933,82 @@ class SwapService {
       actorUserId,
     );
 
+    final Future<void>? existingHide =
+    _pendingHides[
+    cleanRequestId
+    ];
+
+    if (existingHide != null) {
+      await existingHide;
+      return;
+    }
+
+    final Future<SwapRequest>?
+    pendingRestore =
+    _pendingRestores[
+    cleanRequestId
+    ];
+
+    if (pendingRestore != null) {
+      try {
+        await pendingRestore;
+      } catch (_) {}
+
+      throw const SwapServiceException(
+        'This swap request is being restored. Please try again.',
+      );
+    }
+
+    await _waitForPendingStatusChange(
+      cleanRequestId,
+    );
+
+    final Future<void> operation =
+    _removeFromHistoryInternal(
+      requestId:
+      cleanRequestId,
+      actorUserId:
+      actor,
+    );
+
+    _pendingHides[
+    cleanRequestId
+    ] = operation;
+
+    try {
+      await operation;
+    } finally {
+      if (identical(
+        _pendingHides[
+        cleanRequestId
+        ],
+        operation,
+      )) {
+        _pendingHides.remove(
+          cleanRequestId,
+        );
+      }
+    }
+  }
+
+  Future<void> _removeFromHistoryInternal({
+    required String requestId,
+    required String actorUserId,
+  }) async {
     final SwapRequest request =
     _requireRequest(
-      cleanRequestId,
+      requestId,
     );
 
     if (request.status.isActive) {
       throw const SwapServiceException(
-        'Active swap requests cannot be hidden. Cancel or finish the request first.',
+        'Active swap requests cannot be removed from history. Cancel or finish the request first.',
       );
     }
 
     if (!request.hasStableIdentity ||
         !request.involvesUser(
-          actor,
+          actorUserId,
         )) {
       throw const SwapServiceException(
         'You are not allowed to remove this swap request from your history.',
@@ -923,22 +1020,39 @@ class SwapService {
         requestId:
         request.id,
         userId:
-        actor,
+        actorUserId,
       );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
-        'Could not hide the swap request. Please try again.',
+        'Could not remove the swap request from your history. Please try again.',
       );
     }
 
     _requests.removeWhere(
           (
-          item,
+          SwapRequest item,
           ) =>
       item.id ==
           request.id,
     );
   }
+
+  // Backward-compatible wrapper for existing callers.
+  Future<void> deleteRequest({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    await removeFromHistory(
+      requestId:
+      requestId,
+      actorUserId:
+      actorUserId,
+    );
+  }
+
+  // ============================================================
+  // RESTORE HISTORY
+  // ============================================================
 
   Future<SwapRequest> restoreRequest({
     required String requestId,
@@ -956,6 +1070,83 @@ class SwapService {
       actorUserId,
     );
 
+    final Future<SwapRequest>?
+    existingRestore =
+    _pendingRestores[
+    cleanRequestId
+    ];
+
+    if (existingRestore != null) {
+      return existingRestore;
+    }
+
+    final Future<void>? pendingHide =
+    _pendingHides[
+    cleanRequestId
+    ];
+
+    if (pendingHide != null) {
+      try {
+        await pendingHide;
+      } catch (_) {
+        rethrow;
+      }
+    }
+
+    await _waitForPendingStatusChange(
+      cleanRequestId,
+    );
+
+    final Future<SwapRequest> operation =
+    _restoreRequestInternal(
+      requestId:
+      cleanRequestId,
+      actorUserId:
+      actor,
+    );
+
+    _pendingRestores[
+    cleanRequestId
+    ] = operation;
+
+    try {
+      return await operation;
+    } finally {
+      if (identical(
+        _pendingRestores[
+        cleanRequestId
+        ],
+        operation,
+      )) {
+        _pendingRestores.remove(
+          cleanRequestId,
+        );
+      }
+    }
+  }
+
+  Future<SwapRequest> _restoreRequestInternal({
+    required String requestId,
+    required String actorUserId,
+  }) async {
+    final SwapRequest? visibleRequest =
+    findById(
+      requestId,
+    );
+
+    if (visibleRequest != null) {
+      if (!visibleRequest
+          .involvesUser(
+        actorUserId,
+      )) {
+        throw const SwapServiceException(
+          'You are not allowed to restore this swap request.',
+        );
+      }
+
+      return visibleRequest;
+    }
+
     late final List<SwapRequest>
     allRequests;
 
@@ -970,15 +1161,19 @@ class SwapService {
       throw const SwapServiceException(
         'Could not load hidden swap history.',
       );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not load hidden swap history.',
+      );
     }
 
     final List<SwapRequest> matches =
     allRequests.where(
           (
-          request,
+          SwapRequest request,
           ) =>
       request.id ==
-          cleanRequestId,
+          requestId,
     ).toList();
 
     if (matches.length != 1) {
@@ -990,30 +1185,61 @@ class SwapService {
     final SwapRequest request =
         matches.single;
 
+    _validateLoadedRequest(
+      request,
+    );
+
+    if (!request.status.isTerminal) {
+      throw const SwapServiceException(
+        'Only finished swap history can be restored.',
+      );
+    }
+
     if (!request.hasStableIdentity ||
         !request.involvesUser(
-          actor,
+          actorUserId,
         )) {
       throw const SwapServiceException(
         'You are not allowed to restore this swap request.',
       );
     }
 
-    await _repository.unhideSwapRequest(
-      requestId:
-      request.id,
-      userId:
-      actor,
+    try {
+      await _repository.unhideSwapRequest(
+        requestId:
+        request.id,
+        userId:
+        actorUserId,
+      );
+    } on SwapRepositoryException catch (_) {
+      throw const SwapServiceException(
+        'Could not restore the swap request. Please try again.',
+      );
+    }
+
+    final bool alreadyVisible =
+    _requests.any(
+          (
+          SwapRequest item,
+          ) =>
+      item.id ==
+          request.id,
     );
 
-    _requests.add(
-      request,
-    );
+    if (!alreadyVisible) {
+      _requests.add(
+        request,
+      );
 
-    _sortRequests();
+      _sortRequests();
+    }
 
     return request;
   }
+
+  // ============================================================
+  // FIND / REQUIRE
+  // ============================================================
 
   SwapRequest? findById(
       String requestId,
@@ -1083,6 +1309,10 @@ class SwapService {
     }
   }
 
+  // ============================================================
+  // CURRENT USER
+  // ============================================================
+
   String _requireCurrentLocalUser() {
     try {
       return _currentUserService
@@ -1118,6 +1348,10 @@ class SwapService {
     return current;
   }
 
+  // ============================================================
+  // CONCURRENCY
+  // ============================================================
+
   void _throwIfRequestHidingOrRestoring(
       String requestId,
       ) {
@@ -1132,6 +1366,35 @@ class SwapService {
       );
     }
   }
+
+  Future<void> _waitForPendingStatusChange(
+      String requestId,
+      ) async {
+    while (true) {
+      final Future<void>? pending =
+      _pendingStatusChanges[
+      requestId
+      ];
+
+      if (pending == null) {
+        return;
+      }
+
+      try {
+        await pending;
+      } on SwapServiceException {
+        rethrow;
+      } catch (_) {
+        throw const SwapServiceException(
+          'The current swap request update did not finish successfully.',
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // IDENTITY VALIDATION
+  // ============================================================
 
   void _validateIdentityGroup({
     required String? requesterUserId,
@@ -1148,7 +1411,7 @@ class SwapService {
           skillToOfferId,
         ].where(
               (
-              value,
+              String? value,
               ) =>
           value != null &&
               value.trim().isNotEmpty,
@@ -1184,6 +1447,10 @@ class SwapService {
       );
     }
   }
+
+  // ============================================================
+  // CREATE VALIDATION
+  // ============================================================
 
   void _validateCreateRequest({
     required String requesterUserId,
@@ -1240,6 +1507,10 @@ class SwapService {
     }
   }
 
+  // ============================================================
+  // DUPLICATE ACTIVE REQUEST PROTECTION
+  // ============================================================
+
   void _preventDuplicateActiveRequest({
     required String requesterUserId,
     required String providerUserId,
@@ -1277,7 +1548,8 @@ class SwapService {
         request.skillToOfferId!,
       );
 
-      if (existing == incoming) {
+      if (existing ==
+          incoming) {
         throw const SwapServiceException(
           'You already have an active swap request with this user for the same skill exchange.',
         );
@@ -1298,6 +1570,10 @@ class SwapService {
       skillToOfferId.trim(),
     ].join('|');
   }
+
+  // ============================================================
+  // REQUEST ID
+  // ============================================================
 
   void _syncRequestIdCounter(
       List<SwapRequest> requests,
@@ -1347,17 +1623,25 @@ class SwapService {
     return candidate.toString();
   }
 
+  // ============================================================
+  // SORT
+  // ============================================================
+
   void _sortRequests() {
     _requests.sort(
           (
-          a,
-          b,
+          SwapRequest a,
+          SwapRequest b,
           ) =>
-          b.createdAt.compareTo(
-            a.createdAt,
+          b.updatedAt.compareTo(
+            a.updatedAt,
           ),
     );
   }
+
+  // ============================================================
+  // TEXT CLEANING
+  // ============================================================
 
   String? _cleanNullableText(
       String? value,

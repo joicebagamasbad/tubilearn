@@ -268,19 +268,16 @@ class _SwapRequestsScreenState
                 const Expanded(
                   child: Column(
                     crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                    CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Manage your swaps',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight:
-                          FontWeight
-                              .w800,
+                          FontWeight.w800,
                           color:
-                          AppTheme
-                              .darkText,
+                          AppTheme.darkText,
                         ),
                       ),
                       SizedBox(
@@ -292,8 +289,7 @@ class _SwapRequestsScreenState
                           fontSize: 12.5,
                           height: 1.4,
                           color:
-                          AppTheme
-                              .mutedText,
+                          AppTheme.mutedText,
                         ),
                       ),
                     ],
@@ -365,8 +361,7 @@ class _SwapRequestsScreenState
                   color:
                   selected
                       ? Colors.white
-                      : AppTheme
-                      .darkText,
+                      : AppTheme.darkText,
                 ),
                 selectedColor:
                 AppTheme.primary,
@@ -383,8 +378,7 @@ class _SwapRequestsScreenState
                 shape:
                 RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius
-                      .circular(
+                  BorderRadius.circular(
                     20,
                   ),
                 ),
@@ -405,8 +399,7 @@ class _SwapRequestsScreenState
               ? _buildEmptyState()
               : ListView.separated(
             padding:
-            const EdgeInsets
-                .fromLTRB(
+            const EdgeInsets.fromLTRB(
               20,
               4,
               20,
@@ -421,8 +414,7 @@ class _SwapRequestsScreenState
             ),
             itemBuilder:
                 (
-                BuildContext
-                context,
+                BuildContext context,
                 int index,
                 ) {
               return _buildRequestCard(
@@ -487,8 +479,7 @@ class _SwapRequestsScreenState
           MainAxisSize.min,
           children: [
             const Icon(
-              Icons
-                  .error_outline_rounded,
+              Icons.error_outline_rounded,
               size: 42,
               color:
               AppTheme.mutedText,
@@ -552,13 +543,11 @@ class _SwapRequestsScreenState
 
     final bool isIncoming =
         direction ==
-            SwapRequestDirection
-                .incoming;
+            SwapRequestDirection.incoming;
 
     final bool isOutgoing =
         direction ==
-            SwapRequestDirection
-                .outgoing;
+            SwapRequestDirection.outgoing;
 
     final bool isProcessing =
     _processingRequestIds.contains(
@@ -576,31 +565,26 @@ class _SwapRequestsScreenState
             .trim()
             .isNotEmpty) {
       requesterUser =
-          _exploreRepository
-              .findUserById(
+          _exploreRepository.findUserById(
             requesterUserId,
           );
     }
 
     final String displayInitials =
     isIncoming
-        ? requesterUser
-        ?.initials ??
+        ? requesterUser?.initials ??
         '?'
-        : request
-        .providerInitials;
+        : request.providerInitials;
 
     final String displayName =
     isIncoming
-        ? requesterUser
-        ?.name ??
+        ? requesterUser?.name ??
         'Incoming skill request'
         : request.providerName;
 
     final String displayCity =
     isIncoming
-        ? requesterUser
-        ?.city ??
+        ? requesterUser?.city ??
         'Sender profile unavailable'
         : request.providerCity;
 
@@ -656,8 +640,7 @@ class _SwapRequestsScreenState
                     CircularProgressIndicator(
                       strokeWidth: 2,
                       color:
-                      AppTheme
-                          .primary,
+                      AppTheme.primary,
                     ),
                   ),
                 ),
@@ -686,11 +669,9 @@ class _SwapRequestsScreenState
                   const TextStyle(
                     fontSize: 14,
                     fontWeight:
-                    FontWeight
-                        .w800,
+                    FontWeight.w800,
                     color:
-                    AppTheme
-                        .primary,
+                    AppTheme.primary,
                   ),
                 ),
               ),
@@ -700,8 +681,7 @@ class _SwapRequestsScreenState
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+                  CrossAxisAlignment.start,
                   children: [
                     Text(
                       displayName,
@@ -709,11 +689,9 @@ class _SwapRequestsScreenState
                       const TextStyle(
                         fontSize: 15,
                         fontWeight:
-                        FontWeight
-                            .w800,
+                        FontWeight.w800,
                         color:
-                        AppTheme
-                            .darkText,
+                        AppTheme.darkText,
                       ),
                     ),
                     const SizedBox(
@@ -725,8 +703,7 @@ class _SwapRequestsScreenState
                       const TextStyle(
                         fontSize: 12,
                         color:
-                        AppTheme
-                            .mutedText,
+                        AppTheme.mutedText,
                       ),
                     ),
                   ],
@@ -751,8 +728,7 @@ class _SwapRequestsScreenState
               color:
               AppTheme.background,
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 14,
               ),
             ),
@@ -760,26 +736,22 @@ class _SwapRequestsScreenState
               children: [
                 _buildSkillRow(
                   icon:
-                  Icons
-                      .school_outlined,
+                  Icons.school_outlined,
                   label:
                   'Learn',
                   value:
-                  request
-                      .skillToLearn,
+                  request.skillToLearn,
                 ),
                 const SizedBox(
                   height: 9,
                 ),
                 _buildSkillRow(
                   icon:
-                  Icons
-                      .handshake_outlined,
+                  Icons.handshake_outlined,
                   label:
                   'Offer',
                   value:
-                  request
-                      .skillToOffer,
+                  request.skillToOffer,
                 ),
               ],
             ),
@@ -790,8 +762,7 @@ class _SwapRequestsScreenState
           ),
 
           _buildDetailRow(
-            Icons
-                .calendar_today_outlined,
+            Icons.calendar_today_outlined,
             _formatDateTime(
               request.proposedAt,
             ),
@@ -804,10 +775,8 @@ class _SwapRequestsScreenState
           _buildDetailRow(
             request.mode ==
                 'Online'
-                ? Icons
-                .videocam_outlined
-                : Icons
-                .location_on_outlined,
+                ? Icons.videocam_outlined
+                : Icons.location_on_outlined,
             request.mode,
           ),
 
@@ -821,8 +790,7 @@ class _SwapRequestsScreenState
             ),
             _buildDetailRow(
               Icons.info_outline,
-              request
-                  .meetingDetails!,
+              request.meetingDetails!,
             ),
           ],
 
@@ -848,8 +816,7 @@ class _SwapRequestsScreenState
                   alpha: 0.05,
                 ),
                 borderRadius:
-                BorderRadius
-                    .circular(
+                BorderRadius.circular(
                   12,
                 ),
               ),
@@ -860,8 +827,7 @@ class _SwapRequestsScreenState
                   fontSize: 12.5,
                   height: 1.4,
                   color:
-                  AppTheme
-                      .darkText,
+                  AppTheme.darkText,
                 ),
               ),
             ),
@@ -928,12 +894,12 @@ class _SwapRequestsScreenState
         request.canComplete(
           _currentUserId,
         ) ||
-        _canDelete(
+        _canRemoveFromHistory(
           request,
         );
   }
 
-  bool _canDelete(
+  bool _canRemoveFromHistory(
       SwapRequest request,
       ) {
     return request.hasStableIdentity &&
@@ -974,8 +940,7 @@ class _SwapRequestsScreenState
                 );
               },
               style:
-              OutlinedButton
-                  .styleFrom(
+              OutlinedButton.styleFrom(
                 minimumSize:
                 const Size(
                   0,
@@ -984,14 +949,12 @@ class _SwapRequestsScreenState
                 side:
                 const BorderSide(
                   color:
-                  Colors
-                      .redAccent,
+                  Colors.redAccent,
                 ),
                 shape:
                 RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius
-                      .circular(
+                  BorderRadius.circular(
                     12,
                   ),
                 ),
@@ -1003,11 +966,9 @@ class _SwapRequestsScreenState
                 TextStyle(
                   fontSize: 12,
                   fontWeight:
-                  FontWeight
-                      .w800,
+                  FontWeight.w800,
                   color:
-                  Colors
-                      .redAccent,
+                  Colors.redAccent,
                 ),
               ),
             ),
@@ -1027,8 +988,7 @@ class _SwapRequestsScreenState
                 );
               },
               style:
-              ElevatedButton
-                  .styleFrom(
+              ElevatedButton.styleFrom(
                 minimumSize:
                 const Size(
                   0,
@@ -1037,8 +997,7 @@ class _SwapRequestsScreenState
                 shape:
                 RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius
-                      .circular(
+                  BorderRadius.circular(
                     12,
                   ),
                 ),
@@ -1050,8 +1009,7 @@ class _SwapRequestsScreenState
                 TextStyle(
                   fontSize: 12,
                   fontWeight:
-                  FontWeight
-                      .w800,
+                  FontWeight.w800,
                 ),
               ),
             ),
@@ -1079,8 +1037,7 @@ class _SwapRequestsScreenState
                 );
               },
               style:
-              ElevatedButton
-                  .styleFrom(
+              ElevatedButton.styleFrom(
                 minimumSize:
                 const Size(
                   0,
@@ -1089,8 +1046,7 @@ class _SwapRequestsScreenState
                 shape:
                 RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius
-                      .circular(
+                  BorderRadius.circular(
                     12,
                   ),
                 ),
@@ -1102,8 +1058,7 @@ class _SwapRequestsScreenState
                 TextStyle(
                   fontSize: 12,
                   fontWeight:
-                  FontWeight
-                      .w800,
+                  FontWeight.w800,
                 ),
               ),
             ),
@@ -1144,8 +1099,7 @@ class _SwapRequestsScreenState
                 );
               },
               style:
-              ElevatedButton
-                  .styleFrom(
+              ElevatedButton.styleFrom(
                 minimumSize:
                 const Size(
                   0,
@@ -1154,8 +1108,7 @@ class _SwapRequestsScreenState
                 shape:
                 RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius
-                      .circular(
+                  BorderRadius.circular(
                     12,
                   ),
                 ),
@@ -1167,8 +1120,7 @@ class _SwapRequestsScreenState
                 TextStyle(
                   fontSize: 12,
                   fontWeight:
-                  FontWeight
-                      .w800,
+                  FontWeight.w800,
                 ),
               ),
             ),
@@ -1201,7 +1153,7 @@ class _SwapRequestsScreenState
       );
     }
 
-    if (_canDelete(
+    if (_canRemoveFromHistory(
       request,
     )) {
       return SizedBox(
@@ -1213,19 +1165,18 @@ class _SwapRequestsScreenState
           blocked
               ? null
               : () {
-            _confirmDelete(
+            _confirmRemoveFromHistory(
               request,
             );
           },
           icon:
           const Icon(
-            Icons
-                .delete_outline_rounded,
+            Icons.archive_outlined,
             size: 18,
           ),
           label:
           const Text(
-            'DELETE FROM HISTORY',
+            'REMOVE FROM HISTORY',
             style:
             TextStyle(
               fontSize: 12,
@@ -1234,10 +1185,9 @@ class _SwapRequestsScreenState
             ),
           ),
           style:
-          OutlinedButton
-              .styleFrom(
+          OutlinedButton.styleFrom(
             foregroundColor:
-            Colors.redAccent,
+            AppTheme.darkText,
             minimumSize:
             const Size(
               0,
@@ -1246,13 +1196,12 @@ class _SwapRequestsScreenState
             side:
             const BorderSide(
               color:
-              Colors.redAccent,
+              AppTheme.border,
             ),
             shape:
             RoundedRectangleBorder(
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 12,
               ),
             ),
@@ -1281,8 +1230,7 @@ class _SwapRequestsScreenState
           );
         },
         style:
-        OutlinedButton
-            .styleFrom(
+        OutlinedButton.styleFrom(
           minimumSize:
           const Size(
             0,
@@ -1291,8 +1239,7 @@ class _SwapRequestsScreenState
           shape:
           RoundedRectangleBorder(
             borderRadius:
-            BorderRadius
-                .circular(
+            BorderRadius.circular(
               12,
             ),
           ),
@@ -1320,13 +1267,11 @@ class _SwapRequestsScreenState
       ) {
     final bool incoming =
         direction ==
-            SwapRequestDirection
-                .incoming;
+            SwapRequestDirection.incoming;
 
     final bool outgoing =
         direction ==
-            SwapRequestDirection
-                .outgoing;
+            SwapRequestDirection.outgoing;
 
     final String text =
     incoming
@@ -1337,13 +1282,10 @@ class _SwapRequestsScreenState
 
     final IconData icon =
     incoming
-        ? Icons
-        .call_received_rounded
+        ? Icons.call_received_rounded
         : outgoing
-        ? Icons
-        .call_made_rounded
-        : Icons
-        .help_outline_rounded;
+        ? Icons.call_made_rounded
+        : Icons.help_outline_rounded;
 
     return Container(
       padding:
@@ -1354,8 +1296,7 @@ class _SwapRequestsScreenState
       decoration:
       BoxDecoration(
         color:
-        AppTheme.primary
-            .withValues(
+        AppTheme.primary.withValues(
           alpha: 0.08,
         ),
         borderRadius:
@@ -1486,8 +1427,7 @@ class _SwapRequestsScreenState
             const TextStyle(
               fontSize: 11.5,
               color:
-              AppTheme
-                  .mutedText,
+              AppTheme.mutedText,
             ),
           ),
         ),
@@ -1681,8 +1621,7 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .acceptRequest(
+          _swapService.acceptRequest(
             requestId:
             request.id,
             actorUserId:
@@ -1750,8 +1689,7 @@ class _SwapRequestsScreenState
                 style:
                 TextStyle(
                   color:
-                  Colors
-                      .redAccent,
+                  Colors.redAccent,
                 ),
               ),
             ),
@@ -1770,8 +1708,7 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .declineRequest(
+          _swapService.declineRequest(
             requestId:
             request.id,
             actorUserId:
@@ -1839,8 +1776,7 @@ class _SwapRequestsScreenState
                 style:
                 TextStyle(
                   color:
-                  Colors
-                      .redAccent,
+                  Colors.redAccent,
                 ),
               ),
             ),
@@ -1859,8 +1795,7 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .cancelRequest(
+          _swapService.cancelRequest(
             requestId:
             request.id,
             actorUserId:
@@ -1942,8 +1877,7 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .scheduleRequest(
+          _swapService.scheduleRequest(
             requestId:
             request.id,
             actorUserId:
@@ -2025,8 +1959,7 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .completeRequest(
+          _swapService.completeRequest(
             requestId:
             request.id,
             actorUserId:
@@ -2038,10 +1971,10 @@ class _SwapRequestsScreenState
   }
 
   // ============================================================
-  // DELETE
+  // REMOVE FROM HISTORY
   // ============================================================
 
-  Future<void> _confirmDelete(
+  Future<void> _confirmRemoveFromHistory(
       SwapRequest request,
       ) async {
     if (_isProcessing(
@@ -2060,11 +1993,12 @@ class _SwapRequestsScreenState
         return AlertDialog(
           title:
           const Text(
-            'Delete from history?',
+            'Remove from history?',
           ),
           content:
           const Text(
-            'This permanently removes this finished swap request from local history. This cannot be undone.',
+            'This finished swap will be hidden from your history. '
+                'Its underlying record will remain preserved.',
           ),
           actions: [
             TextButton(
@@ -2080,7 +2014,7 @@ class _SwapRequestsScreenState
                 'Cancel',
               ),
             ),
-            TextButton(
+            TextButton.icon(
               onPressed:
                   () {
                 Navigator.pop(
@@ -2088,18 +2022,24 @@ class _SwapRequestsScreenState
                   true,
                 );
               },
-              child:
+              icon:
+              const Icon(
+                Icons.archive_outlined,
+                size: 18,
+              ),
+              label:
               const Text(
-                'Delete',
+                'Remove',
                 style:
                 TextStyle(
-                  color:
-                  Colors
-                      .redAccent,
                   fontWeight:
-                  FontWeight
-                      .w700,
+                  FontWeight.w700,
                 ),
+              ),
+              style:
+              TextButton.styleFrom(
+                foregroundColor:
+                AppTheme.primary,
               ),
             ),
           ],
@@ -2117,15 +2057,14 @@ class _SwapRequestsScreenState
       request.id,
       action:
           () =>
-          _swapService
-              .deleteRequest(
+          _swapService.deleteRequest(
             requestId:
             request.id,
             actorUserId:
             _currentUserId,
           ),
       successMessage:
-      'Swap request deleted.',
+      'Swap removed from your history.',
     );
   }
 
@@ -2220,8 +2159,7 @@ class _SwapRequestsScreenState
       context,
     );
 
-    messenger
-        .hideCurrentSnackBar();
+    messenger.hideCurrentSnackBar();
 
     messenger.showSnackBar(
       SnackBar(
