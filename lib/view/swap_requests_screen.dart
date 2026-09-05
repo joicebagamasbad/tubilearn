@@ -54,6 +54,35 @@ class _SwapRequestsScreenState
   bool get _hasPendingAction =>
       _processingRequestIds.isNotEmpty;
 
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _surfaceColor =>
+      Theme.of(context)
+          .colorScheme
+          .surface;
+
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
+  Color get _textColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
   // ============================================================
   // INITIALIZE
   // ============================================================
@@ -181,12 +210,14 @@ class _SwapRequestsScreenState
       canPop: !_hasPendingAction,
       child: Scaffold(
         backgroundColor:
-        AppTheme.background,
+        Theme.of(context)
+            .scaffoldBackgroundColor,
         appBar: AppBar(
           backgroundColor:
-          AppTheme.background,
+          Theme.of(context)
+              .scaffoldBackgroundColor,
           surfaceTintColor:
-          AppTheme.background,
+          Colors.transparent,
           elevation: 0,
           leading: IconButton(
             onPressed:
@@ -198,22 +229,22 @@ class _SwapRequestsScreenState
               );
             },
             icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons
+                  .arrow_back_ios_new_rounded,
               size: 20,
               color:
               _hasPendingAction
-                  ? AppTheme.mutedText
-                  : AppTheme.darkText,
+                  ? _mutedColor
+                  : _textColor,
             ),
           ),
-          title: const Text(
+          title: Text(
             'My Swap Requests',
             style: TextStyle(
               fontSize: 19,
               fontWeight:
               FontWeight.w800,
-              color:
-              AppTheme.darkText,
+              color: _textColor,
             ),
           ),
           centerTitle: false,
@@ -254,33 +285,35 @@ class _SwapRequestsScreenState
               16,
             ),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _surfaceColor,
               borderRadius:
               BorderRadius.circular(
                 20,
               ),
               border: Border.all(
-                color: AppTheme.border,
+                color: _borderColor,
               ),
             ),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    CrossAxisAlignment
+                        .start,
                     children: [
                       Text(
                         'Manage your swaps',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight:
-                          FontWeight.w800,
+                          FontWeight
+                              .w800,
                           color:
-                          AppTheme.darkText,
+                          _textColor,
                         ),
                       ),
-                      SizedBox(
+                      const SizedBox(
                         height: 5,
                       ),
                       Text(
@@ -289,7 +322,7 @@ class _SwapRequestsScreenState
                           fontSize: 12.5,
                           height: 1.4,
                           color:
-                          AppTheme.mutedText,
+                          _mutedColor,
                         ),
                       ),
                     ],
@@ -338,10 +371,10 @@ class _SwapRequestsScreenState
                       _selectedFilter;
 
               return ChoiceChip(
-                label:
-                Text(filter),
-                selected:
-                selected,
+                label: Text(
+                  filter,
+                ),
+                selected: selected,
                 onSelected:
                 _hasPendingAction
                     ? null
@@ -353,27 +386,26 @@ class _SwapRequestsScreenState
                     },
                   );
                 },
-                labelStyle:
-                TextStyle(
+                labelStyle: TextStyle(
                   fontSize: 12,
                   fontWeight:
                   FontWeight.w700,
                   color:
                   selected
                       ? Colors.white
-                      : AppTheme.darkText,
+                      : _textColor,
                 ),
                 selectedColor:
                 AppTheme.primary,
                 backgroundColor:
-                Colors.white,
+                _surfaceColor,
                 disabledColor:
-                Colors.white,
+                _surfaceVariantColor,
                 side: BorderSide(
                   color:
                   selected
                       ? AppTheme.primary
-                      : AppTheme.border,
+                      : _borderColor,
                 ),
                 shape:
                 RoundedRectangleBorder(
@@ -382,8 +414,7 @@ class _SwapRequestsScreenState
                     20,
                   ),
                 ),
-                showCheckmark:
-                false,
+                showCheckmark: false,
               );
             },
           ),
@@ -399,7 +430,8 @@ class _SwapRequestsScreenState
               ? _buildEmptyState()
               : ListView.separated(
             padding:
-            const EdgeInsets.fromLTRB(
+            const EdgeInsets
+                .fromLTRB(
               20,
               4,
               20,
@@ -432,12 +464,12 @@ class _SwapRequestsScreenState
   // ============================================================
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize:
         MainAxisSize.min,
         children: [
-          SizedBox(
+          const SizedBox(
             width: 28,
             height: 28,
             child:
@@ -447,7 +479,7 @@ class _SwapRequestsScreenState
               AppTheme.primary,
             ),
           ),
-          SizedBox(
+          const SizedBox(
             height: 14,
           ),
           Text(
@@ -455,7 +487,7 @@ class _SwapRequestsScreenState
             style: TextStyle(
               fontSize: 12.5,
               color:
-              AppTheme.mutedText,
+              _mutedColor,
             ),
           ),
         ],
@@ -478,23 +510,22 @@ class _SwapRequestsScreenState
           mainAxisSize:
           MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline_rounded,
+            Icon(
+              Icons
+                  .error_outline_rounded,
               size: 42,
-              color:
-              AppTheme.mutedText,
+              color: _mutedColor,
             ),
             const SizedBox(
               height: 14,
             ),
-            const Text(
+            Text(
               'Could not load requests',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
-                color:
-                AppTheme.darkText,
+                color: _textColor,
               ),
             ),
             const SizedBox(
@@ -505,11 +536,11 @@ class _SwapRequestsScreenState
                   'Something went wrong.',
               textAlign:
               TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
                 color:
-                AppTheme.mutedText,
+                _mutedColor,
               ),
             ),
             const SizedBox(
@@ -594,19 +625,22 @@ class _SwapRequestsScreenState
         16,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
         border: Border.all(
-          color: AppTheme.border,
+          color: _borderColor,
         ),
         boxShadow: [
           BoxShadow(
             color:
             Colors.black.withValues(
-              alpha: 0.025,
+              alpha:
+              _isDarkMode
+                  ? 0.10
+                  : 0.025,
             ),
             blurRadius: 14,
             offset:
@@ -661,7 +695,10 @@ class _SwapRequestsScreenState
                 backgroundColor:
                 AppTheme.primary
                     .withValues(
-                  alpha: 0.10,
+                  alpha:
+                  _isDarkMode
+                      ? 0.18
+                      : 0.10,
                 ),
                 child: Text(
                   displayInitials,
@@ -681,17 +718,18 @@ class _SwapRequestsScreenState
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     Text(
                       displayName,
-                      style:
-                      const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight:
-                        FontWeight.w800,
+                        FontWeight
+                            .w800,
                         color:
-                        AppTheme.darkText,
+                        _textColor,
                       ),
                     ),
                     const SizedBox(
@@ -699,11 +737,10 @@ class _SwapRequestsScreenState
                     ),
                     Text(
                       displayCity,
-                      style:
-                      const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color:
-                        AppTheme.mutedText,
+                        _mutedColor,
                       ),
                     ),
                   ],
@@ -726,10 +763,14 @@ class _SwapRequestsScreenState
             decoration:
             BoxDecoration(
               color:
-              AppTheme.background,
+              _surfaceVariantColor,
               borderRadius:
               BorderRadius.circular(
                 14,
+              ),
+              border: Border.all(
+                color:
+                _borderColor,
               ),
             ),
             child: Column(
@@ -762,7 +803,8 @@ class _SwapRequestsScreenState
           ),
 
           _buildDetailRow(
-            Icons.calendar_today_outlined,
+            Icons
+                .calendar_today_outlined,
             _formatDateTime(
               request.proposedAt,
             ),
@@ -775,8 +817,10 @@ class _SwapRequestsScreenState
           _buildDetailRow(
             request.mode ==
                 'Online'
-                ? Icons.videocam_outlined
-                : Icons.location_on_outlined,
+                ? Icons
+                .videocam_outlined
+                : Icons
+                .location_on_outlined,
             request.mode,
           ),
 
@@ -813,7 +857,10 @@ class _SwapRequestsScreenState
                 color:
                 AppTheme.primary
                     .withValues(
-                  alpha: 0.05,
+                  alpha:
+                  _isDarkMode
+                      ? 0.12
+                      : 0.05,
                 ),
                 borderRadius:
                 BorderRadius.circular(
@@ -822,12 +869,11 @@ class _SwapRequestsScreenState
               ),
               child: Text(
                 request.note!,
-                style:
-                const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   height: 1.4,
                   color:
-                  AppTheme.darkText,
+                  _textColor,
                 ),
               ),
             ),
@@ -839,13 +885,13 @@ class _SwapRequestsScreenState
             const SizedBox(
               height: 10,
             ),
-            const Text(
+            Text(
               'Sender profile could not be resolved from the local user database.',
               style: TextStyle(
                 fontSize: 10.5,
                 height: 1.4,
                 color:
-                AppTheme.mutedText,
+                _mutedColor,
               ),
             ),
           ],
@@ -929,8 +975,7 @@ class _SwapRequestsScreenState
       return Row(
         children: [
           Expanded(
-            child:
-            OutlinedButton(
+            child: OutlinedButton(
               onPressed:
               blocked
                   ? null
@@ -1171,7 +1216,8 @@ class _SwapRequestsScreenState
           },
           icon:
           const Icon(
-            Icons.archive_outlined,
+            Icons
+                .archive_outlined,
             size: 18,
           ),
           label:
@@ -1187,16 +1233,16 @@ class _SwapRequestsScreenState
           style:
           OutlinedButton.styleFrom(
             foregroundColor:
-            AppTheme.darkText,
+            _textColor,
             minimumSize:
             const Size(
               0,
               46,
             ),
             side:
-            const BorderSide(
+            BorderSide(
               color:
-              AppTheme.border,
+              _borderColor,
             ),
             shape:
             RoundedRectangleBorder(
@@ -1231,10 +1277,16 @@ class _SwapRequestsScreenState
         },
         style:
         OutlinedButton.styleFrom(
+          foregroundColor:
+          _textColor,
           minimumSize:
           const Size(
             0,
             46,
+          ),
+          side: BorderSide(
+            color:
+            _borderColor,
           ),
           shape:
           RoundedRectangleBorder(
@@ -1282,10 +1334,13 @@ class _SwapRequestsScreenState
 
     final IconData icon =
     incoming
-        ? Icons.call_received_rounded
+        ? Icons
+        .call_received_rounded
         : outgoing
-        ? Icons.call_made_rounded
-        : Icons.help_outline_rounded;
+        ? Icons
+        .call_made_rounded
+        : Icons
+        .help_outline_rounded;
 
     return Container(
       padding:
@@ -1296,8 +1351,12 @@ class _SwapRequestsScreenState
       decoration:
       BoxDecoration(
         color:
-        AppTheme.primary.withValues(
-          alpha: 0.08,
+        AppTheme.primary
+            .withValues(
+          alpha:
+          _isDarkMode
+              ? 0.16
+              : 0.08,
         ),
         borderRadius:
         BorderRadius.circular(
@@ -1316,6 +1375,9 @@ class _SwapRequestsScreenState
           ),
           const SizedBox(
             width: 5,
+          ),
+          const Text(
+            '',
           ),
           Text(
             text,
@@ -1345,11 +1407,19 @@ class _SwapRequestsScreenState
     switch (status) {
       case SwapRequestStatus.pending:
         color =
-            Colors.orange;
+        _isDarkMode
+            ? const Color(
+          0xFFFFB74D,
+        )
+            : Colors.orange;
 
       case SwapRequestStatus.accepted:
         color =
-            Colors.green;
+        _isDarkMode
+            ? const Color(
+          0xFF81C784,
+        )
+            : Colors.green;
 
       case SwapRequestStatus.declined:
         color =
@@ -1357,15 +1427,23 @@ class _SwapRequestsScreenState
 
       case SwapRequestStatus.scheduled:
         color =
-            Colors.blue;
+        _isDarkMode
+            ? const Color(
+          0xFF64B5F6,
+        )
+            : Colors.blue;
 
       case SwapRequestStatus.completed:
         color =
-            Colors.teal;
+        _isDarkMode
+            ? const Color(
+          0xFF80CBC4,
+        )
+            : Colors.teal;
 
       case SwapRequestStatus.cancelled:
         color =
-            AppTheme.mutedText;
+            _mutedColor;
     }
 
     return Container(
@@ -1378,7 +1456,10 @@ class _SwapRequestsScreenState
       BoxDecoration(
         color:
         color.withValues(
-          alpha: 0.10,
+          alpha:
+          _isDarkMode
+              ? 0.16
+              : 0.10,
         ),
         borderRadius:
         BorderRadius.circular(
@@ -1392,8 +1473,7 @@ class _SwapRequestsScreenState
           fontSize: 10.5,
           fontWeight:
           FontWeight.w800,
-          color:
-          color,
+          color: color,
         ),
       ),
     );
@@ -1424,10 +1504,10 @@ class _SwapRequestsScreenState
           child: Text(
             '$label:',
             style:
-            const TextStyle(
+            TextStyle(
               fontSize: 11.5,
               color:
-              AppTheme.mutedText,
+              _mutedColor,
             ),
           ),
         ),
@@ -1435,12 +1515,12 @@ class _SwapRequestsScreenState
           child: Text(
             value,
             style:
-            const TextStyle(
+            TextStyle(
               fontSize: 12.5,
               fontWeight:
               FontWeight.w700,
               color:
-              AppTheme.darkText,
+              _textColor,
             ),
           ),
         ),
@@ -1464,7 +1544,7 @@ class _SwapRequestsScreenState
           icon,
           size: 16,
           color:
-          AppTheme.mutedText,
+          _mutedColor,
         ),
         const SizedBox(
           width: 8,
@@ -1473,11 +1553,11 @@ class _SwapRequestsScreenState
           child: Text(
             text,
             style:
-            const TextStyle(
+            TextStyle(
               fontSize: 12,
               height: 1.35,
               color:
-              AppTheme.mutedText,
+              _mutedColor,
             ),
           ),
         ),
@@ -1519,12 +1599,12 @@ class _SwapRequestsScreenState
               textAlign:
               TextAlign.center,
               style:
-              const TextStyle(
+              TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
                 color:
-                AppTheme.darkText,
+                _textColor,
               ),
             ),
             const SizedBox(
@@ -1537,11 +1617,11 @@ class _SwapRequestsScreenState
               textAlign:
               TextAlign.center,
               style:
-              const TextStyle(
+              TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
                 color:
-                AppTheme.mutedText,
+                _mutedColor,
               ),
             ),
           ],
@@ -1571,13 +1651,23 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Accept request?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'You are agreeing to continue with this skill swap request.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1588,9 +1678,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Cancel',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1619,8 +1712,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.acceptRequest(
             requestId:
             request.id,
@@ -1653,13 +1745,23 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Decline request?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'This request will be marked as declined.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1670,9 +1772,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Back',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             TextButton(
@@ -1706,8 +1811,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.declineRequest(
             requestId:
             request.id,
@@ -1740,13 +1844,23 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Cancel request?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'This outgoing request will be cancelled.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1757,9 +1871,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Back',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             TextButton(
@@ -1793,8 +1910,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.cancelRequest(
             requestId:
             request.id,
@@ -1827,13 +1943,23 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Mark as scheduled?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'This confirms that the accepted skill swap is scheduled.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1844,9 +1970,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Back',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1875,8 +2004,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.scheduleRequest(
             requestId:
             request.id,
@@ -1909,13 +2037,23 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Complete this swap?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'Only mark the swap completed after the skill exchange has taken place.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1926,9 +2064,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Back',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1957,8 +2098,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.completeRequest(
             requestId:
             request.id,
@@ -1991,14 +2131,24 @@ class _SwapRequestsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Remove from history?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'This finished swap will be hidden from your history. '
                 'Its underlying record will remain preserved.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -2009,9 +2159,12 @@ class _SwapRequestsScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'Cancel',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             TextButton.icon(
@@ -2024,7 +2177,8 @@ class _SwapRequestsScreenState
               },
               icon:
               const Icon(
-                Icons.archive_outlined,
+                Icons
+                    .archive_outlined,
                 size: 18,
               ),
               label:
@@ -2055,8 +2209,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.deleteRequest(
             requestId:
             request.id,
@@ -2164,7 +2317,9 @@ class _SwapRequestsScreenState
     messenger.showSnackBar(
       SnackBar(
         content:
-        Text(message),
+        Text(
+          message,
+        ),
       ),
     );
   }

@@ -3,20 +3,18 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+  });
 
   @override
   State<DashboardScreen> createState() =>
       _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState
+    extends State<DashboardScreen> {
   int _selectedNav = 0;
-
-  static const Color primary = AppTheme.primary;
-  static const Color darkText = AppTheme.darkText;
-  static const Color mutedText = AppTheme.mutedText;
-  static const Color background = AppTheme.background;
 
   final List<Map<String, dynamic>> skills = [
     {
@@ -41,10 +39,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
+  Color get _surfaceColor =>
+      Theme.of(context).colorScheme.surface;
+
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
+  Color get _textColor =>
+      Theme.of(context).colorScheme.onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  Color get _softPrimaryColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFE4F0EF,
+      );
+
+  Color get _skillCardColor =>
+      _isDarkMode
+          ? _surfaceVariantColor
+          : const Color(
+        0xFFF1F5F3,
+      );
+
+  Color get _skillCardBorderColor =>
+      _isDarkMode
+          ? _borderColor
+          : const Color(
+        0xFFDCE6E2,
+      );
+
+  Color get _skillIconBackground =>
+      _isDarkMode
+          ? _surfaceColor
+          : const Color(
+        0xFFFFFFFF,
+      );
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -64,27 +124,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   CrossAxisAlignment.start,
                   children: [
                     _buildHeader(),
-                    const SizedBox(height: 20),
+                    const SizedBox(
+                      height: 20,
+                    ),
                     _buildSearchBar(),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader(
-                      title: '✦ Your AI Match',
-                      action: 'See all',
+                    const SizedBox(
+                      height: 24,
                     ),
-                    const SizedBox(height: 12),
+                    _buildSectionHeader(
+                      title:
+                      '✦ Your AI Match',
+                      action:
+                      'See all',
+                    ),
+                    const SizedBox(
+                      height: 12,
+                    ),
                     _buildMatchCard(),
-                    const SizedBox(height: 28),
-                    _buildSectionHeader(
-                      title: 'Popular Skills',
-                      action: 'Explore',
+                    const SizedBox(
+                      height: 28,
                     ),
-                    const SizedBox(height: 14),
+                    _buildSectionHeader(
+                      title:
+                      'Popular Skills',
+                      action:
+                      'Explore',
+                    ),
+                    const SizedBox(
+                      height: 14,
+                    ),
                     _buildPopularSkills(),
-                    const SizedBox(height: 28),
-                    _buildSectionHeader(
-                      title: 'Upcoming Session',
+                    const SizedBox(
+                      height: 28,
                     ),
-                    const SizedBox(height: 12),
+                    _buildSectionHeader(
+                      title:
+                      'Upcoming Session',
+                    ),
+                    const SizedBox(
+                      height: 12,
+                    ),
                     _buildUpcomingSession(),
                   ],
                 ),
@@ -104,19 +183,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildHeader() {
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
               Text(
                 'Hello, Joice! 👋',
-                style: AppTextStyles.pageTitle,
+                style:
+                AppTextStyles.pageTitle
+                    .copyWith(
+                  color:
+                  _textColor,
+                ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(
+                height: 4,
+              ),
               Text(
                 'Ready to share and learn?',
-                style: AppTextStyles.secondary,
+                style:
+                AppTextStyles.secondary
+                    .copyWith(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ],
           ),
@@ -124,25 +215,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Container(
           width: 38,
           height: 38,
-          decoration: BoxDecoration(
-            color: Colors.white,
+          decoration:
+          BoxDecoration(
+            color:
+            _surfaceColor,
             borderRadius:
-            BorderRadius.circular(12),
+            BorderRadius.circular(
+              12,
+            ),
+            border:
+            Border.all(
+              color:
+              _borderColor,
+            ),
           ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
+          child: Icon(
+            Icons
+                .notifications_none_rounded,
             size: 21,
-            color: darkText,
+            color:
+            _textColor,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(
+          width: 10,
+        ),
         Container(
           width: 42,
           height: 42,
           decoration:
           const BoxDecoration(
-            color: Color(0xFFFFAA45),
-            shape: BoxShape.circle,
+            color:
+            AppTheme.accent,
+            shape:
+            BoxShape.circle,
           ),
         ),
       ],
@@ -156,7 +262,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildSearchBar() {
     return InkWell(
       borderRadius:
-      BorderRadius.circular(14),
+      BorderRadius.circular(
+        14,
+      ),
       onTap: () {
         Navigator.pushNamed(
           context,
@@ -165,38 +273,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       child: Container(
         height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white,
+        decoration:
+        BoxDecoration(
+          color:
+          _surfaceColor,
           borderRadius:
-          BorderRadius.circular(14),
-          border: Border.all(
-            color: const Color(
-              0xFFE9E9F3,
-            ),
+          BorderRadius.circular(
+            14,
+          ),
+          border:
+          Border.all(
+            color:
+            _borderColor,
           ),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            SizedBox(width: 14),
+            const SizedBox(
+              width: 14,
+            ),
             Icon(
               Icons.search,
-              color: mutedText,
+              color:
+              _mutedColor,
               size: 20,
             ),
-            SizedBox(width: 10),
+            const SizedBox(
+              width: 10,
+            ),
             Expanded(
               child: Text(
                 'Search skills or people',
                 style:
-                AppTextStyles.secondary,
+                AppTextStyles.secondary
+                    .copyWith(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
             Icon(
-              Icons.filter_list_rounded,
-              color: primary,
+              Icons
+                  .filter_list_rounded,
+              color:
+              _primaryColor,
               size: 20,
             ),
-            SizedBox(width: 14),
+            const SizedBox(
+              width: 14,
+            ),
           ],
         ),
       ),
@@ -217,13 +342,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Text(
             title,
             style:
-            AppTextStyles.sectionTitle,
+            AppTextStyles.sectionTitle
+                .copyWith(
+              color:
+              _textColor,
+            ),
           ),
         ),
         if (action != null)
           InkWell(
             borderRadius:
-            BorderRadius.circular(8),
+            BorderRadius.circular(
+              8,
+            ),
             onTap: () {
               if (action ==
                   'Explore') {
@@ -252,7 +383,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style:
                 AppTextStyles.caption
                     .copyWith(
-                  color: primary,
+                  color:
+                  _primaryColor,
                   fontWeight:
                   FontWeight.w700,
                 ),
@@ -270,15 +402,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMatchCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
         borderRadius:
-        BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(
-            0xFFEAEAF4,
-          ),
+        BorderRadius.circular(
+          18,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
         ),
       ),
       child: Column(
@@ -291,20 +430,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration:
                 const BoxDecoration(
                   color:
-                  Color(0xFFFFAA45),
-                  shape: BoxShape.circle,
+                  AppTheme.accent,
+                  shape:
+                  BoxShape.circle,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Alex Rivera',
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles
+                          .cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
                     ),
                     const SizedBox(
                       height: 3,
@@ -312,9 +459,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       'Video Editing • Advanced',
                       style:
-                      AppTextStyles.secondary
+                      AppTextStyles
+                          .secondary
                           .copyWith(
                         fontSize: 12,
+                        color:
+                        _mutedColor,
                       ),
                     ),
                   ],
@@ -329,9 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration:
                 BoxDecoration(
                   color:
-                  const Color(
-                    0xFFF0EFFF,
-                  ),
+                  _softPrimaryColor,
                   borderRadius:
                   BorderRadius.circular(
                     20,
@@ -340,9 +488,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   '92% Match',
                   style:
-                  AppTextStyles.caption
+                  AppTextStyles
+                      .caption
                       .copyWith(
-                    color: primary,
+                    color:
+                    _primaryColor,
                     fontWeight:
                     FontWeight.w700,
                   ),
@@ -350,7 +500,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(
+            height: 12,
+          ),
           Row(
             crossAxisAlignment:
             CrossAxisAlignment.center,
@@ -360,17 +512,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 52,
                 height: 52,
               ),
-              const SizedBox(width: 10),
-              const Expanded(
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
                 child: Text(
                   'Great fit! You teach Photography, while Alex can teach Video Editing.',
                   style:
-                  AppTextStyles.bodyMuted,
+                  AppTextStyles
+                      .bodyMuted
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(
+            height: 14,
+          ),
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -400,8 +561,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Axis.horizontal,
         physics:
         const BouncingScrollPhysics(),
-        itemCount: skills.length,
-        separatorBuilder: (_, _) {
+        itemCount:
+        skills.length,
+        separatorBuilder:
+            (_, _) {
           return const SizedBox(
             width: 12,
           );
@@ -410,12 +573,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             context,
             index,
             ) {
-          final skill =
+          final Map<String, dynamic>
+          skill =
           skills[index];
 
           return InkWell(
             borderRadius:
-            BorderRadius.circular(17),
+            BorderRadius.circular(
+              17,
+            ),
             onTap: () {
               Navigator.pushNamed(
                 context,
@@ -431,9 +597,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration:
               BoxDecoration(
                 color:
-                const Color(
-                  0xFFF4F2FF,
-                ),
+                _skillCardColor,
                 borderRadius:
                 BorderRadius.circular(
                   17,
@@ -441,9 +605,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 border:
                 Border.all(
                   color:
-                  const Color(
-                    0xFFE5E1FF,
-                  ),
+                  _skillCardBorderColor,
                 ),
               ),
               child: Column(
@@ -455,16 +617,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     height: 50,
                     decoration:
                     BoxDecoration(
-                      color: Colors.white,
+                      color:
+                      _skillIconBackground,
                       borderRadius:
                       BorderRadius.circular(
                         14,
+                      ),
+                      border:
+                      Border.all(
+                        color:
+                        _borderColor,
                       ),
                     ),
                     child: Icon(
                       skill['icon']
                       as IconData,
-                      color: primary,
+                      color:
+                      _primaryColor,
                       size: 25,
                     ),
                   ),
@@ -476,13 +645,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     as String,
                     maxLines: 1,
                     overflow:
-                    TextOverflow.ellipsis,
+                    TextOverflow
+                        .ellipsis,
                     textAlign:
                     TextAlign.center,
                     style:
-                    AppTextStyles.cardTitle
+                    AppTextStyles
+                        .cardTitle
                         .copyWith(
                       fontSize: 13,
+                      color:
+                      _textColor,
                     ),
                   ),
                 ],
@@ -501,15 +674,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildUpcomingSession() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
         borderRadius:
-        BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(
-            0xFFEAEAF4,
-          ),
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
         ),
       ),
       child: Row(
@@ -520,35 +700,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
             decoration:
             const BoxDecoration(
               color:
-              Color(0xFFFFAA45),
-              shape: BoxShape.circle,
+              AppTheme.accent,
+              shape:
+              BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(
+            width: 12,
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Alex Rivera',
                   style:
-                  AppTextStyles.cardTitle,
+                  AppTextStyles
+                      .cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(
+                  height: 3,
+                ),
                 Text(
                   'Video Editing Session',
                   style:
-                  AppTextStyles.secondary
+                  AppTextStyles
+                      .secondary
                       .copyWith(
                     fontSize: 12,
+                    color:
+                    _mutedColor,
                   ),
                 ),
-                const SizedBox(height: 3),
-                const Text(
+                const SizedBox(
+                  height: 3,
+                ),
+                Text(
                   'Today • 4:00 PM',
                   style:
-                  AppTextStyles.caption,
+                  AppTextStyles
+                      .caption
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
                 ),
               ],
             ),
@@ -556,10 +756,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           SizedBox(
             width: 100,
             height: 38,
-            child: ElevatedButton(
+            child:
+            ElevatedButton(
               onPressed: () {},
               style:
               ElevatedButton.styleFrom(
+                backgroundColor:
+                _primaryColor,
+                foregroundColor:
+                _isDarkMode
+                    ? const Color(
+                  0xFF092E31,
+                )
+                    : Colors.white,
                 padding:
                 EdgeInsets.zero,
                 shape:
@@ -573,7 +782,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Text(
                 'JOIN CALL',
                 style:
-                AppTextStyles.button
+                AppTextStyles
+                    .button
                     .copyWith(
                   fontSize: 11,
                 ),
@@ -590,58 +800,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ============================================================
 
   Widget _buildBottomNavigation() {
-    final items = [
+    final List<Map<String, dynamic>>
+    items = [
       {
-        'icon': Icons.home_outlined,
+        'icon':
+        Icons.home_outlined,
         'selected':
         Icons.home_rounded,
-        'label': 'Home',
+        'label':
+        'Home',
       },
       {
-        'icon': Icons.explore_outlined,
+        'icon':
+        Icons.explore_outlined,
         'selected':
         Icons.explore,
-        'label': 'Explore',
+        'label':
+        'Explore',
       },
       {
         'icon':
         Icons.auto_awesome_outlined,
         'selected':
         Icons.auto_awesome,
-        'label': 'AI Match',
+        'label':
+        'AI Match',
       },
       {
         'icon':
-        Icons.chat_bubble_outline_rounded,
+        Icons
+            .chat_bubble_outline_rounded,
         'selected':
-        Icons.chat_bubble_rounded,
-        'label': 'Chat',
+        Icons
+            .chat_bubble_rounded,
+        'label':
+        'Chat',
       },
       {
         'icon':
         Icons.person_outline_rounded,
         'selected':
         Icons.person_rounded,
-        'label': 'Profile',
+        'label':
+        'Profile',
       },
     ];
 
     return Container(
       height: 76,
       decoration:
-      const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
+      BoxDecoration(
+        color:
+        _isDarkMode
+            ? Theme.of(context)
+            .scaffoldBackgroundColor
+            : _surfaceColor,
+        border:
+        Border(
+          top:
+          BorderSide(
             color:
-            Color(0xFFEEEEF5),
+            _borderColor,
           ),
         ),
       ),
       child: Row(
-        children: List.generate(
+        children:
+        List.generate(
           items.length,
-              (index) {
+              (
+              int index,
+              ) {
             final bool selected =
                 _selectedNav ==
                     index;
@@ -651,9 +880,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () {
                   if (index == 0) {
                     setState(() {
-                      _selectedNav =
-                      0;
+                      _selectedNav = 0;
                     });
+
                     return;
                   }
 
@@ -662,14 +891,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context,
                       '/explore',
                     );
+
                     return;
                   }
 
                   if (index == 2) {
                     setState(() {
-                      _selectedNav =
-                      2;
+                      _selectedNav = 2;
                     });
+
                     return;
                   }
 
@@ -678,14 +908,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context,
                       '/chat',
                     );
+
                     return;
                   }
 
                   if (index == 4) {
                     Navigator.pushNamed(
                       context,
-                      '/my-skills',
+                      '/profile',
                     );
+
                     return;
                   }
                 },
@@ -705,13 +937,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       BoxDecoration(
                         color:
                         selected
-                            ? const Color(
-                          0xFFF0EFFF,
-                        )
+                            ? _softPrimaryColor
                             : Colors
                             .transparent,
                         borderRadius:
-                        BorderRadius.circular(
+                        BorderRadius
+                            .circular(
                           12,
                         ),
                       ),
@@ -720,16 +951,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ? items[index][
                         'selected']
                         as IconData
-                            : items[index]
-                        ['icon']
+                            : items[index][
+                        'icon']
                         as IconData,
                         size: 20,
                         color:
                         selected
-                            ? primary
-                            : const Color(
-                          0xFF777C8F,
-                        ),
+                            ? _primaryColor
+                            : _mutedColor,
                       ),
                     ),
                     const SizedBox(
@@ -740,14 +969,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ['label']
                       as String,
                       style:
-                      AppTextStyles.navLabel
+                      AppTextStyles
+                          .navLabel
                           .copyWith(
                         color:
                         selected
-                            ? primary
-                            : const Color(
-                          0xFF777C8F,
-                        ),
+                            ? _primaryColor
+                            : _mutedColor,
                         fontWeight:
                         selected
                             ? FontWeight

@@ -15,14 +15,73 @@ class SkillDetailsScreen extends StatelessWidget {
     required this.skill,
   });
 
-  static const Color primary = AppTheme.primary;
-  static const Color darkText = AppTheme.darkText;
-  static const Color mutedText = AppTheme.mutedText;
-  static const Color background = AppTheme.background;
-  static const Color border = AppTheme.border;
-
   static final ExploreRepository _repository =
   ExploreRepository();
+
+  Color _primaryColor(
+      BuildContext context,
+      ) =>
+      Theme.of(context).colorScheme.primary;
+
+  Color _surfaceColor(
+      BuildContext context,
+      ) =>
+      Theme.of(context).colorScheme.surface;
+
+  Color _textColor(
+      BuildContext context,
+      ) =>
+      Theme.of(context).colorScheme.onSurface;
+
+  Color _mutedColor(
+      BuildContext context,
+      ) =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color _borderColor(
+      BuildContext context,
+      ) =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  bool _isDarkMode(
+      BuildContext context,
+      ) =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color _softPrimaryColor(
+      BuildContext context,
+      ) =>
+      _isDarkMode(
+        context,
+      )
+          ? _primaryColor(
+        context,
+      ).withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFE4F0EF,
+      );
+
+  Color _softPrimaryBorderColor(
+      BuildContext context,
+      ) =>
+      _isDarkMode(
+        context,
+      )
+          ? _primaryColor(
+        context,
+      ).withValues(
+        alpha: 0.28,
+      )
+          : const Color(
+        0xFFD2E5E2,
+      );
 
   @override
   Widget build(
@@ -34,12 +93,15 @@ class SkillDetailsScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(context),
-
+            _buildTopBar(
+              context,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 physics:
@@ -55,140 +117,201 @@ class SkillDetailsScreen extends StatelessWidget {
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
-                    _buildSkillHeader(),
-
-                    const SizedBox(height: 20),
-
-                    _buildQuickInfo(),
-
-                    const SizedBox(height: 24),
-
-                    const Text(
+                    _buildSkillHeader(
+                      context,
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    _buildQuickInfo(
+                      context,
+                    ),
+                    const SizedBox(
+                      height: 24,
+                    ),
+                    Text(
                       'About this skill',
                       style:
-                      AppTextStyles.cardTitle,
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      skill.description,
-                      style:
-                      AppTextStyles.bodyMuted,
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      'What you can learn',
-                      style:
-                      AppTextStyles.cardTitle,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    ...skill.learnings.map(
-                          (item) => Padding(
-                        padding:
-                        const EdgeInsets.only(
-                          bottom: 8,
-                        ),
-                        child: Row(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              margin:
-                              const EdgeInsets.only(
-                                top: 2,
-                              ),
-                              width: 20,
-                              height: 20,
-                              decoration:
-                              BoxDecoration(
-                                color:
-                                const Color(
-                                  0xFFF0EFFF,
-                                ),
-                                borderRadius:
-                                BorderRadius.circular(
-                                  7,
-                                ),
-                              ),
-                              child:
-                              const Icon(
-                                Icons.check_rounded,
-                                size: 13,
-                                color: primary,
-                              ),
-                            ),
-
-                            const SizedBox(width: 9),
-
-                            Expanded(
-                              child: Text(
-                                item,
-                                style:
-                                AppTextStyles.secondary
-                                    .copyWith(
-                                  color: darkText,
-                                ),
-                              ),
-                            ),
-                          ],
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor(
+                          context,
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    _buildPrerequisiteCard(),
-
-                    const SizedBox(height: 28),
-
+                    const SizedBox(
+                      height: 8,
+                    ),
+                    Text(
+                      skill.description,
+                      style:
+                      AppTextStyles.bodyMuted
+                          .copyWith(
+                        color:
+                        _mutedColor(
+                          context,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 24,
+                    ),
+                    Text(
+                      'What you can learn',
+                      style:
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor(
+                          context,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    ...skill.learnings.map(
+                          (
+                          String item,
+                          ) =>
+                          Padding(
+                            padding:
+                            const EdgeInsets.only(
+                              bottom: 8,
+                            ),
+                            child: Row(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  margin:
+                                  const EdgeInsets.only(
+                                    top: 2,
+                                  ),
+                                  width: 20,
+                                  height: 20,
+                                  decoration:
+                                  BoxDecoration(
+                                    color:
+                                    _softPrimaryColor(
+                                      context,
+                                    ),
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                      7,
+                                    ),
+                                    border:
+                                    Border.all(
+                                      color:
+                                      _softPrimaryBorderColor(
+                                        context,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    size: 13,
+                                    color:
+                                    _primaryColor(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  width: 9,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    item,
+                                    style:
+                                    AppTextStyles.secondary
+                                        .copyWith(
+                                      color:
+                                      _textColor(
+                                        context,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    _buildPrerequisiteCard(
+                      context,
+                    ),
+                    const SizedBox(
+                      height: 28,
+                    ),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'People offering this skill',
                             style:
-                            AppTextStyles.cardTitle,
+                            AppTextStyles.cardTitle
+                                .copyWith(
+                              color:
+                              _textColor(
+                                context,
+                              ),
+                            ),
                           ),
                         ),
-
                         Text(
                           '${providers.length} available',
                           style:
-                          AppTextStyles.caption,
+                          AppTextStyles.caption
+                              .copyWith(
+                            color:
+                            _mutedColor(
+                              context,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 6),
-
-                    const Text(
+                    const SizedBox(
+                      height: 6,
+                    ),
+                    Text(
                       'Choose someone based on availability, experience, and what they want to learn in exchange.',
                       style:
-                      AppTextStyles.secondary,
+                      AppTextStyles.secondary
+                          .copyWith(
+                        color:
+                        _mutedColor(
+                          context,
+                        ),
+                      ),
                     ),
-
-                    const SizedBox(height: 14),
-
+                    const SizedBox(
+                      height: 14,
+                    ),
                     if (providers.isEmpty)
-                      _buildNoProviders()
+                      _buildNoProviders(
+                        context,
+                      )
                     else
                       ...providers.map(
-                            (provider) => Padding(
-                          padding:
-                          const EdgeInsets.only(
-                            bottom: 14,
-                          ),
-                          child:
-                          _buildProviderCard(
-                            context,
-                            provider,
-                          ),
-                        ),
+                            (
+                            User provider,
+                            ) =>
+                            Padding(
+                              padding:
+                              const EdgeInsets.only(
+                                bottom: 14,
+                              ),
+                              child:
+                              _buildProviderCard(
+                                context,
+                                provider,
+                              ),
+                            ),
                       ),
                   ],
                 ),
@@ -214,11 +337,19 @@ class SkillDetailsScreen extends StatelessWidget {
         horizontal: 10,
       ),
       decoration:
-      const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: border,
+      BoxDecoration(
+        color:
+        _surfaceColor(
+          context,
+        ),
+        border:
+        Border(
+          bottom:
+          BorderSide(
+            color:
+            _borderColor(
+              context,
+            ),
           ),
         ),
       ),
@@ -226,31 +357,44 @@ class SkillDetailsScreen extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(
+                context,
+              );
             },
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
+            icon: Icon(
+              Icons
+                  .arrow_back_ios_new_rounded,
               size: 18,
-              color: primary,
+              color:
+              _primaryColor(
+                context,
+              ),
             ),
           ),
-
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Skill Details',
                 style:
-                AppTextStyles.cardTitle,
+                AppTextStyles.cardTitle
+                    .copyWith(
+                  color:
+                  _textColor(
+                    context,
+                  ),
+                ),
               ),
             ),
           ),
-
           IconButton(
             onPressed: () {},
-            icon: const Icon(
+            icon: Icon(
               Icons.favorite_border_rounded,
               size: 20,
-              color: primary,
+              color:
+              _primaryColor(
+                context,
+              ),
             ),
           ),
         ],
@@ -262,7 +406,9 @@ class SkillDetailsScreen extends StatelessWidget {
   // SKILL HEADER
   // ============================================================
 
-  Widget _buildSkillHeader() {
+  Widget _buildSkillHeader(
+      BuildContext context,
+      ) {
     return Container(
       width: double.infinity,
       padding:
@@ -272,17 +418,21 @@ class SkillDetailsScreen extends StatelessWidget {
         10,
         16,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        const Color(0xFFF1EFFF),
+        _softPrimaryColor(
+          context,
+        ),
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border: Border.all(
+        border:
+        Border.all(
           color:
-          const Color(
-            0xFFE4E0FF,
+          _softPrimaryBorderColor(
+            context,
           ),
         ),
       ),
@@ -293,21 +443,34 @@ class SkillDetailsScreen extends StatelessWidget {
             height: 62,
             decoration:
             BoxDecoration(
-              color: Colors.white,
+              color:
+              _surfaceColor(
+                context,
+              ),
               borderRadius:
               BorderRadius.circular(
                 16,
               ),
+              border:
+              Border.all(
+                color:
+                _borderColor(
+                  context,
+                ),
+              ),
             ),
             child: Icon(
               skill.icon,
-              color: primary,
+              color:
+              _primaryColor(
+                context,
+              ),
               size: 30,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(
+            width: 13,
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -316,19 +479,31 @@ class SkillDetailsScreen extends StatelessWidget {
                 Text(
                   skill.title,
                   style:
-                  AppTextStyles.sectionTitle,
+                  AppTextStyles.sectionTitle
+                      .copyWith(
+                    color:
+                    _textColor(
+                      context,
+                    ),
+                  ),
                 ),
-
-                const SizedBox(height: 4),
-
+                const SizedBox(
+                  height: 4,
+                ),
                 Text(
                   skill.category,
                   style:
-                  AppTextStyles.secondary,
+                  AppTextStyles.secondary
+                      .copyWith(
+                    color:
+                    _mutedColor(
+                      context,
+                    ),
+                  ),
                 ),
-
-                const SizedBox(height: 8),
-
+                const SizedBox(
+                  height: 8,
+                ),
                 Container(
                   padding:
                   const EdgeInsets.symmetric(
@@ -337,10 +512,20 @@ class SkillDetailsScreen extends StatelessWidget {
                   ),
                   decoration:
                   BoxDecoration(
-                    color: Colors.white,
+                    color:
+                    _surfaceColor(
+                      context,
+                    ),
                     borderRadius:
                     BorderRadius.circular(
                       14,
+                    ),
+                    border:
+                    Border.all(
+                      color:
+                      _borderColor(
+                        context,
+                      ),
                     ),
                   ),
                   child: Text(
@@ -348,7 +533,10 @@ class SkillDetailsScreen extends StatelessWidget {
                     style:
                     AppTextStyles.caption
                         .copyWith(
-                      color: primary,
+                      color:
+                      _primaryColor(
+                        context,
+                      ),
                       fontWeight:
                       FontWeight.w700,
                     ),
@@ -357,7 +545,6 @@ class SkillDetailsScreen extends StatelessWidget {
               ],
             ),
           ),
-
           Image.asset(
             'assets/images/mascot/tubi_explaining.png',
             width: 70,
@@ -373,38 +560,49 @@ class SkillDetailsScreen extends StatelessWidget {
   // QUICK INFO
   // ============================================================
 
-  Widget _buildQuickInfo() {
+  Widget _buildQuickInfo(
+      BuildContext context,
+      ) {
     return Row(
       children: [
         Expanded(
           child: _infoBox(
+            context:
+            context,
             icon:
             Icons.schedule_outlined,
-            label: 'Session',
+            label:
+            'Session',
             value:
             skill.sessionLength,
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: _infoBox(
+            context:
+            context,
             icon:
             Icons.language_rounded,
-            label: 'Language',
+            label:
+            'Language',
             value:
             skill.language,
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(
+          width: 10,
+        ),
         Expanded(
           child: _infoBox(
+            context:
+            context,
             icon:
             Icons.laptop_mac_rounded,
-            label: 'Mode',
+            label:
+            'Mode',
             value:
             skill.mode,
           ),
@@ -414,6 +612,7 @@ class SkillDetailsScreen extends StatelessWidget {
   }
 
   Widget _infoBox({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String value,
@@ -424,34 +623,51 @@ class SkillDetailsScreen extends StatelessWidget {
         vertical: 13,
         horizontal: 8,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor(
+          context,
+        ),
         borderRadius:
         BorderRadius.circular(
           14,
         ),
-        border: Border.all(
-          color: border,
+        border:
+        Border.all(
+          color:
+          _borderColor(
+            context,
+          ),
         ),
       ),
       child: Column(
         children: [
           Icon(
             icon,
-            color: primary,
+            color:
+            _primaryColor(
+              context,
+            ),
             size: 19,
           ),
-
-          const SizedBox(height: 6),
-
+          const SizedBox(
+            height: 6,
+          ),
           Text(
             label,
             style:
-            AppTextStyles.caption,
+            AppTextStyles.caption
+                .copyWith(
+              color:
+              _mutedColor(
+                context,
+              ),
+            ),
           ),
-
-          const SizedBox(height: 3),
-
+          const SizedBox(
+            height: 3,
+          ),
           Text(
             value,
             maxLines: 2,
@@ -462,7 +678,10 @@ class SkillDetailsScreen extends StatelessWidget {
             style:
             AppTextStyles.caption
                 .copyWith(
-              color: darkText,
+              color:
+              _textColor(
+                context,
+              ),
               fontWeight:
               FontWeight.w700,
             ),
@@ -476,26 +695,42 @@ class SkillDetailsScreen extends StatelessWidget {
   // PREREQUISITE
   // ============================================================
 
-  Widget _buildPrerequisiteCard() {
+  Widget _buildPrerequisiteCard(
+      BuildContext context,
+      ) {
     return Container(
       width: double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        const Color(
-          0xFFFFFAEE,
+        _isDarkMode(
+          context,
+        )
+            ? const Color(
+          0xFF3B2B1F,
+        )
+            : const Color(
+          0xFFFFF6E8,
         ),
         borderRadius:
         BorderRadius.circular(
           14,
         ),
-        border: Border.all(
+        border:
+        Border.all(
           color:
-          const Color(
-            0xFFFFE8AF,
+          _isDarkMode(
+            context,
+          )
+              ? const Color(
+            0xFF5B4632,
+          )
+              : const Color(
+            0xFFF2D1A6,
           ),
         ),
       ),
@@ -506,14 +741,12 @@ class SkillDetailsScreen extends StatelessWidget {
           const Icon(
             Icons.info_outline_rounded,
             color:
-            Color(
-              0xFFE5A72C,
-            ),
+            AppTheme.accent,
             size: 19,
           ),
-
-          const SizedBox(width: 10),
-
+          const SizedBox(
+            width: 10,
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -524,18 +757,27 @@ class SkillDetailsScreen extends StatelessWidget {
                   style:
                   AppTextStyles.secondary
                       .copyWith(
-                    color: darkText,
+                    color:
+                    _textColor(
+                      context,
+                    ),
                     fontWeight:
                     FontWeight.w800,
                   ),
                 ),
-
-                const SizedBox(height: 4),
-
+                const SizedBox(
+                  height: 4,
+                ),
                 Text(
                   skill.prerequisite,
                   style:
-                  AppTextStyles.secondary,
+                  AppTextStyles.secondary
+                      .copyWith(
+                    color:
+                    _mutedColor(
+                      context,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -555,9 +797,12 @@ class SkillDetailsScreen extends StatelessWidget {
       ) {
     final UserSkill? offeredRelationship =
     _repository.findUserSkill(
-      userId: provider.id,
-      skillId: skill.id,
-      type: UserSkillType.offered,
+      userId:
+      provider.id,
+      skillId:
+      skill.id,
+      type:
+      UserSkillType.offered,
     );
 
     final List<String> wantedSkillTitles =
@@ -576,14 +821,22 @@ class SkillDetailsScreen extends StatelessWidget {
       const EdgeInsets.all(
         14,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor(
+          context,
+        ),
         borderRadius:
         BorderRadius.circular(
           17,
         ),
-        border: Border.all(
-          color: border,
+        border:
+        Border.all(
+          color:
+          _borderColor(
+            context,
+          ),
         ),
       ),
       child: Column(
@@ -596,9 +849,7 @@ class SkillDetailsScreen extends StatelessWidget {
                 decoration:
                 const BoxDecoration(
                   color:
-                  Color(
-                    0xFFFFB45E,
-                  ),
+                  AppTheme.accent,
                   shape:
                   BoxShape.circle,
                 ),
@@ -616,9 +867,9 @@ class SkillDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              const SizedBox(width: 11),
-
+              const SizedBox(
+                width: 11,
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -627,33 +878,42 @@ class SkillDetailsScreen extends StatelessWidget {
                     Text(
                       provider.name,
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor(
+                          context,
+                        ),
+                      ),
                     ),
-
-                    const SizedBox(height: 3),
-
+                    const SizedBox(
+                      height: 3,
+                    ),
                     Text(
                       '${provider.city} • ${offeredRelationship?.level ?? skill.level}',
                       style:
-                      AppTextStyles.caption,
+                      AppTextStyles.caption
+                          .copyWith(
+                        color:
+                        _mutedColor(
+                          context,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-
               Row(
                 children: [
                   const Icon(
                     Icons.star_rounded,
                     size: 16,
                     color:
-                    Color(
-                      0xFFFFB547,
-                    ),
+                    AppTheme.accent,
                   ),
-
-                  const SizedBox(width: 3),
-
+                  const SizedBox(
+                    width: 3,
+                  ),
                   Text(
                     provider.rating
                         .toStringAsFixed(
@@ -662,7 +922,10 @@ class SkillDetailsScreen extends StatelessWidget {
                     style:
                     AppTextStyles.caption
                         .copyWith(
-                      color: darkText,
+                      color:
+                      _textColor(
+                        context,
+                      ),
                       fontWeight:
                       FontWeight.w700,
                     ),
@@ -671,59 +934,71 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ],
           ),
-
-          const SizedBox(height: 12),
-
+          const SizedBox(
+            height: 12,
+          ),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.swap_horiz_rounded,
                 size: 15,
-                color: primary,
+                color:
+                _primaryColor(
+                  context,
+                ),
               ),
-
-              const SizedBox(width: 6),
-
+              const SizedBox(
+                width: 6,
+              ),
               Expanded(
                 child: Text(
                   '${provider.completedSwaps} completed skill swaps',
                   style:
                   AppTextStyles.secondary
                       .copyWith(
-                    color: darkText,
+                    color:
+                    _textColor(
+                      context,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 7),
-
+          const SizedBox(
+            height: 7,
+          ),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.school_outlined,
                 size: 15,
-                color: primary,
+                color:
+                _primaryColor(
+                  context,
+                ),
               ),
-
-              const SizedBox(width: 6),
-
+              const SizedBox(
+                width: 6,
+              ),
               Expanded(
                 child: Text(
                   'Wants to learn: $wantsToLearn',
                   style:
                   AppTextStyles.secondary
                       .copyWith(
-                    color: darkText,
+                    color:
+                    _textColor(
+                      context,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 14),
-
+          const SizedBox(
+            height: 14,
+          ),
           Row(
             children: [
               Expanded(
@@ -737,21 +1012,6 @@ class SkillDetailsScreen extends StatelessWidget {
                         provider,
                       );
                     },
-                    style:
-                    OutlinedButton.styleFrom(
-                      foregroundColor: primary,
-                      side:
-                      const BorderSide(
-                        color: primary,
-                      ),
-                      shape:
-                      RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(
-                          11,
-                        ),
-                      ),
-                    ),
                     child:
                     const Text(
                       'VIEW PROFILE',
@@ -761,9 +1021,9 @@ class SkillDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              const SizedBox(width: 9),
-
+              const SizedBox(
+                width: 9,
+              ),
               Expanded(
                 child: SizedBox(
                   height: 40,
@@ -775,26 +1035,6 @@ class SkillDetailsScreen extends StatelessWidget {
                         provider,
                       );
                     },
-                    style:
-                    ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor:
-                      primary,
-                      foregroundColor:
-                      Colors.white,
-                      minimumSize:
-                      const Size(
-                        0,
-                        40,
-                      ),
-                      shape:
-                      RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(
-                          11,
-                        ),
-                      ),
-                    ),
                     child:
                     const Text(
                       'REQUEST SWAP',
@@ -823,10 +1063,14 @@ class SkillDetailsScreen extends StatelessWidget {
       userId,
     )
         .map(
-          (relationship) =>
-      _repository.findSkillById(
+          (
+          UserSkill relationship,
+          ) =>
+      _repository
+          .findSkillById(
         relationship.skillId,
-      )?.title,
+      )
+          ?.title,
     )
         .whereType<String>()
         .toList();
@@ -843,7 +1087,8 @@ class SkillDetailsScreen extends StatelessWidget {
     Navigator.pushNamed(
       context,
       '/user-profile',
-      arguments: provider,
+      arguments:
+      provider,
     );
   }
 
@@ -859,23 +1104,21 @@ class SkillDetailsScreen extends StatelessWidget {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) =>
+        builder:
+            (
+            BuildContext routeContext,
+            ) =>
             CreateSwapRequestScreen(
               providerUserId:
               provider.id,
-
               skillToLearnId:
               skill.id,
-
               providerName:
               provider.name,
-
               providerInitials:
               provider.initials,
-
               providerCity:
               provider.city,
-
               skillToLearn:
               skill.title,
             ),
@@ -891,7 +1134,8 @@ class SkillDetailsScreen extends StatelessWidget {
         context,
       ).showSnackBar(
         SnackBar(
-          content: Text(
+          content:
+          Text(
             'Your request to ${provider.name} is now Pending.',
           ),
           behavior:
@@ -905,10 +1149,11 @@ class SkillDetailsScreen extends StatelessWidget {
   // NO PROVIDERS
   // ============================================================
 
-  Widget _buildNoProviders() {
+  Widget _buildNoProviders(
+      BuildContext context,
+      ) {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         18,
@@ -916,7 +1161,9 @@ class SkillDetailsScreen extends StatelessWidget {
       decoration:
       BoxDecoration(
         color:
-        Colors.white,
+        _surfaceColor(
+          context,
+        ),
         borderRadius:
         BorderRadius.circular(
           14,
@@ -924,15 +1171,23 @@ class SkillDetailsScreen extends StatelessWidget {
         border:
         Border.all(
           color:
-          border,
+          _borderColor(
+            context,
+          ),
         ),
       ),
-      child: const Text(
+      child: Text(
         'No providers are currently available for this skill.',
         textAlign:
         TextAlign.center,
         style:
-        AppTextStyles.bodyMuted,
+        AppTextStyles.bodyMuted
+            .copyWith(
+          color:
+          _mutedColor(
+            context,
+          ),
+        ),
       ),
     );
   }

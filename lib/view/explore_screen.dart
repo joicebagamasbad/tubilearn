@@ -16,12 +16,6 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState
     extends State<ExploreScreen> {
-  static const Color primary = AppTheme.primary;
-  static const Color darkText = AppTheme.darkText;
-  static const Color mutedText = AppTheme.mutedText;
-  static const Color background = AppTheme.background;
-  static const Color border = AppTheme.border;
-
   final ExploreRepository _repository =
   ExploreRepository();
 
@@ -41,12 +35,55 @@ class _ExploreScreenState
     'Music',
   ];
 
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
+  Color get _surfaceColor =>
+      Theme.of(context).colorScheme.surface;
+
+  Color get _textColor =>
+      Theme.of(context).colorScheme.onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  Color get _softPrimaryColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFE4F0EF,
+      );
+
+  Color get _softPrimaryBorderColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.28,
+      )
+          : const Color(
+        0xFFD2E5E2,
+      );
+
   List<Skill> get _filteredSkills {
     final String query =
     _searchQuery.trim().toLowerCase();
 
     return _repository.skills.where(
-          (skill) {
+          (
+          Skill skill,
+          ) {
         final bool matchesCategory =
             _selectedCategory == 'All' ||
                 skill.category ==
@@ -76,6 +113,7 @@ class _ExploreScreenState
   @override
   void dispose() {
     _searchController.dispose();
+
     super.dispose();
   }
 
@@ -87,14 +125,16 @@ class _ExploreScreenState
         _filteredSkills;
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
-
             Expanded(
-              child: SingleChildScrollView(
+              child:
+              SingleChildScrollView(
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
@@ -109,60 +149,63 @@ class _ExploreScreenState
                   CrossAxisAlignment.start,
                   children: [
                     _buildTubiIntro(),
-
                     const SizedBox(
                       height: 18,
                     ),
-
                     _buildSearchBar(),
-
                     const SizedBox(
                       height: 22,
                     ),
-
-                    const Text(
+                    Text(
                       'Browse Categories',
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
                     ),
-
                     const SizedBox(
                       height: 12,
                     ),
-
                     _buildCategories(),
-
                     const SizedBox(
                       height: 26,
                     ),
-
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Skills For You',
                             style:
-                            AppTextStyles.cardTitle,
+                            AppTextStyles.cardTitle
+                                .copyWith(
+                              color:
+                              _textColor,
+                            ),
                           ),
                         ),
-
                         Text(
                           '${skills.length} skills',
                           style:
-                          AppTextStyles.caption,
+                          AppTextStyles.caption
+                              .copyWith(
+                            color:
+                            _mutedColor,
+                          ),
                         ),
                       ],
                     ),
-
                     const SizedBox(
                       height: 12,
                     ),
-
                     if (skills.isEmpty)
                       _buildNoResults()
                     else
                       ...skills.map(
-                            (skill) =>
+                            (
+                            Skill skill,
+                            ) =>
                             Padding(
                               padding:
                               const EdgeInsets.only(
@@ -196,11 +239,15 @@ class _ExploreScreenState
         horizontal: 10,
       ),
       decoration:
-      const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: border,
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        border:
+        Border(
+          bottom:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
       ),
@@ -212,31 +259,36 @@ class _ExploreScreenState
                 context,
               );
             },
-            icon: const Icon(
+            icon:
+            Icon(
               Icons
                   .arrow_back_ios_new_rounded,
               size: 18,
-              color: primary,
+              color:
+              _primaryColor,
             ),
           ),
-
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Explore',
                 style:
-                AppTextStyles.cardTitle,
+                AppTextStyles.cardTitle
+                    .copyWith(
+                  color:
+                  _textColor,
+                ),
               ),
             ),
           ),
-
           IconButton(
             onPressed: () {},
-            icon: const Icon(
-              Icons
-                  .favorite_border_rounded,
+            icon:
+            Icon(
+              Icons.favorite_border_rounded,
               size: 20,
-              color: primary,
+              color:
+              _primaryColor,
             ),
           ),
         ],
@@ -245,12 +297,13 @@ class _ExploreScreenState
   }
 
   // ============================================================
-  // TUBI INTRO
+  // INTRO
   // ============================================================
 
   Widget _buildTubiIntro() {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.fromLTRB(
         16,
@@ -258,25 +311,23 @@ class _ExploreScreenState
         10,
         14,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        const Color(
-          0xFFF1EFFF,
-        ),
+        _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border: Border.all(
+        border:
+        Border.all(
           color:
-          const Color(
-            0xFFE4E0FF,
-          ),
+          _softPrimaryBorderColor,
         ),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
@@ -284,26 +335,30 @@ class _ExploreScreenState
                 Text(
                   'Discover something new',
                   style:
-                  AppTextStyles.cardTitle,
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
                 ),
-
-                SizedBox(
+                const SizedBox(
                   height: 5,
                 ),
-
                 Text(
                   'Find practical skills and people willing to exchange knowledge with you.',
                   style:
-                  AppTextStyles.secondary,
+                  AppTextStyles.secondary
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(
             width: 8,
           ),
-
           Image.asset(
             'assets/images/mascot/tubi_studying.png',
             width: 82,
@@ -322,43 +377,54 @@ class _ExploreScreenState
   Widget _buildSearchBar() {
     return Container(
       height: 50,
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        Colors.white,
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           13,
         ),
-        border: Border.all(
+        border:
+        Border.all(
           color:
-          border,
+          _borderColor,
         ),
       ),
       child: TextField(
         controller:
         _searchController,
-        onChanged: (value) {
+        onChanged: (
+            String value,
+            ) {
           setState(() {
             _searchQuery =
                 value;
           });
         },
         style:
-        AppTextStyles.input,
+        AppTextStyles.input
+            .copyWith(
+          color:
+          _textColor,
+        ),
         decoration:
         InputDecoration(
           hintText:
           'Search skills or topics',
           hintStyle:
-          AppTextStyles.inputHint,
-
+          AppTextStyles.inputHint
+              .copyWith(
+            color:
+            _mutedColor,
+          ),
           prefixIcon:
-          const Icon(
+          Icon(
             Icons.search_rounded,
-            color: mutedText,
+            color:
+            _mutedColor,
             size: 20,
           ),
-
           suffixIcon:
           _searchQuery.isNotEmpty
               ? IconButton(
@@ -371,28 +437,25 @@ class _ExploreScreenState
                 '';
               });
             },
-            icon:
-            const Icon(
+            icon: Icon(
               Icons.close_rounded,
-              color: mutedText,
+              color:
+              _mutedColor,
               size: 18,
             ),
           )
-              : const Icon(
+              : Icon(
             Icons.tune_rounded,
-            color: primary,
+            color:
+            _primaryColor,
             size: 19,
           ),
-
           border:
           InputBorder.none,
-
           enabledBorder:
           InputBorder.none,
-
           focusedBorder:
           InputBorder.none,
-
           filled:
           false,
         ),
@@ -407,23 +470,28 @@ class _ExploreScreenState
   Widget _buildCategories() {
     return SizedBox(
       height: 38,
-      child: ListView.separated(
+      child:
+      ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
         const BouncingScrollPhysics(),
         itemCount:
         _categories.length,
-
         separatorBuilder:
-            (context, index) {
+            (
+            BuildContext context,
+            int index,
+            ) {
           return const SizedBox(
             width: 8,
           );
         },
-
         itemBuilder:
-            (context, index) {
+            (
+            BuildContext context,
+            int index,
+            ) {
           final String category =
           _categories[index];
 
@@ -456,27 +524,36 @@ class _ExploreScreenState
               Alignment.center,
               decoration:
               BoxDecoration(
-                color: selected
-                    ? primary
-                    : Colors.white,
+                color:
+                selected
+                    ? _primaryColor
+                    : _surfaceColor,
                 borderRadius:
                 BorderRadius.circular(
                   20,
                 ),
-                border: Border.all(
-                  color: selected
-                      ? primary
-                      : border,
+                border:
+                Border.all(
+                  color:
+                  selected
+                      ? _primaryColor
+                      : _borderColor,
                 ),
               ),
-              child: Text(
+              child:
+              Text(
                 category,
                 style:
                 AppTextStyles.caption
                     .copyWith(
-                  color: selected
-                      ? Colors.white
-                      : darkText,
+                  color:
+                  selected
+                      ? _isDarkMode
+                      ? const Color(
+                    0xFF092E31,
+                  )
+                      : Colors.white
+                      : _textColor,
                   fontWeight:
                   selected
                       ? FontWeight.w700
@@ -501,7 +578,8 @@ class _ExploreScreenState
         _repository
             .getProvidersForSkill(
           skill.id,
-        ).length;
+        )
+            .length;
 
     return InkWell(
       borderRadius:
@@ -526,7 +604,7 @@ class _ExploreScreenState
         decoration:
         BoxDecoration(
           color:
-          Colors.white,
+          _surfaceColor,
           borderRadius:
           BorderRadius.circular(
             16,
@@ -534,13 +612,17 @@ class _ExploreScreenState
           border:
           Border.all(
             color:
-            border,
+            _borderColor,
           ),
           boxShadow: [
             BoxShadow(
               color:
-              Colors.black.withValues(
-                alpha: 0.025,
+              Colors.black
+                  .withValues(
+                alpha:
+                _isDarkMode
+                    ? 0.12
+                    : 0.025,
               ),
               blurRadius:
               10,
@@ -555,34 +637,32 @@ class _ExploreScreenState
         child: Row(
           children: [
             Container(
-              width:
-              58,
-              height:
-              58,
+              width: 58,
+              height: 58,
               decoration:
               BoxDecoration(
                 color:
-                const Color(
-                  0xFFF2F0FF,
-                ),
+                _softPrimaryColor,
                 borderRadius:
                 BorderRadius.circular(
                   15,
+                ),
+                border:
+                Border.all(
+                  color:
+                  _softPrimaryBorderColor,
                 ),
               ),
               child: Icon(
                 skill.icon,
                 color:
-                primary,
-                size:
-                28,
+                _primaryColor,
+                size: 28,
               ),
             ),
-
             const SizedBox(
               width: 13,
             ),
-
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -591,23 +671,27 @@ class _ExploreScreenState
                   Text(
                     skill.title,
                     style:
-                    AppTextStyles.cardTitle,
+                    AppTextStyles.cardTitle
+                        .copyWith(
+                      color:
+                      _textColor,
+                    ),
                   ),
-
                   const SizedBox(
                     height: 4,
                   ),
-
                   Text(
                     skill.category,
                     style:
-                    AppTextStyles.caption,
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _mutedColor,
+                    ),
                   ),
-
                   const SizedBox(
                     height: 8,
                   ),
-
                   Row(
                     children: [
                       Container(
@@ -619,9 +703,7 @@ class _ExploreScreenState
                         decoration:
                         BoxDecoration(
                           color:
-                          const Color(
-                            0xFFF2F0FF,
-                          ),
+                          _softPrimaryColor,
                           borderRadius:
                           BorderRadius.circular(
                             12,
@@ -633,33 +715,33 @@ class _ExploreScreenState
                           AppTextStyles.caption
                               .copyWith(
                             color:
-                            primary,
+                            _primaryColor,
                             fontWeight:
                             FontWeight.w600,
                           ),
                         ),
                       ),
-
                       const SizedBox(
                         width: 9,
                       ),
-
-                      const Icon(
-                        Icons
-                            .people_outline_rounded,
+                      Icon(
+                        Icons.people_outline_rounded,
                         size: 13,
-                        color: mutedText,
+                        color:
+                        _mutedColor,
                       ),
-
                       const SizedBox(
                         width: 4,
                       ),
-
                       Expanded(
                         child: Text(
                           '$providerCount provider${providerCount == 1 ? '' : 's'}',
                           style:
-                          AppTextStyles.caption,
+                          AppTextStyles.caption
+                              .copyWith(
+                            color:
+                            _mutedColor,
+                          ),
                         ),
                       ),
                     ],
@@ -667,14 +749,11 @@ class _ExploreScreenState
                 ],
               ),
             ),
-
-            const Icon(
-              Icons
-                  .arrow_forward_ios_rounded,
-              size:
-              14,
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
               color:
-              mutedText,
+              _mutedColor,
             ),
           ],
         ),
@@ -699,32 +778,34 @@ class _ExploreScreenState
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
-            width:
-            90,
-            height:
-            90,
+            width: 90,
+            height: 90,
           ),
-
           const SizedBox(
             height: 12,
           ),
-
-          const Text(
+          Text(
             'No skills found',
             style:
-            AppTextStyles.cardTitle,
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor,
+            ),
           ),
-
           const SizedBox(
             height: 5,
           ),
-
           Text(
             'We couldn\'t find anything for "$_searchQuery".',
             textAlign:
             TextAlign.center,
             style:
-            AppTextStyles.secondary,
+            AppTextStyles.secondary
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
           ),
         ],
       ),

@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
 
-import '../model/repositories/my_skills_repository.dart';
+import '../model/repositories/wanted_skills_repository.dart';
 import '../services/current_user_service.dart';
+import '../theme/app_theme.dart';
 
-class AddSkillScreen extends StatefulWidget {
-  const AddSkillScreen({
+class AddWantedSkillScreen extends StatefulWidget {
+  const AddWantedSkillScreen({
     super.key,
   });
 
   @override
-  State<AddSkillScreen> createState() =>
-      _AddSkillScreenState();
+  State<AddWantedSkillScreen> createState() =>
+      _AddWantedSkillScreenState();
 }
 
-class _AddSkillScreenState
-    extends State<AddSkillScreen> {
-  final MySkillsRepository _repository =
-      MySkillsRepository.instance;
+class _AddWantedSkillScreenState
+    extends State<AddWantedSkillScreen> {
+  final WantedSkillsRepository _repository =
+      WantedSkillsRepository.instance;
 
-  final CurrentUserService _currentUser =
+  final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
   final TextEditingController _skillNameController =
@@ -29,13 +30,13 @@ class _AddSkillScreenState
 
   String? _selectedCategory;
 
-  String _experienceLevel = 'Intermediate';
+  String _level = 'Beginner';
 
-  String _availability = 'Weekends';
+  String _availability = 'Flexible';
 
   bool _saving = false;
 
-  final List<String> _categories = [
+  static const List<String> _categories = <String>[
     'Design & Creative',
     'Technology',
     'Photography',
@@ -46,7 +47,8 @@ class _AddSkillScreenState
     'Lifestyle',
   ];
 
-  final List<String> _availabilityOptions = [
+  static const List<String> _availabilityOptions =
+  <String>[
     'Weekdays',
     'Weekends',
     'Mornings',
@@ -102,186 +104,222 @@ class _AddSkillScreenState
   Widget build(
       BuildContext context,
       ) {
-    return Scaffold(
-      backgroundColor:
-      Theme.of(context)
-          .scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  16,
-                  20,
-                  30,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildIntro(),
-                    const SizedBox(
-                      height: 22,
-                    ),
-                    _buildLabel(
-                      'Skill Name',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildSkillNameField(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Category',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildCategoryDropdown(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Description',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildDescriptionField(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Experience Level',
-                    ),
-                    const SizedBox(
-                      height: 10,
-                    ),
-                    _buildExperienceSelector(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Availability',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildAvailabilitySelector(),
-                    const SizedBox(
-                      height: 28,
-                    ),
-                    _buildAddButton(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 60,
-      padding:
-      const EdgeInsets.symmetric(
-        horizontal: 10,
-      ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
-        border:
-        Border(
-          bottom:
-          BorderSide(
-            color:
-            _borderColor,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed:
-            _saving
-                ? null
-                : () {
-              Navigator.pop(
-                context,
-              );
-            },
-            icon:
-            Icon(
-              Icons
-                  .arrow_back_ios_new_rounded,
-              size: 18,
+    return PopScope(
+      canPop:
+      !_saving,
+      child:
+      Scaffold(
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
+        appBar:
+        AppBar(
+          backgroundColor:
+          Theme.of(context)
+              .scaffoldBackgroundColor,
+          surfaceTintColor:
+          Colors.transparent,
+          elevation:
+          0,
+          title:
+          Text(
+            'Add Learning Interest',
+            style:
+            TextStyle(
+              fontSize:
+              18,
+              fontWeight:
+              FontWeight.w800,
               color:
-              _saving
-                  ? _mutedColor
-                  : _primaryColor,
+              _textColor,
             ),
           ),
-          Expanded(
-            child: Center(
-              child: Text(
-                'Add Skill',
-                style:
-                TextStyle(
-                  fontSize: 15,
-                  fontWeight:
-                  FontWeight.w800,
-                  color:
-                  _textColor,
+        ),
+        body:
+        SafeArea(
+          child:
+          SingleChildScrollView(
+            physics:
+            const BouncingScrollPhysics(),
+            padding:
+            const EdgeInsets.fromLTRB(
+              20,
+              10,
+              20,
+              32,
+            ),
+            child:
+            Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                _buildIntro(),
+
+                const SizedBox(
+                  height:
+                  24,
                 ),
-              ),
+
+                _buildLabel(
+                  'Skill name',
+                ),
+
+                const SizedBox(
+                  height:
+                  8,
+                ),
+
+                _buildSkillNameField(),
+
+                const SizedBox(
+                  height:
+                  20,
+                ),
+
+                _buildLabel(
+                  'Category',
+                ),
+
+                const SizedBox(
+                  height:
+                  8,
+                ),
+
+                _buildCategoryField(),
+
+                const SizedBox(
+                  height:
+                  20,
+                ),
+
+                _buildLabel(
+                  'What do you want to learn?',
+                ),
+
+                const SizedBox(
+                  height:
+                  8,
+                ),
+
+                _buildDescriptionField(),
+
+                const SizedBox(
+                  height:
+                  20,
+                ),
+
+                _buildLabel(
+                  'Current level',
+                ),
+
+                const SizedBox(
+                  height:
+                  10,
+                ),
+
+                _buildLevelSelector(),
+
+                const SizedBox(
+                  height:
+                  20,
+                ),
+
+                _buildLabel(
+                  'Availability',
+                ),
+
+                const SizedBox(
+                  height:
+                  8,
+                ),
+
+                _buildAvailabilitySelector(),
+
+                const SizedBox(
+                  height:
+                  28,
+                ),
+
+                _buildSaveButton(),
+              ],
             ),
           ),
-          const SizedBox(
-            width: 48,
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildIntro() {
-    return Row(
-      crossAxisAlignment:
-      CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            'Share what you can teach with the community.',
-            style:
-            TextStyle(
-              fontSize: 11,
-              height: 1.4,
-              color:
-              _mutedColor,
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          18,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child:
+      Row(
+        children: [
+          Expanded(
+            child:
+            Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What would you like to learn?',
+                  style:
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
+                ),
+                const SizedBox(
+                  height:
+                  5,
+                ),
+                Text(
+                  'Add skills you want to learn so TubiLearn can better understand your learning goals.',
+                  style:
+                  AppTextStyles.bodyMuted
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(
-          width: 10,
-        ),
-        Image.asset(
-          'assets/images/mascot/tubi_explaining.png',
-          width: 66,
-          height: 66,
-          fit: BoxFit.contain,
-        ),
-      ],
+          const SizedBox(
+            width:
+            12,
+          ),
+          Image.asset(
+            'assets/images/mascot/tubi_studying.png',
+            width:
+            68,
+            height:
+            68,
+            fit:
+            BoxFit.contain,
+          ),
+        ],
+      ),
     );
   }
 
@@ -292,7 +330,8 @@ class _AddSkillScreenState
       text,
       style:
       TextStyle(
-        fontSize: 12,
+        fontSize:
+        12,
         fontWeight:
         FontWeight.w700,
         color:
@@ -309,28 +348,27 @@ class _AddSkillScreenState
       !_saving,
       maxLength:
       80,
+      textCapitalization:
+      TextCapitalization.words,
       style:
       TextStyle(
-        fontSize: 12,
         color:
         _textColor,
       ),
       decoration:
       InputDecoration(
         hintText:
-        'e.g. Digital Illustration',
+        'e.g. UI/UX Design',
         counterText:
         '',
         hintStyle:
         TextStyle(
-          fontSize: 11,
           color:
           _mutedColor,
         ),
         prefixIcon:
         Icon(
           Icons.lightbulb_outline_rounded,
-          size: 19,
           color:
           _primaryColor,
         ),
@@ -338,16 +376,11 @@ class _AddSkillScreenState
         true,
         fillColor:
         _surfaceColor,
-        contentPadding:
-        const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
-        ),
         border:
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -359,7 +392,7 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -371,7 +404,7 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -383,19 +416,21 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
             color:
             _primaryColor,
+            width:
+            1.3,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryDropdown() {
+  Widget _buildCategoryField() {
     return DropdownButtonFormField<String>(
       initialValue:
       _selectedCategory,
@@ -403,28 +438,11 @@ class _AddSkillScreenState
       true,
       dropdownColor:
       _surfaceColor,
-      hint:
-      Text(
-        'Select category',
-        style:
-        TextStyle(
-          fontSize: 11,
-          color:
-          _mutedColor,
-        ),
-      ),
-      icon:
-      Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color:
-        _mutedColor,
-      ),
       decoration:
       InputDecoration(
         prefixIcon:
         Icon(
           Icons.grid_view_rounded,
-          size: 18,
           color:
           _primaryColor,
         ),
@@ -432,16 +450,11 @@ class _AddSkillScreenState
         true,
         fillColor:
         _surfaceColor,
-        contentPadding:
-        const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
-        ),
         border:
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -453,7 +466,7 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -465,7 +478,7 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
@@ -477,37 +490,46 @@ class _AddSkillScreenState
         OutlineInputBorder(
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           borderSide:
           BorderSide(
             color:
             _primaryColor,
+            width:
+            1.3,
           ),
+        ),
+      ),
+      hint:
+      Text(
+        'Select category',
+        style:
+        TextStyle(
+          color:
+          _mutedColor,
         ),
       ),
       items:
       _categories.map(
             (
             String category,
-            ) {
-          return DropdownMenuItem<String>(
-            value:
-            category,
-            child:
-            Text(
+            ) =>
+            DropdownMenuItem<String>(
+              value:
               category,
-              overflow:
-              TextOverflow.ellipsis,
-              style:
-              TextStyle(
-                fontSize: 11,
-                color:
-                _textColor,
+              child:
+              Text(
+                category,
+                overflow:
+                TextOverflow.ellipsis,
+                style:
+                TextStyle(
+                  color:
+                  _textColor,
+                ),
               ),
             ),
-          );
-        },
       ).toList(),
       onChanged:
       _saving
@@ -535,24 +557,24 @@ class _AddSkillScreenState
           5,
           maxLength:
           200,
+          textCapitalization:
+          TextCapitalization.sentences,
           style:
           TextStyle(
-            fontSize: 12,
             color:
             _textColor,
           ),
           decoration:
           InputDecoration(
             hintText:
-            'Tell others what they can learn from you...',
+            'Describe what you want to learn or improve...',
+            counterText:
+            '',
             hintStyle:
             TextStyle(
-              fontSize: 11,
               color:
               _mutedColor,
             ),
-            counterText:
-            '',
             filled:
             true,
             fillColor:
@@ -568,7 +590,7 @@ class _AddSkillScreenState
             OutlineInputBorder(
               borderRadius:
               BorderRadius.circular(
-                12,
+                13,
               ),
               borderSide:
               BorderSide(
@@ -580,7 +602,7 @@ class _AddSkillScreenState
             OutlineInputBorder(
               borderRadius:
               BorderRadius.circular(
-                12,
+                13,
               ),
               borderSide:
               BorderSide(
@@ -592,7 +614,7 @@ class _AddSkillScreenState
             OutlineInputBorder(
               borderRadius:
               BorderRadius.circular(
-                12,
+                13,
               ),
               borderSide:
               BorderSide(
@@ -604,12 +626,14 @@ class _AddSkillScreenState
             OutlineInputBorder(
               borderRadius:
               BorderRadius.circular(
-                12,
+                13,
               ),
               borderSide:
               BorderSide(
                 color:
                 _primaryColor,
+                width:
+                1.3,
               ),
             ),
           ),
@@ -618,14 +642,16 @@ class _AddSkillScreenState
           },
         ),
         Positioned(
-          right: 12,
-          bottom: 10,
+          right:
+          12,
+          bottom:
+          10,
           child:
           Text(
             '${_descriptionController.text.length}/200',
             style:
-            TextStyle(
-              fontSize: 9,
+            AppTextStyles.caption
+                .copyWith(
               color:
               _mutedColor,
             ),
@@ -635,8 +661,9 @@ class _AddSkillScreenState
     );
   }
 
-  Widget _buildExperienceSelector() {
-    final List<String> levels = [
+  Widget _buildLevelSelector() {
+    const List<String> levels =
+    <String>[
       'Beginner',
       'Intermediate',
       'Advanced',
@@ -648,21 +675,24 @@ class _AddSkillScreenState
             (
             String level,
             ) {
-          final bool isSelected =
-              _experienceLevel ==
+          final bool selected =
+              _level ==
                   level;
 
           return Expanded(
-            child: Padding(
+            child:
+            Padding(
               padding:
               EdgeInsets.only(
                 right:
-                level == 'Advanced'
+                level == levels.last
                     ? 0
                     : 8,
               ),
-              child: SizedBox(
-                height: 42,
+              child:
+              SizedBox(
+                height:
+                42,
                 child:
                 OutlinedButton(
                   onPressed:
@@ -670,24 +700,24 @@ class _AddSkillScreenState
                       ? null
                       : () {
                     setState(() {
-                      _experienceLevel =
+                      _level =
                           level;
                     });
                   },
                   style:
                   OutlinedButton.styleFrom(
                     backgroundColor:
-                    isSelected
+                    selected
                         ? _primaryColor
                         : _surfaceColor,
                     foregroundColor:
-                    isSelected
+                    selected
                         ? _primaryForeground
                         : _textColor,
                     side:
                     BorderSide(
                       color:
-                      isSelected
+                      selected
                           ? _primaryColor
                           : _borderColor,
                     ),
@@ -706,9 +736,10 @@ class _AddSkillScreenState
                     level,
                     style:
                     TextStyle(
-                      fontSize: 9,
+                      fontSize:
+                      9,
                       fontWeight:
-                      isSelected
+                      selected
                           ? FontWeight.w700
                           : FontWeight.w500,
                     ),
@@ -726,7 +757,7 @@ class _AddSkillScreenState
     return InkWell(
       borderRadius:
       BorderRadius.circular(
-        12,
+        13,
       ),
       onTap:
       _saving
@@ -734,10 +765,12 @@ class _AddSkillScreenState
           : _showAvailabilitySheet,
       child:
       Container(
-        height: 48,
+        height:
+        50,
         padding:
         const EdgeInsets.symmetric(
-          horizontal: 14,
+          horizontal:
+          14,
         ),
         decoration:
         BoxDecoration(
@@ -745,7 +778,7 @@ class _AddSkillScreenState
           _surfaceColor,
           borderRadius:
           BorderRadius.circular(
-            12,
+            13,
           ),
           border:
           Border.all(
@@ -758,12 +791,14 @@ class _AddSkillScreenState
           children: [
             Icon(
               Icons.calendar_month_outlined,
-              size: 19,
               color:
               _primaryColor,
+              size:
+              20,
             ),
             const SizedBox(
-              width: 10,
+              width:
+              10,
             ),
             Expanded(
               child:
@@ -771,15 +806,15 @@ class _AddSkillScreenState
                 _availability,
                 style:
                 TextStyle(
-                  fontSize: 11,
+                  fontSize:
+                  12,
                   color:
                   _textColor,
                 ),
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
+              Icons.keyboard_arrow_down_rounded,
               color:
               _mutedColor,
             ),
@@ -789,141 +824,171 @@ class _AddSkillScreenState
     );
   }
 
-  void _showAvailabilitySheet() {
-    showModalBottomSheet(
+  Future<void> _showAvailabilitySheet() async {
+    final String? selected =
+    await showModalBottomSheet<String>(
       context:
       context,
       backgroundColor:
-      Colors.transparent,
+      _surfaceColor,
+      shape:
+      const RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.vertical(
+          top:
+          Radius.circular(
+            22,
+          ),
+        ),
+      ),
       builder:
           (
           BuildContext sheetContext,
           ) {
-        return Container(
-          padding:
-          const EdgeInsets.fromLTRB(
-            20,
-            18,
-            20,
-            28,
-          ),
-          decoration:
-          BoxDecoration(
-            color:
-            _surfaceColor,
-            borderRadius:
-            const BorderRadius.vertical(
-              top:
-              Radius.circular(
-                22,
-              ),
-            ),
-          ),
+        return SafeArea(
           child:
-          Column(
-            mainAxisSize:
-            MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration:
-                BoxDecoration(
-                  color:
-                  _borderColor,
-                  borderRadius:
-                  BorderRadius.circular(
-                    10,
+          Padding(
+            padding:
+            const EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              24,
+            ),
+            child:
+            Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child:
+                  Container(
+                    width:
+                    40,
+                    height:
+                    4,
+                    decoration:
+                    BoxDecoration(
+                      color:
+                      _borderColor,
+                      borderRadius:
+                      BorderRadius.circular(
+                        10,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(
-                height: 18,
-              ),
-              Align(
-                alignment:
-                Alignment.centerLeft,
-                child:
+                const SizedBox(
+                  height:
+                  18,
+                ),
                 Text(
-                  'Choose Availability',
+                  'Choose availability',
                   style:
-                  TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                    FontWeight.w800,
+                  AppTextStyles.cardTitle
+                      .copyWith(
                     color:
                     _textColor,
                   ),
                 ),
-              ),
-              const SizedBox(
-                height: 10,
-              ),
-              ..._availabilityOptions.map(
-                    (
-                    String option,
-                    ) {
-                  final bool selected =
-                      _availability ==
-                          option;
-
-                  return ListTile(
-                    contentPadding:
-                    EdgeInsets.zero,
-                    title:
-                    Text(
-                      option,
-                      style:
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color:
-                        _textColor,
+                const SizedBox(
+                  height:
+                  8,
+                ),
+                ..._availabilityOptions.map(
+                      (
+                      String option,
+                      ) {
+                    return ListTile(
+                      contentPadding:
+                      EdgeInsets.zero,
+                      title:
+                      Text(
+                        option,
+                        style:
+                        TextStyle(
+                          color:
+                          _textColor,
+                        ),
                       ),
-                    ),
-                    trailing:
-                    selected
-                        ? Icon(
-                      Icons.check_circle_rounded,
-                      color:
-                      _primaryColor,
-                    )
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        _availability =
-                            option;
-                      });
-
-                      Navigator.pop(
-                        sheetContext,
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
+                      trailing:
+                      _availability ==
+                          option
+                          ? Icon(
+                        Icons.check_circle_rounded,
+                        color:
+                        _primaryColor,
+                      )
+                          : null,
+                      onTap: () {
+                        Navigator.pop(
+                          sheetContext,
+                          option,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
     );
+
+    if (!mounted ||
+        selected == null) {
+      return;
+    }
+
+    setState(() {
+      _availability =
+          selected;
+    });
   }
 
-  Widget _buildAddButton() {
+  Widget _buildSaveButton() {
     return SizedBox(
       width:
       double.infinity,
       height:
       48,
       child:
-      ElevatedButton(
+      ElevatedButton.icon(
         onPressed:
         _saving
             ? null
-            : _saveSkill,
+            : _save,
+        icon:
+        _saving
+            ? SizedBox(
+          width:
+          18,
+          height:
+          18,
+          child:
+          CircularProgressIndicator(
+            strokeWidth:
+            2,
+            color:
+            _primaryForeground,
+          ),
+        )
+            : const Icon(
+          Icons.add_rounded,
+          size:
+          20,
+        ),
+        label:
+        Text(
+          _saving
+              ? 'ADDING...'
+              : 'ADD LEARNING INTEREST',
+          style:
+          AppTextStyles.button,
+        ),
         style:
         ElevatedButton.styleFrom(
           backgroundColor:
@@ -936,61 +1001,48 @@ class _AddSkillScreenState
           _mutedColor,
           elevation:
           0,
-          minimumSize:
-          const Size(
-            0,
-            48,
-          ),
           shape:
           RoundedRectangleBorder(
             borderRadius:
             BorderRadius.circular(
-              12,
+              13,
             ),
-          ),
-        ),
-        child:
-        _saving
-            ? SizedBox(
-          width: 20,
-          height: 20,
-          child:
-          CircularProgressIndicator(
-            strokeWidth: 2,
-            color:
-            _primaryForeground,
-          ),
-        )
-            : const Text(
-          'ADD SKILL',
-          style:
-          TextStyle(
-            fontSize: 11,
-            fontWeight:
-            FontWeight.w800,
-            letterSpacing:
-            0.4,
           ),
         ),
       ),
     );
   }
 
-  Future<void> _saveSkill() async {
-    final String title =
+  Future<void> _save() async {
+    if (_saving) {
+      return;
+    }
+
+    final String skillName =
     _skillNameController.text.trim();
 
     final String description =
     _descriptionController.text.trim();
 
-    if (title.isEmpty) {
+    final String? category =
+        _selectedCategory;
+
+    if (skillName.isEmpty) {
       _showMessage(
-        'Please enter a skill name.',
+        'Skill name is required.',
       );
       return;
     }
 
-    if (_selectedCategory == null) {
+    if (skillName.length > 80) {
+      _showMessage(
+        'Skill name must be 80 characters or less.',
+      );
+      return;
+    }
+
+    if (category == null ||
+        category.trim().isEmpty) {
       _showMessage(
         'Please select a category.',
       );
@@ -999,27 +1051,42 @@ class _AddSkillScreenState
 
     if (description.isEmpty) {
       _showMessage(
-        'Please add a short description.',
+        'Please describe what you want to learn.',
       );
       return;
     }
 
+    if (description.length > 200) {
+      _showMessage(
+        'Description must be 200 characters or less.',
+      );
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
     setState(() {
-      _saving = true;
+      _saving =
+      true;
     });
 
     try {
-      await _repository.addOfferedSkill(
+      final String userId =
+      _currentUserService.requireUserId();
+
+      await _repository.addWantedSkill(
         userId:
-        _currentUser.userId,
+        userId,
         title:
-        title,
+        skillName,
         category:
-        _selectedCategory!,
+        category,
         description:
         description,
         level:
-        _experienceLevel,
+        _level,
         availability:
         _availability,
       );
@@ -1028,48 +1095,64 @@ class _AddSkillScreenState
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content:
-          Text(
-            'Skill added successfully!',
-          ),
-        ),
-      );
-
       Navigator.pop(
         context,
         true,
       );
-    } catch (error) {
+    } on CurrentUserServiceException catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _saving = false;
-      });
+      _showMessage(
+        error.message,
+      );
+    } on WantedSkillsRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
 
       _showMessage(
-        error.toString(),
+        error.message,
       );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Could not add the learning interest. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving =
+          false;
+        });
+      }
     }
   }
 
   void _showMessage(
       String message,
       ) {
+    if (!mounted) {
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(
-      SnackBar(
-        content:
-        Text(
-          message,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
   }
 }

@@ -28,21 +28,6 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState
     extends State<UserProfileScreen> {
-  static const Color primary =
-      AppTheme.primary;
-
-  static const Color darkText =
-      AppTheme.darkText;
-
-  static const Color mutedText =
-      AppTheme.mutedText;
-
-  static const Color background =
-      AppTheme.background;
-
-  static const Color border =
-      AppTheme.border;
-
   static final ExploreRepository _repository =
   ExploreRepository();
 
@@ -56,8 +41,90 @@ class _UserProfileScreenState
       _isOpeningConversation ||
           _isOpeningSwapRequest;
 
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
+  Color get _surfaceColor =>
+      Theme.of(context).colorScheme.surface;
+
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
+  Color get _textColor =>
+      Theme.of(context).colorScheme.onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  Color get _softPrimaryColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFE4F0EF,
+      );
+
+  Color get _wantedBackgroundColor =>
+      _isDarkMode
+          ? AppTheme.accent.withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFFFF4E8,
+      );
+
+  Color get _wantedTextColor =>
+      _isDarkMode
+          ? const Color(
+        0xFFFFC37B,
+      )
+          : const Color(
+        0xFFB66C18,
+      );
+
+  Color get _trustBackgroundColor =>
+      _isDarkMode
+          ? AppTheme.success.withValues(
+        alpha: 0.13,
+      )
+          : const Color(
+        0xFFF2F8F4,
+      );
+
+  Color get _trustBorderColor =>
+      _isDarkMode
+          ? AppTheme.success.withValues(
+        alpha: 0.32,
+      )
+          : const Color(
+        0xFFD4E8DB,
+      );
+
+  Color get _primaryForeground =>
+      _isDarkMode
+          ? const Color(
+        0xFF092E31,
+      )
+          : Colors.white;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     final List<Skill> offeredSkills =
     _getOfferedSkills();
 
@@ -66,12 +133,12 @@ class _UserProfileScreenState
 
     return Scaffold(
       backgroundColor:
-      background,
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
-
             Expanded(
               child:
               SingleChildScrollView(
@@ -100,10 +167,14 @@ class _UserProfileScreenState
                       height: 24,
                     ),
 
-                    const Text(
+                    Text(
                       'About',
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
                     ),
 
                     const SizedBox(
@@ -113,7 +184,11 @@ class _UserProfileScreenState
                     Text(
                       user.bio,
                       style:
-                      AppTextStyles.bodyMuted,
+                      AppTextStyles.bodyMuted
+                          .copyWith(
+                        color:
+                        _mutedColor,
+                      ),
                     ),
 
                     const SizedBox(
@@ -126,10 +201,14 @@ class _UserProfileScreenState
                       height: 24,
                     ),
 
-                    const Text(
+                    Text(
                       'Skills offered',
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
                     ),
 
                     const SizedBox(
@@ -137,15 +216,21 @@ class _UserProfileScreenState
                     ),
 
                     if (offeredSkills.isEmpty)
-                      const Text(
+                      Text(
                         'No offered skills yet.',
                         style:
-                        AppTextStyles.bodyMuted,
+                        AppTextStyles.bodyMuted
+                            .copyWith(
+                          color:
+                          _mutedColor,
+                        ),
                       )
                     else
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing:
+                        8,
+                        runSpacing:
+                        8,
                         children:
                         offeredSkills.map(
                               (
@@ -153,10 +238,8 @@ class _UserProfileScreenState
                               ) {
                             return _skillChip(
                               skill.title,
-                              const Color(
-                                0xFFF0EFFF,
-                              ),
-                              primary,
+                              _softPrimaryColor,
+                              _primaryColor,
                             );
                           },
                         ).toList(),
@@ -166,10 +249,14 @@ class _UserProfileScreenState
                       height: 24,
                     ),
 
-                    const Text(
+                    Text(
                       'Wants to learn',
                       style:
-                      AppTextStyles.cardTitle,
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
                     ),
 
                     const SizedBox(
@@ -177,15 +264,21 @@ class _UserProfileScreenState
                     ),
 
                     if (wantedSkills.isEmpty)
-                      const Text(
+                      Text(
                         'No learning interests yet.',
                         style:
-                        AppTextStyles.bodyMuted,
+                        AppTextStyles.bodyMuted
+                            .copyWith(
+                          color:
+                          _mutedColor,
+                        ),
                       )
                     else
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing:
+                        8,
+                        runSpacing:
+                        8,
                         children:
                         wantedSkills.map(
                               (
@@ -193,12 +286,8 @@ class _UserProfileScreenState
                               ) {
                             return _skillChip(
                               skill.title,
-                              const Color(
-                                0xFFFFF4E8,
-                              ),
-                              const Color(
-                                0xFFCA7A1B,
-                              ),
+                              _wantedBackgroundColor,
+                              _wantedTextColor,
                             );
                           },
                         ).toList(),
@@ -234,21 +323,28 @@ class _UserProfileScreenState
 
   Widget _buildTopBar() {
     return Container(
-      height: 62,
+      height:
+      62,
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 10,
+        horizontal:
+        10,
       ),
       decoration:
-      const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: border,
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        border:
+        Border(
+          bottom:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           IconButton(
             onPressed:
@@ -260,20 +356,29 @@ class _UserProfileScreenState
               );
             },
             icon:
-            const Icon(
-              Icons
-                  .arrow_back_ios_new_rounded,
-              size: 18,
-              color: primary,
+            Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size:
+              18,
+              color:
+              _hasPendingAction
+                  ? _mutedColor
+                  : _primaryColor,
             ),
           ),
 
-          const Expanded(
-            child: Center(
-              child: Text(
+          Expanded(
+            child:
+            Center(
+              child:
+              Text(
                 'Profile',
                 style:
-                AppTextStyles.cardTitle,
+                AppTextStyles.cardTitle
+                    .copyWith(
+                  color:
+                  _textColor,
+                ),
               ),
             ),
           ),
@@ -284,9 +389,10 @@ class _UserProfileScreenState
                 ? null
                 : () {},
             icon:
-            const Icon(
+            Icon(
               Icons.more_horiz_rounded,
-              color: mutedText,
+              color:
+              _mutedColor,
             ),
           ),
         ],
@@ -302,23 +408,26 @@ class _UserProfileScreenState
     return Row(
       children: [
         Container(
-          width: 78,
-          height: 78,
+          width:
+          78,
+          height:
+          78,
           decoration:
           const BoxDecoration(
-            color: Color(
-              0xFFFFB45E,
-            ),
+            color:
+            AppTheme.accent,
             shape:
             BoxShape.circle,
           ),
           alignment:
           Alignment.center,
-          child: Text(
+          child:
+          Text(
             user.initials,
             style:
             const TextStyle(
-              fontSize: 20,
+              fontSize:
+              20,
               fontWeight:
               FontWeight.w800,
               color:
@@ -328,89 +437,108 @@ class _UserProfileScreenState
         ),
 
         const SizedBox(
-          width: 16,
+          width:
+          16,
         ),
 
         Expanded(
-          child: Column(
+          child:
+          Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
               Text(
                 user.name,
                 style:
-                AppTextStyles.pageTitle,
+                AppTextStyles.pageTitle
+                    .copyWith(
+                  color:
+                  _textColor,
+                ),
               ),
 
               const SizedBox(
-                height: 4,
+                height:
+                4,
               ),
 
               Row(
                 children: [
-                  const Icon(
-                    Icons
-                        .location_on_outlined,
-                    size: 15,
+                  Icon(
+                    Icons.location_on_outlined,
+                    size:
+                    15,
                     color:
-                    mutedText,
+                    _mutedColor,
                   ),
 
                   const SizedBox(
-                    width: 4,
+                    width:
+                    4,
                   ),
 
                   Expanded(
-                    child: Text(
+                    child:
+                    Text(
                       user.city,
                       style:
-                      AppTextStyles.secondary,
+                      AppTextStyles.secondary
+                          .copyWith(
+                        color:
+                        _mutedColor,
+                      ),
                     ),
                   ),
                 ],
               ),
 
               const SizedBox(
-                height: 8,
+                height:
+                8,
               ),
 
               Row(
                 children: [
                   const Icon(
                     Icons.star_rounded,
-                    size: 17,
-                    color: Color(
-                      0xFFFFB547,
-                    ),
+                    size:
+                    17,
+                    color:
+                    AppTheme.accent,
                   ),
 
                   const SizedBox(
-                    width: 3,
+                    width:
+                    3,
                   ),
 
                   Text(
-                    user.rating
-                        .toStringAsFixed(
+                    user.rating.toStringAsFixed(
                       1,
                     ),
                     style:
                     AppTextStyles.secondary
                         .copyWith(
                       color:
-                      darkText,
+                      _textColor,
                       fontWeight:
                       FontWeight.w700,
                     ),
                   ),
 
                   const SizedBox(
-                    width: 5,
+                    width:
+                    5,
                   ),
 
                   Text(
                     '(${user.reviewCount} reviews)',
                     style:
-                    AppTextStyles.caption,
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _mutedColor,
+                    ),
                   ),
                 ],
               ),
@@ -420,8 +548,10 @@ class _UserProfileScreenState
 
         Image.asset(
           'assets/images/mascot/tubi_happy.png',
-          width: 58,
-          height: 58,
+          width:
+          58,
+          height:
+          58,
         ),
       ],
     );
@@ -435,29 +565,34 @@ class _UserProfileScreenState
     return Row(
       children: [
         Expanded(
-          child: _statBox(
+          child:
+          _statBox(
             '${user.completedSwaps}',
             'Completed swaps',
           ),
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
         Expanded(
-          child: _statBox(
+          child:
+          _statBox(
             '${user.responseRate}%',
             'Response rate',
           ),
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
         Expanded(
-          child: _statBox(
+          child:
+          _statBox(
             user.memberSince,
             'Member since',
           ),
@@ -473,13 +608,15 @@ class _UserProfileScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        vertical: 14,
-        horizontal: 8,
+        vertical:
+        14,
+        horizontal:
+        8,
       ),
       decoration:
       BoxDecoration(
         color:
-        Colors.white,
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           14,
@@ -487,19 +624,25 @@ class _UserProfileScreenState
         border:
         Border.all(
           color:
-          border,
+          _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         children: [
           Text(
             value,
             style:
-            AppTextStyles.cardTitle,
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor,
+            ),
           ),
 
           const SizedBox(
-            height: 4,
+            height:
+            4,
           ),
 
           Text(
@@ -507,7 +650,11 @@ class _UserProfileScreenState
             textAlign:
             TextAlign.center,
             style:
-            AppTextStyles.caption,
+            AppTextStyles.caption
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
           ),
         ],
       ),
@@ -527,7 +674,7 @@ class _UserProfileScreenState
       decoration:
       BoxDecoration(
         color:
-        Colors.white,
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           16,
@@ -535,10 +682,11 @@ class _UserProfileScreenState
         border:
         Border.all(
           color:
-          border,
+          _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         children: [
           _infoRow(
             Icons.language_rounded,
@@ -546,9 +694,11 @@ class _UserProfileScreenState
             user.language,
           ),
 
-          const Divider(
-            height: 22,
-            color: border,
+          Divider(
+            height:
+            22,
+            color:
+            _borderColor,
           ),
 
           _infoRow(
@@ -557,9 +707,11 @@ class _UserProfileScreenState
             user.availability,
           ),
 
-          const Divider(
-            height: 22,
-            color: border,
+          Divider(
+            height:
+            22,
+            color:
+            _borderColor,
           ),
 
           _infoRow(
@@ -568,9 +720,11 @@ class _UserProfileScreenState
             user.preferredMode,
           ),
 
-          const Divider(
-            height: 22,
-            color: border,
+          Divider(
+            height:
+            22,
+            color:
+            _borderColor,
           ),
 
           _infoRow(
@@ -594,28 +748,36 @@ class _UserProfileScreenState
       children: [
         Icon(
           icon,
-          size: 18,
+          size:
+          18,
           color:
-          primary,
+          _primaryColor,
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
         Expanded(
-          child: Column(
+          child:
+          Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
               Text(
                 label,
                 style:
-                AppTextStyles.caption,
+                AppTextStyles.caption
+                    .copyWith(
+                  color:
+                  _mutedColor,
+                ),
               ),
 
               const SizedBox(
-                height: 3,
+                height:
+                3,
               ),
 
               Text(
@@ -624,7 +786,7 @@ class _UserProfileScreenState
                 AppTextStyles.secondary
                     .copyWith(
                   color:
-                  darkText,
+                  _textColor,
                   fontWeight:
                   FontWeight.w600,
                 ),
@@ -648,8 +810,10 @@ class _UserProfileScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
+        horizontal:
+        11,
+        vertical:
+        7,
       ),
       decoration:
       BoxDecoration(
@@ -660,7 +824,8 @@ class _UserProfileScreenState
           20,
         ),
       ),
-      child: Text(
+      child:
+      Text(
         skill,
         style:
         AppTextStyles.secondary
@@ -723,9 +888,7 @@ class _UserProfileScreenState
       decoration:
       BoxDecoration(
         color:
-        const Color(
-          0xFFF3FBF6,
-        ),
+        _trustBackgroundColor,
         borderRadius:
         BorderRadius.circular(
           15,
@@ -733,12 +896,11 @@ class _UserProfileScreenState
         border:
         Border.all(
           color:
-          const Color(
-            0xFFD9F0E0,
-          ),
+          _trustBorderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -747,12 +909,16 @@ class _UserProfileScreenState
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              fontSize: 14,
+              fontSize:
+              14,
+              color:
+              _textColor,
             ),
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           if (user.emailVerified)
@@ -762,7 +928,8 @@ class _UserProfileScreenState
 
           if (user.emailVerified)
             const SizedBox(
-              height: 7,
+              height:
+              7,
             ),
 
           if (user.profileCompleted)
@@ -772,7 +939,8 @@ class _UserProfileScreenState
 
           if (user.profileCompleted)
             const SizedBox(
-              height: 7,
+              height:
+              7,
             ),
 
           _trustRow(
@@ -790,25 +958,26 @@ class _UserProfileScreenState
       children: [
         const Icon(
           Icons.check_circle_rounded,
-          size: 16,
+          size:
+          16,
           color:
-          Color(
-            0xFF47A568,
-          ),
+          AppTheme.success,
         ),
 
         const SizedBox(
-          width: 7,
+          width:
+          7,
         ),
 
         Expanded(
-          child: Text(
+          child:
+          Text(
             text,
             style:
             AppTextStyles.secondary
                 .copyWith(
               color:
-              darkText,
+              _textColor,
             ),
           ),
         ),
@@ -827,8 +996,10 @@ class _UserProfileScreenState
     return Row(
       children: [
         Expanded(
-          child: SizedBox(
-            height: 46,
+          child:
+          SizedBox(
+            height:
+            46,
             child:
             OutlinedButton.icon(
               onPressed:
@@ -842,20 +1013,26 @@ class _UserProfileScreenState
               },
               icon:
               _isOpeningConversation
-                  ? const SizedBox(
-                width: 16,
-                height: 16,
+                  ? SizedBox(
+                width:
+                16,
+                height:
+                16,
                 child:
                 CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth:
+                  2,
+                  color:
+                  _primaryColor,
                 ),
               )
                   : const Icon(
-                Icons
-                    .chat_bubble_outline_rounded,
-                size: 16,
+                Icons.chat_bubble_outline_rounded,
+                size:
+                16,
               ),
-              label: Text(
+              label:
+              Text(
                 _isOpeningConversation
                     ? 'OPENING...'
                     : 'MESSAGE',
@@ -865,15 +1042,15 @@ class _UserProfileScreenState
               style:
               OutlinedButton.styleFrom(
                 foregroundColor:
-                primary,
+                _primaryColor,
                 disabledForegroundColor:
-                mutedText,
+                _mutedColor,
                 side:
                 BorderSide(
                   color:
                   _hasPendingAction
-                      ? border
-                      : primary,
+                      ? _borderColor
+                      : _primaryColor,
                 ),
                 shape:
                 RoundedRectangleBorder(
@@ -888,12 +1065,15 @@ class _UserProfileScreenState
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
         Expanded(
-          child: SizedBox(
-            height: 46,
+          child:
+          SizedBox(
+            height:
+            46,
             child:
             ElevatedButton.icon(
               onPressed:
@@ -906,20 +1086,23 @@ class _UserProfileScreenState
               },
               icon:
               _isOpeningSwapRequest
-                  ? const SizedBox(
-                width: 16,
-                height: 16,
+                  ? SizedBox(
+                width:
+                16,
+                height:
+                16,
                 child:
                 CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth:
+                  2,
                   color:
-                  Colors.white,
+                  _primaryForeground,
                 ),
               )
                   : const Icon(
-                Icons
-                    .swap_horiz_rounded,
-                size: 17,
+                Icons.swap_horiz_rounded,
+                size:
+                17,
               ),
               label:
               Text(
@@ -932,14 +1115,15 @@ class _UserProfileScreenState
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
-                primary,
+                _primaryColor,
                 foregroundColor:
-                Colors.white,
+                _primaryForeground,
                 disabledBackgroundColor:
-                border,
+                _surfaceVariantColor,
                 disabledForegroundColor:
-                mutedText,
-                elevation: 0,
+                _mutedColor,
+                elevation:
+                0,
                 minimumSize:
                 const Size(
                   0,
@@ -980,14 +1164,12 @@ class _UserProfileScreenState
     final String skillWanted =
     offeredSkills.isEmpty
         ? 'Skill'
-        : offeredSkills
-        .first.title;
+        : offeredSkills.first.title;
 
     final String skillOffered =
     wantedSkills.isEmpty
         ? 'Skill'
-        : wantedSkills
-        .first.title;
+        : wantedSkills.first.title;
 
     try {
       final conversation =
@@ -1200,6 +1382,8 @@ class _UserProfileScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
           shape:
           RoundedRectangleBorder(
             borderRadius:
@@ -1211,37 +1395,42 @@ class _UserProfileScreenState
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width:
+                38,
+                height:
+                38,
                 decoration:
-                const BoxDecoration(
+                BoxDecoration(
                   color:
-                  Color(
-                    0xFFF0EFFF,
-                  ),
+                  _softPrimaryColor,
                   shape:
                   BoxShape.circle,
                 ),
                 child:
-                const Icon(
-                  Icons
-                      .history_rounded,
+                Icon(
+                  Icons.history_rounded,
                   color:
-                  primary,
-                  size: 21,
+                  _primaryColor,
+                  size:
+                  21,
                 ),
               ),
 
               const SizedBox(
-                width: 12,
+                width:
+                12,
               ),
 
-              const Expanded(
+              Expanded(
                 child:
                 Text(
                   'Previous chat found',
                   style:
-                  AppTextStyles.cardTitle,
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
                 ),
               ),
             ],
@@ -1251,7 +1440,11 @@ class _UserProfileScreenState
             'You previously removed your conversation with ${user.name}. '
                 'You can restore that chat and its messages, or start a fresh conversation.',
             style:
-            AppTextStyles.bodyMuted,
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
           ),
           actionsPadding:
           const EdgeInsets.fromLTRB(
@@ -1262,8 +1455,7 @@ class _UserProfileScreenState
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop(
@@ -1277,14 +1469,13 @@ class _UserProfileScreenState
                 AppTextStyles.button
                     .copyWith(
                   color:
-                  mutedText,
+                  _mutedColor,
                 ),
               ),
             ),
 
             TextButton.icon(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop(
@@ -1294,7 +1485,8 @@ class _UserProfileScreenState
               icon:
               const Icon(
                 Icons.restore_rounded,
-                size: 17,
+                size:
+                17,
               ),
               label:
               const Text(
@@ -1305,13 +1497,12 @@ class _UserProfileScreenState
               style:
               TextButton.styleFrom(
                 foregroundColor:
-                primary,
+                _primaryColor,
               ),
             ),
 
             ElevatedButton.icon(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop(
@@ -1320,9 +1511,9 @@ class _UserProfileScreenState
               },
               icon:
               const Icon(
-                Icons
-                    .add_comment_outlined,
-                size: 17,
+                Icons.add_comment_outlined,
+                size:
+                17,
               ),
               label:
               const Text(
@@ -1333,10 +1524,11 @@ class _UserProfileScreenState
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
-                primary,
+                _primaryColor,
                 foregroundColor:
-                Colors.white,
-                elevation: 0,
+                _primaryForeground,
+                elevation:
+                0,
                 minimumSize:
                 const Size(
                   0,

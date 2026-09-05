@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../model/conversation.dart';
 import '../services/chat_service.dart';
+import '../theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -15,19 +16,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   static const Color primary =
-  Color(0xFF5B5FEF);
-
-  static const Color darkText =
-  Color(0xFF171A2B);
-
-  static const Color mutedText =
-  Color(0xFF8A8FA3);
-
-  static const Color background =
-  Color(0xFFF9F9FF);
-
-  static const Color border =
-  Color(0xFFE8E8F2);
+      AppTheme.primary;
 
   final TextEditingController
   _searchController =
@@ -43,6 +32,33 @@ class _ChatScreenState extends State<ChatScreen> {
   bool get _hasPendingAction =>
       _openingConversationId != null ||
           _deletingConversationId != null;
+
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _surfaceColor =>
+      Theme.of(context).colorScheme.surface;
+
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
+  Color get _textColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
 
   @override
   void initState() {
@@ -119,14 +135,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ) {
         final DateTime aTime =
         a.messages.isEmpty
-            ? DateTime.fromMillisecondsSinceEpoch(
+            ? DateTime
+            .fromMillisecondsSinceEpoch(
           0,
         )
             : a.messages.last.sentAt;
 
         final DateTime bTime =
         b.messages.isEmpty
-            ? DateTime.fromMillisecondsSinceEpoch(
+            ? DateTime
+            .fromMillisecondsSinceEpoch(
           0,
         )
             : b.messages.last.sentAt;
@@ -181,7 +199,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _visibleConversations();
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -206,7 +226,8 @@ class _ChatScreenState extends State<ChatScreen> {
       ) {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
+        child:
+        CircularProgressIndicator(
           color: primary,
         ),
       );
@@ -270,12 +291,11 @@ class _ChatScreenState extends State<ChatScreen> {
       const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration:
-      const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         border: Border(
           bottom: BorderSide(
-            color: border,
+            color: _borderColor,
           ),
         ),
       ),
@@ -290,7 +310,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 context,
               );
             },
-            icon: const Icon(
+            icon:
+            const Icon(
               Icons
                   .arrow_back_ios_new_rounded,
               size: 18,
@@ -298,7 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Messages',
@@ -306,7 +327,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   fontSize: 15,
                   fontWeight:
                   FontWeight.w800,
-                  color: darkText,
+                  color: _textColor,
                 ),
               ),
             ),
@@ -336,7 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildSearchBar() {
     return Container(
-      color: Colors.white,
+      color: _surfaceColor,
       padding:
       const EdgeInsets.fromLTRB(
         20,
@@ -350,6 +371,10 @@ class _ChatScreenState extends State<ChatScreen> {
         autofocus: true,
         textInputAction:
         TextInputAction.search,
+        style: TextStyle(
+          color: _textColor,
+          fontSize: 13,
+        ),
         onChanged: (_) {
           if (!mounted) {
             return;
@@ -361,16 +386,14 @@ class _ChatScreenState extends State<ChatScreen> {
         InputDecoration(
           hintText:
           'Search conversations',
-          hintStyle:
-          const TextStyle(
+          hintStyle: TextStyle(
             fontSize: 12,
-            color: mutedText,
+            color: _mutedColor,
           ),
-          prefixIcon:
-          const Icon(
+          prefixIcon: Icon(
             Icons.search_rounded,
             size: 19,
-            color: mutedText,
+            color: _mutedColor,
           ),
           suffixIcon:
           _searchController
@@ -384,16 +407,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
               setState(() {});
             },
-            icon:
-            const Icon(
+            icon: Icon(
               Icons
                   .clear_rounded,
               size: 18,
+              color:
+              _mutedColor,
             ),
           ),
           filled: true,
           fillColor:
-          background,
+          _surfaceVariantColor,
           contentPadding:
           const EdgeInsets
               .symmetric(
@@ -415,8 +439,8 @@ class _ChatScreenState extends State<ChatScreen> {
               14,
             ),
             borderSide:
-            const BorderSide(
-              color: border,
+            BorderSide(
+              color: _borderColor,
             ),
           ),
           focusedBorder:
@@ -499,21 +523,23 @@ class _ChatScreenState extends State<ChatScreen> {
         const EdgeInsets.all(
           14,
         ),
-        decoration:
-        BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: _surfaceColor,
           borderRadius:
           BorderRadius.circular(
             16,
           ),
           border: Border.all(
-            color: border,
+            color: _borderColor,
           ),
           boxShadow: [
             BoxShadow(
               color: Colors.black
                   .withValues(
-                alpha: 0.025,
+                alpha:
+                _isDarkMode
+                    ? 0.10
+                    : 0.025,
               ),
               blurRadius: 10,
               offset:
@@ -552,7 +578,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontSize: 13,
                       fontWeight:
                       FontWeight.w800,
-                      color: Colors.white,
+                      color:
+                      Colors.white,
                     ),
                   ),
                 ),
@@ -574,7 +601,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       border:
                       Border.all(
                         color:
-                        Colors.white,
+                        _surfaceColor,
                         width: 2,
                       ),
                     ),
@@ -599,12 +626,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           conversation
                               .userName,
                           style:
-                          const TextStyle(
+                          TextStyle(
                             fontSize: 13,
                             fontWeight:
-                            FontWeight.w800,
+                            FontWeight
+                                .w800,
                             color:
-                            darkText,
+                            _textColor,
                           ),
                         ),
                       ),
@@ -615,8 +643,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           height: 15,
                           child:
                           CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: primary,
+                            strokeWidth:
+                            2,
+                            color:
+                            primary,
                           ),
                         )
                       else if (latestMessage !=
@@ -627,10 +657,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                 .sentAt,
                           ),
                           style:
-                          const TextStyle(
-                            fontSize: 8.5,
+                          TextStyle(
+                            fontSize:
+                            8.5,
                             color:
-                            mutedText,
+                            _mutedColor,
                           ),
                         ),
                     ],
@@ -643,9 +674,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     conversation.city,
                     style:
-                    const TextStyle(
+                    TextStyle(
                       fontSize: 8.5,
-                      color: mutedText,
+                      color:
+                      _mutedColor,
                     ),
                   ),
 
@@ -659,7 +691,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         Icons
                             .swap_horiz_rounded,
                         size: 14,
-                        color: primary,
+                        color:
+                        primary,
                       ),
 
                       const SizedBox(
@@ -677,8 +710,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           const TextStyle(
                             fontSize: 9,
                             fontWeight:
-                            FontWeight.w600,
-                            color: primary,
+                            FontWeight
+                                .w600,
+                            color:
+                            primary,
                           ),
                         ),
                       ),
@@ -703,10 +738,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           TextOverflow
                               .ellipsis,
                           style:
-                          const TextStyle(
+                          TextStyle(
                             fontSize: 10,
                             color:
-                            mutedText,
+                            _mutedColor,
                           ),
                         ),
                       ),
@@ -741,7 +776,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           TextStyle(
                             fontSize: 7.5,
                             fontWeight:
-                            FontWeight.w700,
+                            FontWeight
+                                .w700,
                             color:
                             _statusColor(
                               conversation
@@ -774,13 +810,12 @@ class _ChatScreenState extends State<ChatScreen> {
                             conversation,
                           );
                         },
-                        icon:
-                        const Icon(
+                        icon: Icon(
                           Icons
                               .more_vert_rounded,
                           size: 17,
                           color:
-                          mutedText,
+                          _mutedColor,
                         ),
                       ),
                     ],
@@ -856,7 +891,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await showModalBottomSheet<String>(
       context: context,
       backgroundColor:
-      Colors.white,
+      _surfaceColor,
       showDragHandle: true,
       builder:
           (
@@ -877,10 +912,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   const Icon(
                     Icons
                         .chat_bubble_outline_rounded,
-                    color: primary,
+                    color:
+                    primary,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Open conversation',
+                    style: TextStyle(
+                      color:
+                      _textColor,
+                    ),
                   ),
                   onTap: () {
                     Navigator.pop(
@@ -893,11 +933,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ListTile(
                   leading:
                   const Icon(
-                    Icons.delete_outline_rounded,
+                    Icons
+                        .delete_outline_rounded,
                     color:
                     Colors.redAccent,
                   ),
-                  title: const Text(
+                  title:
+                  const Text(
                     'Delete conversation',
                     style:
                     TextStyle(
@@ -953,18 +995,28 @@ class _ChatScreenState extends State<ChatScreen> {
     final bool? confirmed =
     await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible:
+      false,
       builder:
           (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Delete conversation?',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
           content: Text(
             'This will permanently delete your conversation with ${conversation.userName} and its saved messages.',
+            style: TextStyle(
+              color: _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -974,9 +1026,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'CANCEL',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
 
@@ -1082,24 +1137,24 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisAlignment:
           MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons
                   .error_outline_rounded,
               size: 48,
-              color: mutedText,
+              color: _mutedColor,
             ),
 
             const SizedBox(
               height: 14,
             ),
 
-            const Text(
+            Text(
               'Couldn’t load messages',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
-                color: darkText,
+                color: _textColor,
               ),
             ),
 
@@ -1113,10 +1168,11 @@ class _ChatScreenState extends State<ChatScreen> {
               textAlign:
               TextAlign.center,
               style:
-              const TextStyle(
+              TextStyle(
                 fontSize: 10.5,
                 height: 1.5,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
 
@@ -1160,13 +1216,13 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 14,
             ),
 
-            const Text(
+            Text(
               'No conversations yet',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
-                color: darkText,
+                color: _textColor,
               ),
             ),
 
@@ -1174,14 +1230,16 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 6,
             ),
 
-            const Text(
+            Text(
               'Find someone with a skill you want to learn and start a conversation.',
               textAlign:
               TextAlign.center,
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 10.5,
                 height: 1.5,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
           ],
@@ -1201,23 +1259,24 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisAlignment:
           MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.search_off_rounded,
+            Icon(
+              Icons
+                  .search_off_rounded,
               size: 48,
-              color: mutedText,
+              color: _mutedColor,
             ),
 
             const SizedBox(
               height: 14,
             ),
 
-            const Text(
+            Text(
               'No conversations found',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight:
                 FontWeight.w800,
-                color: darkText,
+                color: _textColor,
               ),
             ),
 
@@ -1225,14 +1284,16 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 6,
             ),
 
-            const Text(
+            Text(
               'Try searching by name, city, skill, or status.',
               textAlign:
               TextAlign.center,
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 10.5,
                 height: 1.5,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
           ],
@@ -1273,24 +1334,38 @@ class _ChatScreenState extends State<ChatScreen> {
       ) {
     switch (status) {
       case 'Scheduled':
-        return const Color(
+        return _isDarkMode
+            ? const Color(
+          0xFF3D9158,
+        ).withValues(
+          alpha: 0.18,
+        )
+            : const Color(
           0xFFEAF8EE,
         );
 
       case 'Planning':
-        return const Color(
+        return _isDarkMode
+            ? const Color(
+          0xFFB97820,
+        ).withValues(
+          alpha: 0.18,
+        )
+            : const Color(
           0xFFFFF5E8,
         );
 
       case 'New':
-        return const Color(
+        return _isDarkMode
+            ? primary.withValues(
+          alpha: 0.18,
+        )
+            : const Color(
           0xFFF0EFFF,
         );
 
       default:
-        return const Color(
-          0xFFF2F2F6,
-        );
+        return _surfaceVariantColor;
     }
   }
 
@@ -1299,20 +1374,32 @@ class _ChatScreenState extends State<ChatScreen> {
       ) {
     switch (status) {
       case 'Scheduled':
-        return const Color(
+        return _isDarkMode
+            ? const Color(
+          0xFF7EDB9C,
+        )
+            : const Color(
           0xFF3D9158,
         );
 
       case 'Planning':
-        return const Color(
+        return _isDarkMode
+            ? const Color(
+          0xFFFFC36B,
+        )
+            : const Color(
           0xFFB97820,
         );
 
       case 'New':
-        return primary;
+        return _isDarkMode
+            ? const Color(
+          0xFFB9BAFF,
+        )
+            : primary;
 
       default:
-        return mutedText;
+        return _mutedColor;
     }
   }
 
@@ -1434,7 +1521,6 @@ class _ChatScreenState extends State<ChatScreen> {
     ];
 
     return weekdays[
-    weekday - 1
-    ];
+    weekday - 1];
   }
 }

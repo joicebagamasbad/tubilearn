@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/current_user_service.dart';
 import '../database/app_database.dart';
 import '../skill.dart';
 import '../user.dart';
@@ -120,28 +121,32 @@ class ExploreRepository {
       await AppDatabase.instance.database;
 
       final List<Map<String, Object?>>
-      userRows = await db.query(
+      userRows =
+      await db.query(
         'users',
         orderBy:
         'name COLLATE NOCASE ASC',
       );
 
       final List<Map<String, Object?>>
-      skillRows = await db.query(
+      skillRows =
+      await db.query(
         'skills',
         orderBy:
         'title COLLATE NOCASE ASC',
       );
 
       final List<Map<String, Object?>>
-      learningRows = await db.query(
+      learningRows =
+      await db.query(
         'skill_learnings',
         orderBy:
         'skill_id ASC, position ASC',
       );
 
       final List<Map<String, Object?>>
-      userSkillRows = await db.query(
+      userSkillRows =
+      await db.query(
         'user_skills',
         orderBy:
         'id ASC',
@@ -396,6 +401,269 @@ class ExploreRepository {
   }
 
   // ============================================================
+  // UPDATE CURRENT USER PROFILE
+  // ============================================================
+
+  Future<User> updateCurrentUserProfile({
+    required String name,
+    required String city,
+    required String bio,
+    required String availability,
+    required String language,
+    required String preferredMode,
+    required String teachingStyle,
+  }) async {
+    await initialize();
+
+    final String currentUserId;
+
+    try {
+      currentUserId =
+          CurrentUserService.instance
+              .requireUserId();
+    } on CurrentUserServiceException catch (_) {
+      throw const ExploreRepositoryException(
+        'No active local user is available.',
+      );
+    }
+
+    final User? existing =
+    findUserById(
+      currentUserId,
+    );
+
+    if (existing == null) {
+      throw const ExploreRepositoryException(
+        'Your profile could not be found.',
+      );
+    }
+
+    final String cleanName =
+    name.trim();
+
+    final String cleanCity =
+    city.trim();
+
+    final String cleanBio =
+    bio.trim();
+
+    final String cleanAvailability =
+    availability.trim();
+
+    final String cleanLanguage =
+    language.trim();
+
+    final String cleanPreferredMode =
+    preferredMode.trim();
+
+    final String cleanTeachingStyle =
+    teachingStyle.trim();
+
+    if (cleanName.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Name is required.',
+      );
+    }
+
+    if (cleanCity.isEmpty) {
+      throw const ExploreRepositoryException(
+        'City is required.',
+      );
+    }
+
+    if (cleanBio.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Bio is required.',
+      );
+    }
+
+    if (cleanAvailability.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Availability is required.',
+      );
+    }
+
+    if (cleanLanguage.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Language is required.',
+      );
+    }
+
+    if (cleanPreferredMode.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Preferred mode is required.',
+      );
+    }
+
+    if (cleanTeachingStyle.isEmpty) {
+      throw const ExploreRepositoryException(
+        'Teaching style is required.',
+      );
+    }
+
+    if (cleanName.length > 80) {
+      throw const ExploreRepositoryException(
+        'Name is too long.',
+      );
+    }
+
+    if (cleanCity.length > 100) {
+      throw const ExploreRepositoryException(
+        'City is too long.',
+      );
+    }
+
+    if (cleanBio.length > 500) {
+      throw const ExploreRepositoryException(
+        'Bio must be 500 characters or less.',
+      );
+    }
+
+    final String initials =
+    _buildInitials(
+      cleanName,
+    );
+
+    try {
+      final db =
+      await AppDatabase.instance.database;
+
+      final int updatedRows =
+      await db.update(
+        'users',
+        <String, Object?>{
+          'name':
+          cleanName,
+          'initials':
+          initials,
+          'city':
+          cleanCity,
+          'bio':
+          cleanBio,
+          'availability':
+          cleanAvailability,
+          'language':
+          cleanLanguage,
+          'preferred_mode':
+          cleanPreferredMode,
+          'teaching_style':
+          cleanTeachingStyle,
+          'profile_completed':
+          1,
+        },
+        where:
+        'id = ?',
+        whereArgs:
+        <Object?>[
+          currentUserId,
+        ],
+      );
+
+      if (updatedRows != 1) {
+        throw const ExploreRepositoryException(
+          'Your profile could not be saved.',
+        );
+      }
+    } on ExploreRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ExploreRepositoryException(
+        'Your profile could not be saved. Please try again.',
+      );
+    }
+
+    final User updatedUser =
+    existing.copyWith(
+      name:
+      cleanName,
+      initials:
+      initials,
+      city:
+      cleanCity,
+      bio:
+      cleanBio,
+      availability:
+      cleanAvailability,
+      language:
+      cleanLanguage,
+      preferredMode:
+      cleanPreferredMode,
+      teachingStyle:
+      cleanTeachingStyle,
+      profileCompleted:
+      true,
+    );
+
+    final int userIndex =
+    _users.indexWhere(
+          (
+          User user,
+          ) =>
+      user.id ==
+          currentUserId,
+    );
+
+    if (userIndex < 0) {
+      throw const ExploreRepositoryException(
+        'Your profile was saved but could not be refreshed.',
+      );
+    }
+
+    _users[userIndex] =
+        updatedUser;
+
+    return updatedUser;
+  }
+
+  // ============================================================
+  // PROFILE INITIALS
+  // ============================================================
+
+  String _buildInitials(
+      String name,
+      ) {
+    final List<String> parts =
+    name
+        .trim()
+        .split(
+      RegExp(
+        r'\s+',
+      ),
+    )
+        .where(
+          (
+          String part,
+          ) =>
+      part.isNotEmpty,
+    )
+        .toList();
+
+    if (parts.isEmpty) {
+      return '?';
+    }
+
+    if (parts.length == 1) {
+      final String first =
+          parts.first;
+
+      if (first.length == 1) {
+        return first
+            .toUpperCase();
+      }
+
+      return first
+          .substring(
+        0,
+        2,
+      )
+          .toUpperCase();
+    }
+
+    return '${parts.first[0]}${parts.last[0]}'
+        .toUpperCase();
+  }
+
+  // ============================================================
   // MAP -> USER
   // ============================================================
 
@@ -640,7 +908,6 @@ class ExploreRepository {
       'Skill language',
     );
 
-    // Prerequisite is allowed to be blank.
     final String prerequisite =
     _readStringAllowEmpty(
       map,
@@ -687,9 +954,6 @@ class ExploreRepository {
 
   // ============================================================
   // ICON CODE POINT -> MATERIAL ICON CONSTANT
-  //
-  // Dynamic IconData is intentionally avoided so release-mode
-  // icon tree shaking remains safe.
   // ============================================================
 
   IconData _iconFromCodePoint(
@@ -835,13 +1099,6 @@ class ExploreRepository {
 
     return cleaned;
   }
-
-  // ------------------------------------------------------------
-  // STRING THAT MAY BE EMPTY
-  //
-  // Used for valid optional text columns such as prerequisite.
-  // The database value must still be a String, but "" is valid.
-  // ------------------------------------------------------------
 
   String _readStringAllowEmpty(
       Map<String, Object?> row,

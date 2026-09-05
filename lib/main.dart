@@ -7,6 +7,7 @@ import 'model/repositories/explore_repository.dart';
 
 import 'theme/app_theme.dart';
 
+import 'services/app_settings_service.dart';
 import 'services/chat_service.dart';
 import 'services/swap_service.dart';
 
@@ -16,6 +17,7 @@ import 'view/my_skills_screen.dart';
 import 'view/explore_screen.dart';
 import 'view/skill_details_screen.dart';
 import 'view/user_profile_screen.dart';
+import 'view/profile_screen.dart';
 import 'view/chat_screen.dart';
 import 'view/conversation_screen.dart';
 import 'view/swap_requests_screen.dart';
@@ -26,6 +28,8 @@ Future<void> main() async {
   // ============================================================
   // STARTUP INITIALIZATION
   // ============================================================
+
+  await AppSettingsService.instance.initialize();
 
   await ExploreRepository.instance.initialize();
 
@@ -47,83 +51,111 @@ class TubiLearnApp extends StatelessWidget {
   Widget build(
       BuildContext context,
       ) {
-    return MaterialApp(
-      title: 'TubiLearn',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const DashboardScreen(),
+    return AnimatedBuilder(
+      animation:
+      AppSettingsService.instance,
+      builder: (
+          BuildContext context,
+          Widget? child,
+          ) {
+        return MaterialApp(
+          title: 'TubiLearn',
+          debugShowCheckedModeBanner:
+          false,
 
-      routes: {
-        '/add-skill': (context) =>
-        const AddSkillScreen(),
+          theme:
+          AppTheme.lightTheme,
 
-        '/my-skills': (context) =>
-        const MySkillsScreen(),
+          darkTheme:
+          AppTheme.darkTheme,
 
-        '/explore': (context) =>
-        const ExploreScreen(),
+          themeMode:
+          AppSettingsService
+              .instance
+              .themeMode,
 
-        '/chat': (context) =>
-        const ChatScreen(),
+          home:
+          const DashboardScreen(),
 
-        '/swap-requests': (context) =>
-        const SwapRequestsScreen(),
-      },
+          routes: {
+            '/add-skill': (context) =>
+            const AddSkillScreen(),
 
-      onGenerateRoute: (settings) {
-        // ======================================================
-        // SKILL DETAILS
-        // ======================================================
+            '/my-skills': (context) =>
+            const MySkillsScreen(),
 
-        if (settings.name ==
-            '/skill-details') {
-          final Skill skill =
-          settings.arguments as Skill;
+            '/explore': (context) =>
+            const ExploreScreen(),
 
-          return MaterialPageRoute(
-            builder: (context) =>
-                SkillDetailsScreen(
-                  skill: skill,
-                ),
-          );
-        }
+            '/chat': (context) =>
+            const ChatScreen(),
 
-        // ======================================================
-        // USER PROFILE
-        // ======================================================
+            '/swap-requests': (context) =>
+            const SwapRequestsScreen(),
 
-        if (settings.name ==
-            '/user-profile') {
-          final User user =
-          settings.arguments as User;
+            '/profile': (context) =>
+            const ProfileScreen(),
+          },
 
-          return MaterialPageRoute(
-            builder: (context) =>
-                UserProfileScreen(
-                  user: user,
-                ),
-          );
-        }
+          onGenerateRoute: (settings) {
+            // ==================================================
+            // SKILL DETAILS
+            // ==================================================
 
-        // ======================================================
-        // CONVERSATION
-        // ======================================================
+            if (settings.name ==
+                '/skill-details') {
+              final Skill skill =
+              settings.arguments
+              as Skill;
 
-        if (settings.name ==
-            '/conversation') {
-          final String conversationId =
-          settings.arguments as String;
+              return MaterialPageRoute(
+                builder: (context) =>
+                    SkillDetailsScreen(
+                      skill: skill,
+                    ),
+              );
+            }
 
-          return MaterialPageRoute(
-            builder: (context) =>
-                ConversationScreen(
-                  conversationId:
-                  conversationId,
-                ),
-          );
-        }
+            // ==================================================
+            // USER PROFILE
+            // ==================================================
 
-        return null;
+            if (settings.name ==
+                '/user-profile') {
+              final User user =
+              settings.arguments
+              as User;
+
+              return MaterialPageRoute(
+                builder: (context) =>
+                    UserProfileScreen(
+                      user: user,
+                    ),
+              );
+            }
+
+            // ==================================================
+            // CONVERSATION
+            // ==================================================
+
+            if (settings.name ==
+                '/conversation') {
+              final String conversationId =
+              settings.arguments
+              as String;
+
+              return MaterialPageRoute(
+                builder: (context) =>
+                    ConversationScreen(
+                      conversationId:
+                      conversationId,
+                    ),
+              );
+            }
+
+            return null;
+          },
+        );
       },
     );
   }

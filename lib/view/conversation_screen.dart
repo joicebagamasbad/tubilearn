@@ -5,6 +5,7 @@ import '../model/conversation.dart';
 import '../model/message.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
+import '../theme/app_theme.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String conversationId;
@@ -22,32 +23,18 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState
     extends State<ConversationScreen> {
   static const Color primary =
-  Color(0xFF5B5FEF);
+      AppTheme.primary;
 
-  static const Color darkText =
-  Color(0xFF171A2B);
+  static const int _maxMessageLength =
+  2000;
 
-  static const Color mutedText =
-  Color(0xFF8A8FA3);
-
-  static const Color background =
-  Color(0xFFF9F9FF);
-
-  static const Color border =
-  Color(0xFFE8E8F2);
-
-  static const int _maxMessageLength = 2000;
-
-  final TextEditingController
-  _messageController =
+  final TextEditingController _messageController =
   TextEditingController();
 
-  final ScrollController
-  _scrollController =
+  final ScrollController _scrollController =
   ScrollController();
 
-  final CurrentUserService
-  _currentUserService =
+  final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
   bool _isLoading = true;
@@ -58,6 +45,51 @@ class _ConversationScreenState
 
   bool get _hasPendingAction =>
       _isSending || _isDeleting;
+
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _surfaceColor =>
+      Theme.of(context)
+          .colorScheme
+          .surface;
+
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
+  Color get _textColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  Color get _contextBackground =>
+      primary.withValues(
+        alpha:
+        _isDarkMode
+            ? 0.14
+            : 0.08,
+      );
+
+  Color get _contextBorder =>
+      primary.withValues(
+        alpha:
+        _isDarkMode
+            ? 0.28
+            : 0.16,
+      );
 
   @override
   void initState() {
@@ -104,7 +136,8 @@ class _ConversationScreenState
         _loadError = null;
       });
 
-      WidgetsBinding.instance.addPostFrameCallback(
+      WidgetsBinding.instance
+          .addPostFrameCallback(
             (_) {
           if (!mounted) {
             return;
@@ -153,10 +186,13 @@ class _ConversationScreenState
       ) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: background,
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
         body: const SafeArea(
           child: Center(
-            child: CircularProgressIndicator(
+            child:
+            CircularProgressIndicator(
               color: primary,
             ),
           ),
@@ -175,7 +211,9 @@ class _ConversationScreenState
     return PopScope(
       canPop: !_hasPendingAction,
       child: Scaffold(
-        backgroundColor: background,
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
@@ -189,7 +227,10 @@ class _ConversationScreenState
               ),
 
               Expanded(
-                child: conversation.messages.isEmpty
+                child:
+                conversation
+                    .messages
+                    .isEmpty
                     ? _buildNoMessages()
                     : _buildMessageList(
                   conversation,
@@ -210,7 +251,9 @@ class _ConversationScreenState
 
   Widget _buildUnavailableScreen() {
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+      Theme.of(context)
+          .scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -220,12 +263,11 @@ class _ConversationScreenState
               const EdgeInsets.symmetric(
                 horizontal: 10,
               ),
-              decoration:
-              const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: _surfaceColor,
                 border: Border(
                   bottom: BorderSide(
-                    color: border,
+                    color: _borderColor,
                   ),
                 ),
               ),
@@ -246,15 +288,17 @@ class _ConversationScreenState
                     ),
                   ),
 
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Conversation',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight:
-                          FontWeight.w800,
-                          color: darkText,
+                          FontWeight
+                              .w800,
+                          color:
+                          _textColor,
                         ),
                       ),
                     ),
@@ -271,31 +315,36 @@ class _ConversationScreenState
               child: Center(
                 child: Padding(
                   padding:
-                  const EdgeInsets.symmetric(
+                  const EdgeInsets
+                      .symmetric(
                     horizontal: 36,
                   ),
                   child: Column(
                     mainAxisAlignment:
-                    MainAxisAlignment.center,
+                    MainAxisAlignment
+                        .center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons
                             .chat_bubble_outline_rounded,
                         size: 52,
-                        color: mutedText,
+                        color:
+                        _mutedColor,
                       ),
 
                       const SizedBox(
                         height: 14,
                       ),
 
-                      const Text(
+                      Text(
                         'Conversation unavailable',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight:
-                          FontWeight.w800,
-                          color: darkText,
+                          FontWeight
+                              .w800,
+                          color:
+                          _textColor,
                         ),
                       ),
 
@@ -308,11 +357,11 @@ class _ConversationScreenState
                             'This conversation may have been deleted.',
                         textAlign:
                         TextAlign.center,
-                        style:
-                        const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           height: 1.5,
-                          color: mutedText,
+                          color:
+                          _mutedColor,
                         ),
                       ),
 
@@ -355,12 +404,11 @@ class _ConversationScreenState
       const EdgeInsets.symmetric(
         horizontal: 8,
       ),
-      decoration:
-      const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         border: Border(
           bottom: BorderSide(
-            color: border,
+            color: _borderColor,
           ),
         ),
       ),
@@ -389,7 +437,8 @@ class _ConversationScreenState
             height: 42,
             decoration:
             const BoxDecoration(
-              color: Color(
+              color:
+              Color(
                 0xFFFFB45E,
               ),
               shape:
@@ -404,7 +453,8 @@ class _ConversationScreenState
                 fontSize: 11,
                 fontWeight:
                 FontWeight.w800,
-                color: Colors.white,
+                color:
+                Colors.white,
               ),
             ),
           ),
@@ -425,12 +475,12 @@ class _ConversationScreenState
                   maxLines: 1,
                   overflow:
                   TextOverflow.ellipsis,
-                  style:
-                  const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight:
                     FontWeight.w800,
-                    color: darkText,
+                    color:
+                    _textColor,
                   ),
                 ),
 
@@ -438,12 +488,12 @@ class _ConversationScreenState
                   height: 2,
                 ),
 
-                const Text(
+                Text(
                   'Skill swap conversation',
-                  style:
-                  TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: mutedText,
+                    color:
+                    _mutedColor,
                   ),
                 ),
               ],
@@ -477,11 +527,12 @@ class _ConversationScreenState
                 );
               },
               icon:
-              const Icon(
+              Icon(
                 Icons
                     .more_vert_rounded,
                 size: 20,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
         ],
@@ -504,16 +555,13 @@ class _ConversationScreenState
         horizontal: 16,
         vertical: 12,
       ),
-      decoration:
-      const BoxDecoration(
-        color: Color(
-          0xFFF3F1FF,
-        ),
+      decoration: BoxDecoration(
+        color:
+        _contextBackground,
         border: Border(
           bottom: BorderSide(
-            color: Color(
-              0xFFE4E0FF,
-            ),
+            color:
+            _contextBorder,
           ),
         ),
       ),
@@ -535,12 +583,12 @@ class _ConversationScreenState
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Skill swap discussion',
-                  style:
-                  TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: mutedText,
+                    color:
+                    _mutedColor,
                   ),
                 ),
 
@@ -553,12 +601,12 @@ class _ConversationScreenState
                   maxLines: 1,
                   overflow:
                   TextOverflow.ellipsis,
-                  style:
-                  const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight:
                     FontWeight.w700,
-                    color: darkText,
+                    color:
+                    _textColor,
                   ),
                 ),
               ],
@@ -645,7 +693,7 @@ class _ConversationScreenState
                   color:
                   isMe
                       ? primary
-                      : Colors.white,
+                      : _surfaceColor,
                   borderRadius:
                   BorderRadius.only(
                     topLeft:
@@ -658,19 +706,46 @@ class _ConversationScreenState
                     ),
                     bottomLeft:
                     Radius.circular(
-                      isMe ? 16 : 4,
+                      isMe
+                          ? 16
+                          : 4,
                     ),
                     bottomRight:
                     Radius.circular(
-                      isMe ? 4 : 16,
+                      isMe
+                          ? 4
+                          : 16,
                     ),
                   ),
                   border:
                   isMe
                       ? null
                       : Border.all(
-                    color: border,
+                    color:
+                    _borderColor,
                   ),
+                  boxShadow:
+                  isMe
+                      ? null
+                      : [
+                    BoxShadow(
+                      color:
+                      Colors.black
+                          .withValues(
+                        alpha:
+                        _isDarkMode
+                            ? 0.08
+                            : 0.02,
+                      ),
+                      blurRadius:
+                      8,
+                      offset:
+                      const Offset(
+                        0,
+                        2,
+                      ),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment:
@@ -680,14 +755,13 @@ class _ConversationScreenState
                   children: [
                     Text(
                       message.text,
-                      style:
-                      TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         height: 1.4,
                         color:
                         isMe
                             ? Colors.white
-                            : darkText,
+                            : _textColor,
                       ),
                     ),
 
@@ -703,15 +777,14 @@ class _ConversationScreenState
                           _formatMessageTime(
                             message.sentAt,
                           ),
-                          style:
-                          TextStyle(
+                          style: TextStyle(
                             fontSize: 10.5,
                             fontWeight:
                             FontWeight.w500,
                             color:
                             isMe
                                 ? Colors.white70
-                                : mutedText,
+                                : _mutedColor,
                           ),
                         ),
 
@@ -753,9 +826,10 @@ class _ConversationScreenState
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Divider(
-              color: border,
+              color:
+              _borderColor,
             ),
           ),
 
@@ -768,19 +842,20 @@ class _ConversationScreenState
               _formatDateSeparator(
                 date,
               ),
-              style:
-              const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
                 fontWeight:
                 FontWeight.w600,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
           ),
 
-          const Expanded(
+          Expanded(
             child: Divider(
-              color: border,
+              color:
+              _borderColor,
             ),
           ),
         ],
@@ -807,21 +882,22 @@ class _ConversationScreenState
               'assets/images/mascot/tubi_typing.png',
               width: 100,
               height: 100,
-              fit: BoxFit.contain,
+              fit:
+              BoxFit.contain,
             ),
 
             const SizedBox(
               height: 12,
             ),
 
-            const Text(
+            Text(
               'Start the conversation',
-              style:
-              TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight:
                 FontWeight.w800,
-                color: darkText,
+                color:
+                _textColor,
               ),
             ),
 
@@ -829,15 +905,15 @@ class _ConversationScreenState
               height: 7,
             ),
 
-            const Text(
+            Text(
               'Introduce yourself, ask about the skill, and discuss what you can offer in exchange.',
               textAlign:
               TextAlign.center,
-              style:
-              TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 1.5,
-                color: mutedText,
+                color:
+                _mutedColor,
               ),
             ),
           ],
@@ -859,12 +935,13 @@ class _ConversationScreenState
         12,
         10,
       ),
-      decoration:
-      const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color:
+        _surfaceColor,
         border: Border(
           top: BorderSide(
-            color: border,
+            color:
+            _borderColor,
           ),
         ),
       ),
@@ -883,15 +960,17 @@ class _ConversationScreenState
               maxLength:
               _maxMessageLength,
               maxLengthEnforcement:
-              MaxLengthEnforcement.enforced,
+              MaxLengthEnforcement
+                  .enforced,
               textCapitalization:
-              TextCapitalization.sentences,
+              TextCapitalization
+                  .sentences,
               textInputAction:
               TextInputAction.newline,
-              style:
-              const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: darkText,
+                color:
+                _textColor,
               ),
               decoration:
               InputDecoration(
@@ -902,17 +981,23 @@ class _ConversationScreenState
                     ? 'Sending...'
                     : 'Type a message...',
                 hintStyle:
-                const TextStyle(
+                TextStyle(
                   fontSize: 13,
-                  color: mutedText,
+                  color:
+                  _mutedColor,
                 ),
-                counterText: '',
-                filled: true,
-                fillColor: background,
+                counterText:
+                '',
+                filled:
+                true,
+                fillColor:
+                _surfaceVariantColor,
                 contentPadding:
                 const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
+                  horizontal:
+                  14,
+                  vertical:
+                  11,
                 ),
                 border:
                 OutlineInputBorder(
@@ -922,6 +1007,30 @@ class _ConversationScreenState
                   ),
                   borderSide:
                   BorderSide.none,
+                ),
+                enabledBorder:
+                OutlineInputBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    18,
+                  ),
+                  borderSide:
+                  BorderSide(
+                    color:
+                    _borderColor,
+                  ),
+                ),
+                focusedBorder:
+                OutlineInputBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    18,
+                  ),
+                  borderSide:
+                  const BorderSide(
+                    color:
+                    primary,
+                  ),
                 ),
               ),
             ),
@@ -963,8 +1072,10 @@ class _ConversationScreenState
                 ),
               )
                   : const Icon(
-                Icons.send_rounded,
-                color: Colors.white,
+                Icons
+                    .send_rounded,
+                color:
+                Colors.white,
                 size: 19,
               ),
             ),
@@ -984,7 +1095,8 @@ class _ConversationScreenState
     }
 
     final String text =
-    _messageController.text.trim();
+    _messageController.text
+        .trim();
 
     if (text.isEmpty) {
       return;
@@ -1007,7 +1119,8 @@ class _ConversationScreenState
       await ChatService.instance.sendMessage(
         conversationId:
         widget.conversationId,
-        text: text,
+        text:
+        text,
       );
 
       if (!mounted) {
@@ -1072,13 +1185,15 @@ class _ConversationScreenState
 
     final String? action =
     await showModalBottomSheet<String>(
-      context: context,
+      context:
+      context,
       backgroundColor:
-      Colors.white,
-      showDragHandle: true,
+      _surfaceColor,
+      showDragHandle:
+      true,
       builder:
           (
-          BuildContext context,
+          BuildContext sheetContext,
           ) {
         return SafeArea(
           child: Padding(
@@ -1109,7 +1224,7 @@ class _ConversationScreenState
                   ),
                   onTap: () {
                     Navigator.pop(
-                      context,
+                      sheetContext,
                       'delete',
                     );
                   },
@@ -1146,19 +1261,32 @@ class _ConversationScreenState
 
     final bool? confirmed =
     await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
+      context:
+      context,
+      barrierDismissible:
+      false,
       builder:
           (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
             'Delete conversation?',
+            style: TextStyle(
+              fontWeight:
+              FontWeight.w800,
+              color:
+              _textColor,
+            ),
           ),
           content: Text(
             'This will permanently delete your conversation with ${conversation.userName} and all saved messages in this thread.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
           ),
           actions: [
             TextButton(
@@ -1168,9 +1296,12 @@ class _ConversationScreenState
                   false,
                 );
               },
-              child:
-              const Text(
+              child: Text(
                 'CANCEL',
+                style: TextStyle(
+                  color:
+                  _mutedColor,
+                ),
               ),
             ),
 
@@ -1282,7 +1413,8 @@ class _ConversationScreenState
         target,
         duration:
         const Duration(
-          milliseconds: 220,
+          milliseconds:
+          220,
         ),
         curve:
         Curves.easeOut,
