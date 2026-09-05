@@ -33,6 +33,7 @@ class _SwapRequestsScreenState
   String _selectedFilter = 'All';
 
   bool _isLoading = true;
+
   String? _loadError;
 
   final Set<String> _processingRequestIds =
@@ -58,10 +59,11 @@ class _SwapRequestsScreenState
       Theme.of(context).brightness ==
           Brightness.dark;
 
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
   Color get _surfaceColor =>
-      Theme.of(context)
-          .colorScheme
-          .surface;
+      Theme.of(context).colorScheme.surface;
 
   Color get _surfaceVariantColor =>
       Theme.of(context)
@@ -69,9 +71,7 @@ class _SwapRequestsScreenState
           .surfaceContainerHighest;
 
   Color get _textColor =>
-      Theme.of(context)
-          .colorScheme
-          .onSurface;
+      Theme.of(context).colorScheme.onSurface;
 
   Color get _mutedColor =>
       Theme.of(context)
@@ -83,9 +83,14 @@ class _SwapRequestsScreenState
           .colorScheme
           .outlineVariant;
 
-  // ============================================================
-  // INITIALIZE
-  // ============================================================
+  Color get _softPrimaryColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.16,
+      )
+          : const Color(
+        0xFFE4F0EF,
+      );
 
   @override
   void initState() {
@@ -134,10 +139,6 @@ class _SwapRequestsScreenState
       });
     }
   }
-
-  // ============================================================
-  // FILTERED REQUESTS
-  // ============================================================
 
   List<SwapRequest> get _filteredRequests {
     final List<SwapRequest> requests =
@@ -198,16 +199,13 @@ class _SwapRequestsScreenState
     ).toList();
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(
       BuildContext context,
       ) {
     return PopScope(
-      canPop: !_hasPendingAction,
+      canPop:
+      !_hasPendingAction,
       child: Scaffold(
         backgroundColor:
         Theme.of(context)
@@ -218,7 +216,8 @@ class _SwapRequestsScreenState
               .scaffoldBackgroundColor,
           surfaceTintColor:
           Colors.transparent,
-          elevation: 0,
+          elevation:
+          0,
           leading: IconButton(
             onPressed:
             _hasPendingAction
@@ -229,9 +228,9 @@ class _SwapRequestsScreenState
               );
             },
             icon: Icon(
-              Icons
-                  .arrow_back_ios_new_rounded,
-              size: 20,
+              Icons.arrow_back_ios_new_rounded,
+              size:
+              20,
               color:
               _hasPendingAction
                   ? _mutedColor
@@ -241,16 +240,20 @@ class _SwapRequestsScreenState
           title: Text(
             'My Swap Requests',
             style: TextStyle(
-              fontSize: 19,
+              fontSize:
+              19,
               fontWeight:
               FontWeight.w800,
-              color: _textColor,
+              color:
+              _textColor,
             ),
           ),
-          centerTitle: false,
+          centerTitle:
+          false,
         ),
         body: SafeArea(
-          child: _buildBody(),
+          child:
+          _buildBody(),
         ),
       ),
     );
@@ -279,19 +282,24 @@ class _SwapRequestsScreenState
             12,
           ),
           child: Container(
-            width: double.infinity,
+            width:
+            double.infinity,
             padding:
             const EdgeInsets.all(
               16,
             ),
-            decoration: BoxDecoration(
-              color: _surfaceColor,
+            decoration:
+            BoxDecoration(
+              color:
+              _surfaceColor,
               borderRadius:
               BorderRadius.circular(
                 20,
               ),
-              border: Border.all(
-                color: _borderColor,
+              border:
+              Border.all(
+                color:
+                _borderColor,
               ),
             ),
             child: Row(
@@ -299,28 +307,30 @@ class _SwapRequestsScreenState
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                    CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Manage your swaps',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize:
+                          17,
                           fontWeight:
-                          FontWeight
-                              .w800,
+                          FontWeight.w800,
                           color:
                           _textColor,
                         ),
                       ),
                       const SizedBox(
-                        height: 5,
+                        height:
+                        5,
                       ),
                       Text(
                         'Track incoming and outgoing skill requests.',
                         style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.4,
+                          fontSize:
+                          12.5,
+                          height:
+                          1.4,
                           color:
                           _mutedColor,
                         ),
@@ -329,13 +339,17 @@ class _SwapRequestsScreenState
                   ),
                 ),
                 const SizedBox(
-                  width: 12,
+                  width:
+                  12,
                 ),
                 Image.asset(
                   'assets/images/mascot/tubi_checking.png',
-                  width: 68,
-                  height: 68,
-                  fit: BoxFit.contain,
+                  width:
+                  68,
+                  height:
+                  68,
+                  fit:
+                  BoxFit.contain,
                 ),
               ],
             ),
@@ -343,20 +357,26 @@ class _SwapRequestsScreenState
         ),
 
         SizedBox(
-          height: 42,
+          height:
+          42,
           child: ListView.separated(
             padding:
             const EdgeInsets.symmetric(
-              horizontal: 20,
+              horizontal:
+              20,
             ),
             scrollDirection:
             Axis.horizontal,
             itemCount:
             _filters.length,
             separatorBuilder:
-                (_, _) =>
+                (
+                _,
+                _,
+                ) =>
             const SizedBox(
-              width: 8,
+              width:
+              8,
             ),
             itemBuilder:
                 (
@@ -374,37 +394,43 @@ class _SwapRequestsScreenState
                 label: Text(
                   filter,
                 ),
-                selected: selected,
+                selected:
+                selected,
                 onSelected:
                 _hasPendingAction
                     ? null
                     : (_) {
-                  setState(
-                        () {
-                      _selectedFilter =
-                          filter;
-                    },
-                  );
+                  setState(() {
+                    _selectedFilter =
+                        filter;
+                  });
                 },
-                labelStyle: TextStyle(
-                  fontSize: 12,
+                labelStyle:
+                TextStyle(
+                  fontSize:
+                  12,
                   fontWeight:
                   FontWeight.w700,
                   color:
                   selected
-                      ? Colors.white
+                      ? (_isDarkMode
+                      ? const Color(
+                    0xFF092E31,
+                  )
+                      : Colors.white)
                       : _textColor,
                 ),
                 selectedColor:
-                AppTheme.primary,
+                _primaryColor,
                 backgroundColor:
                 _surfaceColor,
                 disabledColor:
                 _surfaceVariantColor,
-                side: BorderSide(
+                side:
+                BorderSide(
                   color:
                   selected
-                      ? AppTheme.primary
+                      ? _primaryColor
                       : _borderColor,
                 ),
                 shape:
@@ -414,14 +440,16 @@ class _SwapRequestsScreenState
                     20,
                   ),
                 ),
-                showCheckmark: false,
+                showCheckmark:
+                false,
               );
             },
           ),
         ),
 
         const SizedBox(
-          height: 12,
+          height:
+          12,
         ),
 
         Expanded(
@@ -430,8 +458,7 @@ class _SwapRequestsScreenState
               ? _buildEmptyState()
               : ListView.separated(
             padding:
-            const EdgeInsets
-                .fromLTRB(
+            const EdgeInsets.fromLTRB(
               20,
               4,
               20,
@@ -440,9 +467,13 @@ class _SwapRequestsScreenState
             itemCount:
             requests.length,
             separatorBuilder:
-                (_, _) =>
+                (
+                _,
+                _,
+                ) =>
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             itemBuilder:
                 (
@@ -459,33 +490,34 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // LOADING
-  // ============================================================
-
   Widget _buildLoadingState() {
     return Center(
       child: Column(
         mainAxisSize:
         MainAxisSize.min,
         children: [
-          const SizedBox(
-            width: 28,
-            height: 28,
+          SizedBox(
+            width:
+            28,
+            height:
+            28,
             child:
             CircularProgressIndicator(
-              strokeWidth: 2.5,
+              strokeWidth:
+              2.5,
               color:
-              AppTheme.primary,
+              _primaryColor,
             ),
           ),
           const SizedBox(
-            height: 14,
+            height:
+            14,
           ),
           Text(
             'Loading swap requests...',
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize:
+              12.5,
               color:
               _mutedColor,
             ),
@@ -494,10 +526,6 @@ class _SwapRequestsScreenState
       ),
     );
   }
-
-  // ============================================================
-  // ERROR
-  // ============================================================
 
   Widget _buildErrorState() {
     return Center(
@@ -511,25 +539,30 @@ class _SwapRequestsScreenState
           MainAxisSize.min,
           children: [
             Icon(
-              Icons
-                  .error_outline_rounded,
-              size: 42,
-              color: _mutedColor,
+              Icons.error_outline_rounded,
+              size:
+              42,
+              color:
+              _mutedColor,
             ),
             const SizedBox(
-              height: 14,
+              height:
+              14,
             ),
             Text(
               'Could not load requests',
               style: TextStyle(
-                fontSize: 17,
+                fontSize:
+                17,
                 fontWeight:
                 FontWeight.w800,
-                color: _textColor,
+                color:
+                _textColor,
               ),
             ),
             const SizedBox(
-              height: 7,
+              height:
+              7,
             ),
             Text(
               _loadError ??
@@ -537,14 +570,17 @@ class _SwapRequestsScreenState
               textAlign:
               TextAlign.center,
               style: TextStyle(
-                fontSize: 12.5,
-                height: 1.4,
+                fontSize:
+                12.5,
+                height:
+                1.4,
                 color:
                 _mutedColor,
               ),
             ),
             const SizedBox(
-              height: 18,
+              height:
+              18,
             ),
             ElevatedButton(
               onPressed:
@@ -559,10 +595,6 @@ class _SwapRequestsScreenState
       ),
     );
   }
-
-  // ============================================================
-  // REQUEST CARD
-  // ============================================================
 
   Widget _buildRequestCard(
       SwapRequest request,
@@ -624,32 +656,19 @@ class _SwapRequestsScreenState
       const EdgeInsets.all(
         16,
       ),
-      decoration: BoxDecoration(
-        color: _surfaceColor,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
-        border: Border.all(
-          color: _borderColor,
+        border:
+        Border.all(
+          color:
+          _borderColor,
         ),
-        boxShadow: [
-          BoxShadow(
-            color:
-            Colors.black.withValues(
-              alpha:
-              _isDarkMode
-                  ? 0.10
-                  : 0.025,
-            ),
-            blurRadius: 14,
-            offset:
-            const Offset(
-              0,
-              4,
-            ),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment:
@@ -662,19 +681,23 @@ class _SwapRequestsScreenState
               ),
               const Spacer(),
               if (isProcessing)
-                const Padding(
+                Padding(
                   padding:
-                  EdgeInsets.only(
-                    right: 10,
+                  const EdgeInsets.only(
+                    right:
+                    10,
                   ),
                   child: SizedBox(
-                    width: 16,
-                    height: 16,
+                    width:
+                    16,
+                    height:
+                    16,
                     child:
                     CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth:
+                      2,
                       color:
-                      AppTheme.primary,
+                      _primaryColor,
                     ),
                   ),
                 ),
@@ -685,60 +708,63 @@ class _SwapRequestsScreenState
           ),
 
           const SizedBox(
-            height: 14,
+            height:
+            14,
           ),
 
           Row(
             children: [
               CircleAvatar(
-                radius: 23,
+                radius:
+                23,
                 backgroundColor:
-                AppTheme.primary
-                    .withValues(
-                  alpha:
-                  _isDarkMode
-                      ? 0.18
-                      : 0.10,
-                ),
+                _softPrimaryColor,
                 child: Text(
                   displayInitials,
                   style:
-                  const TextStyle(
-                    fontSize: 14,
+                  TextStyle(
+                    fontSize:
+                    14,
                     fontWeight:
                     FontWeight.w800,
                     color:
-                    AppTheme.primary,
+                    _primaryColor,
                   ),
                 ),
               ),
+
               const SizedBox(
-                width: 12,
+                width:
+                12,
               ),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+                  CrossAxisAlignment.start,
                   children: [
                     Text(
                       displayName,
-                      style: TextStyle(
-                        fontSize: 15,
+                      style:
+                      TextStyle(
+                        fontSize:
+                        15,
                         fontWeight:
-                        FontWeight
-                            .w800,
+                        FontWeight.w800,
                         color:
                         _textColor,
                       ),
                     ),
                     const SizedBox(
-                      height: 3,
+                      height:
+                      3,
                     ),
                     Text(
                       displayCity,
-                      style: TextStyle(
-                        fontSize: 12,
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
                         color:
                         _mutedColor,
                       ),
@@ -750,7 +776,8 @@ class _SwapRequestsScreenState
           ),
 
           const SizedBox(
-            height: 16,
+            height:
+            16,
           ),
 
           Container(
@@ -768,7 +795,8 @@ class _SwapRequestsScreenState
               BorderRadius.circular(
                 14,
               ),
-              border: Border.all(
+              border:
+              Border.all(
                 color:
                 _borderColor,
               ),
@@ -784,7 +812,8 @@ class _SwapRequestsScreenState
                   request.skillToLearn,
                 ),
                 const SizedBox(
-                  height: 9,
+                  height:
+                  9,
                 ),
                 _buildSkillRow(
                   icon:
@@ -799,28 +828,27 @@ class _SwapRequestsScreenState
           ),
 
           const SizedBox(
-            height: 14,
+            height:
+            14,
           ),
 
           _buildDetailRow(
-            Icons
-                .calendar_today_outlined,
+            Icons.calendar_today_outlined,
             _formatDateTime(
               request.proposedAt,
             ),
           ),
 
           const SizedBox(
-            height: 8,
+            height:
+            8,
           ),
 
           _buildDetailRow(
             request.mode ==
                 'Online'
-                ? Icons
-                .videocam_outlined
-                : Icons
-                .location_on_outlined,
+                ? Icons.videocam_outlined
+                : Icons.location_on_outlined,
             request.mode,
           ),
 
@@ -830,7 +858,8 @@ class _SwapRequestsScreenState
                   .trim()
                   .isNotEmpty) ...[
             const SizedBox(
-              height: 8,
+              height:
+              8,
             ),
             _buildDetailRow(
               Icons.info_outline,
@@ -843,7 +872,8 @@ class _SwapRequestsScreenState
                   .trim()
                   .isNotEmpty) ...[
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             Container(
               width:
@@ -855,13 +885,7 @@ class _SwapRequestsScreenState
               decoration:
               BoxDecoration(
                 color:
-                AppTheme.primary
-                    .withValues(
-                  alpha:
-                  _isDarkMode
-                      ? 0.12
-                      : 0.05,
-                ),
+                _softPrimaryColor,
                 borderRadius:
                 BorderRadius.circular(
                   12,
@@ -869,29 +893,15 @@ class _SwapRequestsScreenState
               ),
               child: Text(
                 request.note!,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  height: 1.4,
+                style:
+                TextStyle(
+                  fontSize:
+                  12.5,
+                  height:
+                  1.4,
                   color:
                   _textColor,
                 ),
-              ),
-            ),
-          ],
-
-          if (isIncoming &&
-              requesterUser ==
-                  null) ...[
-            const SizedBox(
-              height: 10,
-            ),
-            Text(
-              'Sender profile could not be resolved from the local user database.',
-              style: TextStyle(
-                fontSize: 10.5,
-                height: 1.4,
-                color:
-                _mutedColor,
               ),
             ),
           ],
@@ -900,7 +910,8 @@ class _SwapRequestsScreenState
             request,
           )) ...[
             const SizedBox(
-              height: 16,
+              height:
+              16,
             ),
             _buildActions(
               request:
@@ -917,10 +928,6 @@ class _SwapRequestsScreenState
       ),
     );
   }
-
-  // ============================================================
-  // AVAILABLE ACTION
-  // ============================================================
 
   bool _hasAvailableAction(
       SwapRequest request,
@@ -955,10 +962,6 @@ class _SwapRequestsScreenState
         );
   }
 
-  // ============================================================
-  // ACTIONS
-  // ============================================================
-
   Widget _buildActions({
     required SwapRequest request,
     required bool isIncoming,
@@ -975,7 +978,8 @@ class _SwapRequestsScreenState
       return Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child:
+            OutlinedButton(
               onPressed:
               blocked
                   ? null
@@ -984,43 +988,18 @@ class _SwapRequestsScreenState
                   request,
                 );
               },
-              style:
-              OutlinedButton.styleFrom(
-                minimumSize:
-                const Size(
-                  0,
-                  46,
-                ),
-                side:
-                const BorderSide(
-                  color:
-                  Colors.redAccent,
-                ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    12,
-                  ),
-                ),
-              ),
               child:
               const Text(
                 'DECLINE',
-                style:
-                TextStyle(
-                  fontSize: 12,
-                  fontWeight:
-                  FontWeight.w800,
-                  color:
-                  Colors.redAccent,
-                ),
               ),
             ),
           ),
+
           const SizedBox(
-            width: 10,
+            width:
+            10,
           ),
+
           Expanded(
             child:
             ElevatedButton(
@@ -1032,30 +1011,9 @@ class _SwapRequestsScreenState
                   request,
                 );
               },
-              style:
-              ElevatedButton.styleFrom(
-                minimumSize:
-                const Size(
-                  0,
-                  46,
-                ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    12,
-                  ),
-                ),
-              ),
               child:
               const Text(
                 'ACCEPT',
-                style:
-                TextStyle(
-                  fontSize: 12,
-                  fontWeight:
-                  FontWeight.w800,
-                ),
               ),
             ),
           ),
@@ -1072,7 +1030,7 @@ class _SwapRequestsScreenState
             width:
             double.infinity,
             child:
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed:
               blocked
                   ? null
@@ -1081,39 +1039,26 @@ class _SwapRequestsScreenState
                   request,
                 );
               },
-              style:
-              ElevatedButton.styleFrom(
-                minimumSize:
-                const Size(
-                  0,
-                  46,
-                ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    12,
-                  ),
-                ),
+              icon:
+              const Icon(
+                Icons.event_available_outlined,
+                size:
+                18,
               ),
-              child:
+              label:
               const Text(
-                'MARK AS SCHEDULED',
-                style:
-                TextStyle(
-                  fontSize: 12,
-                  fontWeight:
-                  FontWeight.w800,
-                ),
+                'CONFIRM SCHEDULE',
               ),
             ),
           ),
+
           if (isOutgoing &&
               request.canCancel(
                 _currentUserId,
               )) ...[
             const SizedBox(
-              height: 9,
+              height:
+              9,
             ),
             _buildCancelButton(
               request,
@@ -1128,62 +1073,24 @@ class _SwapRequestsScreenState
     if (request.canComplete(
       _currentUserId,
     )) {
-      return Column(
-        children: [
-          SizedBox(
-            width:
-            double.infinity,
-            child:
-            ElevatedButton(
-              onPressed:
-              blocked
-                  ? null
-                  : () {
-                _confirmComplete(
-                  request,
-                );
-              },
-              style:
-              ElevatedButton.styleFrom(
-                minimumSize:
-                const Size(
-                  0,
-                  46,
-                ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    12,
-                  ),
-                ),
-              ),
-              child:
-              const Text(
-                'MARK AS COMPLETED',
-                style:
-                TextStyle(
-                  fontSize: 12,
-                  fontWeight:
-                  FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          if (isOutgoing &&
-              request.canCancel(
-                _currentUserId,
-              )) ...[
-            const SizedBox(
-              height: 9,
-            ),
-            _buildCancelButton(
+      return SizedBox(
+        width:
+        double.infinity,
+        child:
+        ElevatedButton(
+          onPressed:
+          blocked
+              ? null
+              : () {
+            _confirmComplete(
               request,
-              blocked:
-              blocked,
-            ),
-          ],
-        ],
+            );
+          },
+          child:
+          const Text(
+            'MARK AS COMPLETED',
+          ),
+        ),
       );
     }
 
@@ -1216,41 +1123,13 @@ class _SwapRequestsScreenState
           },
           icon:
           const Icon(
-            Icons
-                .archive_outlined,
-            size: 18,
+            Icons.archive_outlined,
+            size:
+            18,
           ),
           label:
           const Text(
             'REMOVE FROM HISTORY',
-            style:
-            TextStyle(
-              fontSize: 12,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-          style:
-          OutlinedButton.styleFrom(
-            foregroundColor:
-            _textColor,
-            minimumSize:
-            const Size(
-              0,
-              46,
-            ),
-            side:
-            BorderSide(
-              color:
-              _borderColor,
-            ),
-            shape:
-            RoundedRectangleBorder(
-              borderRadius:
-              BorderRadius.circular(
-                12,
-              ),
-            ),
           ),
         ),
       );
@@ -1266,7 +1145,8 @@ class _SwapRequestsScreenState
     return SizedBox(
       width:
       double.infinity,
-      child: OutlinedButton(
+      child:
+      OutlinedButton(
         onPressed:
         blocked
             ? null
@@ -1275,44 +1155,13 @@ class _SwapRequestsScreenState
             request,
           );
         },
-        style:
-        OutlinedButton.styleFrom(
-          foregroundColor:
-          _textColor,
-          minimumSize:
-          const Size(
-            0,
-            46,
-          ),
-          side: BorderSide(
-            color:
-            _borderColor,
-          ),
-          shape:
-          RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(
-              12,
-            ),
-          ),
-        ),
         child:
         const Text(
           'CANCEL REQUEST',
-          style:
-          TextStyle(
-            fontSize: 12,
-            fontWeight:
-            FontWeight.w800,
-          ),
         ),
       ),
     );
   }
-
-  // ============================================================
-  // DIRECTION BADGE
-  // ============================================================
 
   Widget _buildDirectionBadge(
       SwapRequestDirection direction,
@@ -1334,30 +1183,23 @@ class _SwapRequestsScreenState
 
     final IconData icon =
     incoming
-        ? Icons
-        .call_received_rounded
+        ? Icons.call_received_rounded
         : outgoing
-        ? Icons
-        .call_made_rounded
-        : Icons
-        .help_outline_rounded;
+        ? Icons.call_made_rounded
+        : Icons.help_outline_rounded;
 
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
+        horizontal:
+        10,
+        vertical:
+        6,
       ),
       decoration:
       BoxDecoration(
         color:
-        AppTheme.primary
-            .withValues(
-          alpha:
-          _isDarkMode
-              ? 0.16
-              : 0.08,
-        ),
+        _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           20,
@@ -1369,35 +1211,31 @@ class _SwapRequestsScreenState
         children: [
           Icon(
             icon,
-            size: 13,
+            size:
+            13,
             color:
-            AppTheme.primary,
+            _primaryColor,
           ),
           const SizedBox(
-            width: 5,
-          ),
-          const Text(
-            '',
+            width:
+            5,
           ),
           Text(
             text,
             style:
-            const TextStyle(
-              fontSize: 10.5,
+            TextStyle(
+              fontSize:
+              10.5,
               fontWeight:
               FontWeight.w800,
               color:
-              AppTheme.primary,
+              _primaryColor,
             ),
           ),
         ],
       ),
     );
   }
-
-  // ============================================================
-  // STATUS BADGE
-  // ============================================================
 
   Widget _buildStatusBadge(
       SwapRequestStatus status,
@@ -1419,11 +1257,11 @@ class _SwapRequestsScreenState
             ? const Color(
           0xFF81C784,
         )
-            : Colors.green;
+            : AppTheme.success;
 
       case SwapRequestStatus.declined:
         color =
-            Colors.redAccent;
+            AppTheme.error;
 
       case SwapRequestStatus.scheduled:
         color =
@@ -1449,8 +1287,10 @@ class _SwapRequestsScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
+        horizontal:
+        10,
+        vertical:
+        6,
       ),
       decoration:
       BoxDecoration(
@@ -1470,18 +1310,16 @@ class _SwapRequestsScreenState
         status.label,
         style:
         TextStyle(
-          fontSize: 10.5,
+          fontSize:
+          10.5,
           fontWeight:
           FontWeight.w800,
-          color: color,
+          color:
+          color,
         ),
       ),
     );
   }
-
-  // ============================================================
-  // SKILL ROW
-  // ============================================================
 
   Widget _buildSkillRow({
     required IconData icon,
@@ -1492,20 +1330,24 @@ class _SwapRequestsScreenState
       children: [
         Icon(
           icon,
-          size: 17,
+          size:
+          17,
           color:
-          AppTheme.primary,
+          _primaryColor,
         ),
         const SizedBox(
-          width: 9,
+          width:
+          9,
         ),
         SizedBox(
-          width: 46,
+          width:
+          46,
           child: Text(
             '$label:',
             style:
             TextStyle(
-              fontSize: 11.5,
+              fontSize:
+              11.5,
               color:
               _mutedColor,
             ),
@@ -1516,7 +1358,8 @@ class _SwapRequestsScreenState
             value,
             style:
             TextStyle(
-              fontSize: 12.5,
+              fontSize:
+              12.5,
               fontWeight:
               FontWeight.w700,
               color:
@@ -1528,10 +1371,6 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // DETAIL ROW
-  // ============================================================
-
   Widget _buildDetailRow(
       IconData icon,
       String text,
@@ -1542,20 +1381,24 @@ class _SwapRequestsScreenState
       children: [
         Icon(
           icon,
-          size: 16,
+          size:
+          16,
           color:
           _mutedColor,
         ),
         const SizedBox(
-          width: 8,
+          width:
+          8,
         ),
         Expanded(
           child: Text(
             text,
             style:
             TextStyle(
-              fontSize: 12,
-              height: 1.35,
+              fontSize:
+              12,
+              height:
+              1.35,
               color:
               _mutedColor,
             ),
@@ -1565,13 +1408,10 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
   Widget _buildEmptyState() {
     final bool filtered =
-        _selectedFilter != 'All';
+        _selectedFilter !=
+            'All';
 
     return Center(
       child: Padding(
@@ -1585,43 +1425,27 @@ class _SwapRequestsScreenState
           children: [
             Image.asset(
               'assets/images/mascot/tubi_confused.png',
-              width: 100,
-              height: 100,
-              fit: BoxFit.contain,
+              width:
+              100,
+              height:
+              100,
             ),
             const SizedBox(
-              height: 14,
+              height:
+              14,
             ),
             Text(
               filtered
                   ? 'No $_selectedFilter requests'
                   : 'No swap requests yet',
-              textAlign:
-              TextAlign.center,
               style:
               TextStyle(
-                fontSize: 17,
+                fontSize:
+                17,
                 fontWeight:
                 FontWeight.w800,
                 color:
                 _textColor,
-              ),
-            ),
-            const SizedBox(
-              height: 6,
-            ),
-            Text(
-              filtered
-                  ? 'There are no requests with this status right now.'
-                  : 'Your incoming and outgoing skill swaps will appear here.',
-              textAlign:
-              TextAlign.center,
-              style:
-              TextStyle(
-                fontSize: 12.5,
-                height: 1.4,
-                color:
-                _mutedColor,
               ),
             ),
           ],
@@ -1630,65 +1454,41 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // ACCEPT
-  // ============================================================
-
   Future<void> _confirmAccept(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
-    )) {
-      return;
-    }
-
     final bool? confirmed =
     await showDialog<bool>(
-      context: context,
+      context:
+      context,
       builder:
           (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
+          title:
+          const Text(
             'Accept request?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
           ),
-          content: Text(
-            'You are agreeing to continue with this skill swap request.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
+          content:
+          const Text(
+            'Accepting means you agree to continue with this skill swap.',
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   false,
                 );
               },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
+              child:
+              const Text(
+                'Back',
               ),
             ),
             ElevatedButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -1704,8 +1504,7 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true ||
-        !mounted) {
+    if (confirmed != true) {
       return;
     }
 
@@ -1724,90 +1523,9 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // DECLINE
-  // ============================================================
-
   Future<void> _confirmDecline(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
-    )) {
-      return;
-    }
-
-    final bool? confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder:
-          (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
-            'Decline request?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-          content: Text(
-            'This request will be marked as declined.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: Text(
-                'Back',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              child:
-              const Text(
-                'Decline',
-                style:
-                TextStyle(
-                  color:
-                  Colors.redAccent,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true ||
-        !mounted) {
-      return;
-    }
-
     await _performAction(
       requestId:
       request.id,
@@ -1823,90 +1541,9 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // CANCEL
-  // ============================================================
-
   Future<void> _confirmCancel(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
-    )) {
-      return;
-    }
-
-    final bool? confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder:
-          (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
-            'Cancel request?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-          content: Text(
-            'This outgoing request will be cancelled.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: Text(
-                'Back',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              child:
-              const Text(
-                'Cancel request',
-                style:
-                TextStyle(
-                  color:
-                  Colors.redAccent,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true ||
-        !mounted) {
-      return;
-    }
-
     await _performAction(
       requestId:
       request.id,
@@ -1922,65 +1559,51 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // SCHEDULE
-  // ============================================================
-
   Future<void> _confirmSchedule(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
+    if (!request.proposedAt.isAfter(
+      DateTime.now(),
     )) {
+      _showMessage(
+        'The proposed schedule has already passed.',
+      );
       return;
     }
 
     final bool? confirmed =
     await showDialog<bool>(
-      context: context,
+      context:
+      context,
       builder:
           (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
-            'Mark as scheduled?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
+          title:
+          const Text(
+            'Confirm session schedule',
           ),
           content: Text(
-            'This confirms that the accepted skill swap is scheduled.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
+            '${_formatDateTime(request.proposedAt)}\n\n'
+                '${request.mode}\n'
+                '${request.meetingDetails ?? ''}',
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   false,
                 );
               },
-              child: Text(
+              child:
+              const Text(
                 'Back',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
               ),
             ),
             ElevatedButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -1988,7 +1611,7 @@ class _SwapRequestsScreenState
               },
               child:
               const Text(
-                'Schedule',
+                'Confirm schedule',
               ),
             ),
           ],
@@ -1996,8 +1619,7 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true ||
-        !mounted) {
+    if (confirmed != true) {
       return;
     }
 
@@ -2012,86 +1634,19 @@ class _SwapRequestsScreenState
             _currentUserId,
           ),
       successMessage:
-      'Swap marked as scheduled.',
+      'Session scheduled successfully.',
     );
   }
-
-  // ============================================================
-  // COMPLETE
-  // ============================================================
 
   Future<void> _confirmComplete(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
+    if (DateTime.now().isBefore(
+      request.proposedAt,
     )) {
-      return;
-    }
-
-    final bool? confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder:
-          (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
-            'Complete this swap?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-          content: Text(
-            'Only mark the swap completed after the skill exchange has taken place.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: Text(
-                'Back',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              child:
-              const Text(
-                'Complete',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true ||
-        !mounted) {
+      _showMessage(
+        'This session is still upcoming.',
+      );
       return;
     }
 
@@ -2110,102 +1665,9 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // REMOVE FROM HISTORY
-  // ============================================================
-
   Future<void> _confirmRemoveFromHistory(
       SwapRequest request,
       ) async {
-    if (_isProcessing(
-      request.id,
-    )) {
-      return;
-    }
-
-    final bool? confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder:
-          (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title: Text(
-            'Remove from history?',
-            style: TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-          content: Text(
-            'This finished swap will be hidden from your history. '
-                'Its underlying record will remain preserved.',
-            style: TextStyle(
-              color:
-              _mutedColor,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color:
-                  _mutedColor,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed:
-                  () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              icon:
-              const Icon(
-                Icons
-                    .archive_outlined,
-                size: 18,
-              ),
-              label:
-              const Text(
-                'Remove',
-                style:
-                TextStyle(
-                  fontWeight:
-                  FontWeight.w700,
-                ),
-              ),
-              style:
-              TextButton.styleFrom(
-                foregroundColor:
-                AppTheme.primary,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true ||
-        !mounted) {
-      return;
-    }
-
     await _performAction(
       requestId:
       request.id,
@@ -2221,37 +1683,17 @@ class _SwapRequestsScreenState
     );
   }
 
-  // ============================================================
-  // PROCESSING
-  // ============================================================
-
-  bool _isProcessing(
-      String requestId,
-      ) {
-    return _processingRequestIds
-        .contains(
-      requestId.trim(),
-    );
-  }
-
-  // ============================================================
-  // SHARED ACTION HANDLER
-  // ============================================================
-
   Future<void> _performAction({
     required String requestId,
-    required Future<void> Function()
-    action,
+    required Future<void> Function() action,
     required String successMessage,
   }) async {
     final String cleanRequestId =
     requestId.trim();
 
-    if (cleanRequestId.isEmpty ||
-        _processingRequestIds
-            .contains(
-          cleanRequestId,
-        )) {
+    if (_processingRequestIds.contains(
+      cleanRequestId,
+    )) {
       return;
     }
 
@@ -2287,7 +1729,7 @@ class _SwapRequestsScreenState
       }
 
       _showMessage(
-        'Something went wrong. Please try again.',
+        'Something went wrong.',
       );
     } finally {
       if (mounted) {
@@ -2299,10 +1741,6 @@ class _SwapRequestsScreenState
       }
     }
   }
-
-  // ============================================================
-  // SNACKBAR
-  // ============================================================
 
   void _showMessage(
       String message,
@@ -2323,10 +1761,6 @@ class _SwapRequestsScreenState
       ),
     );
   }
-
-  // ============================================================
-  // DATE FORMAT
-  // ============================================================
 
   String _formatDateTime(
       DateTime value,

@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../model/repositories/explore_repository.dart';
+import '../model/skill.dart';
+import '../model/swap_request.dart';
+import '../model/user.dart';
+import '../services/current_user_service.dart';
+import '../services/swap_service.dart';
 import '../theme/app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -14,6 +20,21 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState
     extends State<DashboardScreen> {
+  final ExploreRepository _repository =
+      ExploreRepository.instance;
+
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
+  final SwapService _swapService =
+      SwapService.instance;
+
+  final ScrollController _scrollController =
+  ScrollController();
+
+  final GlobalKey _matchSectionKey =
+  GlobalKey();
+
   int _selectedNav = 0;
 
   final List<Map<String, dynamic>> skills = [
@@ -93,14 +114,38 @@ class _DashboardScreenState
   Color get _skillIconBackground =>
       _isDarkMode
           ? _surfaceColor
-          : const Color(
-        0xFFFFFFFF,
+          : Colors.white;
+
+  User? get _currentUser {
+    try {
+      final String userId =
+      _currentUserService.requireUserId();
+
+      return _repository.findUserById(
+        userId,
       );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+
+    super.dispose();
+  }
 
   @override
   Widget build(
       BuildContext context,
       ) {
+    final _DashboardMatch? match =
+    _findBestMatch();
+
+    final SwapRequest? upcomingSession =
+    _findUpcomingSession();
+
     return Scaffold(
       backgroundColor:
       Theme.of(context)
@@ -110,6 +155,8 @@ class _DashboardScreenState
           children: [
             Expanded(
               child: SingleChildScrollView(
+                controller:
+                _scrollController,
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
@@ -124,51 +171,98 @@ class _DashboardScreenState
                   CrossAxisAlignment.start,
                   children: [
                     _buildHeader(),
+
                     const SizedBox(
                       height: 20,
                     ),
+
                     _buildSearchBar(),
+
                     const SizedBox(
                       height: 24,
                     ),
-                    _buildSectionHeader(
-                      title:
-                      '✦ Your AI Match',
-                      action:
-                      'See all',
+
+                    Container(
+                      key:
+                      _matchSectionKey,
+                      child: Column(
+                        children: [
+                          _buildSectionHeader(
+                            title:
+                            '✦ Your Best Match',
+                            action:
+                            'Explore',
+                            onAction: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/explore',
+                              );
+                            },
+                          ),
+
+                          const SizedBox(
+                            height: 12,
+                          ),
+
+                          _buildMatchCard(
+                            match,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(
-                      height: 12,
-                    ),
-                    _buildMatchCard(),
+
                     const SizedBox(
                       height: 28,
                     ),
+
                     _buildSectionHeader(
                       title:
                       'Popular Skills',
                       action:
                       'Explore',
+                      onAction: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/explore',
+                        );
+                      },
                     ),
+
                     const SizedBox(
                       height: 14,
                     ),
+
                     _buildPopularSkills(),
+
                     const SizedBox(
                       height: 28,
                     ),
+
                     _buildSectionHeader(
                       title:
                       'Upcoming Session',
+                      action:
+                      'Requests',
+                      onAction: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/swap-requests',
+                        );
+                      },
                     ),
+
                     const SizedBox(
                       height: 12,
                     ),
-                    _buildUpcomingSession(),
+
+                    _buildUpcomingSession(
+                      upcomingSession,
+                    ),
                   ],
                 ),
               ),
             ),
+
             _buildBottomNavigation(),
           ],
         ),
@@ -181,6 +275,27 @@ class _DashboardScreenState
   // ============================================================
 
   Widget _buildHeader() {
+    final User? currentUser =
+        _currentUser;
+
+    final String displayName;
+
+    if (currentUser == null ||
+        currentUser.name.trim().isEmpty) {
+      displayName =
+      'there';
+    } else {
+      displayName =
+          currentUser.name
+              .trim()
+              .split(
+            RegExp(
+              r'\s+',
+            ),
+          )
+              .first;
+    }
+
     return Row(
       children: [
         Expanded(
@@ -189,7 +304,7 @@ class _DashboardScreenState
             CrossAxisAlignment.start,
             children: [
               Text(
-                'Hello, Joice! 👋',
+                'Hello, $displayName! 👋',
                 style:
                 AppTextStyles.pageTitle
                     .copyWith(
@@ -197,9 +312,11 @@ class _DashboardScreenState
                   _textColor,
                 ),
               ),
+
               const SizedBox(
                 height: 4,
               ),
+
               Text(
                 'Ready to share and learn?',
                 style:
@@ -212,9 +329,12 @@ class _DashboardScreenState
             ],
           ),
         ),
+
         Container(
-          width: 38,
-          height: 38,
+          width:
+          40,
+          height:
+          40,
           decoration:
           BoxDecoration(
             color:
@@ -229,26 +349,57 @@ class _DashboardScreenState
               _borderColor,
             ),
           ),
-          child: Icon(
-            Icons
-                .notifications_none_rounded,
-            size: 21,
-            color:
-            _textColor,
+          child: IconButton(
+            tooltip:
+            'Swap activity',
+            padding:
+            EdgeInsets.zero,
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                '/swap-requests',
+              );
+            },
+            icon: Icon(
+              Icons.notifications_none_rounded,
+              size:
+              21,
+              color:
+              _textColor,
+            ),
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Container(
-          width: 42,
-          height: 42,
+          width:
+          42,
+          height:
+          42,
           decoration:
           const BoxDecoration(
             color:
             AppTheme.accent,
             shape:
             BoxShape.circle,
+          ),
+          alignment:
+          Alignment.center,
+          child: Text(
+            currentUser?.initials ??
+                'TL',
+            style:
+            const TextStyle(
+              fontSize:
+              12,
+              fontWeight:
+              FontWeight.w800,
+              color:
+              Colors.white,
+            ),
           ),
         ),
       ],
@@ -272,7 +423,8 @@ class _DashboardScreenState
         );
       },
       child: Container(
-        height: 50,
+        height:
+        50,
         decoration:
         BoxDecoration(
           color:
@@ -292,15 +444,19 @@ class _DashboardScreenState
             const SizedBox(
               width: 14,
             ),
+
             Icon(
-              Icons.search,
+              Icons.search_rounded,
               color:
               _mutedColor,
-              size: 20,
+              size:
+              20,
             ),
+
             const SizedBox(
               width: 10,
             ),
+
             Expanded(
               child: Text(
                 'Search skills or people',
@@ -312,13 +468,15 @@ class _DashboardScreenState
                 ),
               ),
             ),
+
             Icon(
-              Icons
-                  .filter_list_rounded,
+              Icons.explore_outlined,
               color:
               _primaryColor,
-              size: 20,
+              size:
+              20,
             ),
+
             const SizedBox(
               width: 14,
             ),
@@ -335,6 +493,7 @@ class _DashboardScreenState
   Widget _buildSectionHeader({
     required String title,
     String? action,
+    VoidCallback? onAction,
   }) {
     return Row(
       children: [
@@ -349,29 +508,16 @@ class _DashboardScreenState
             ),
           ),
         ),
-        if (action != null)
+
+        if (action != null &&
+            onAction != null)
           InkWell(
             borderRadius:
             BorderRadius.circular(
               8,
             ),
-            onTap: () {
-              if (action ==
-                  'Explore') {
-                Navigator.pushNamed(
-                  context,
-                  '/explore',
-                );
-              }
-
-              if (action ==
-                  'See all') {
-                Navigator.pushNamed(
-                  context,
-                  '/swap-requests',
-                );
-              }
-            },
+            onTap:
+            onAction,
             child: Padding(
               padding:
               const EdgeInsets.symmetric(
@@ -396,12 +542,210 @@ class _DashboardScreenState
   }
 
   // ============================================================
-  // AI MATCH
+  // BEST MATCH
   // ============================================================
 
-  Widget _buildMatchCard() {
+  _DashboardMatch? _findBestMatch() {
+    final User? currentUser =
+        _currentUser;
+
+    if (currentUser == null) {
+      return null;
+    }
+
+    final Set<String> currentOfferedIds =
+    _repository
+        .getOfferedSkillsForUser(
+      currentUser.id,
+    )
+        .map(
+          (
+          relationship,
+          ) =>
+      relationship.skillId,
+    )
+        .toSet();
+
+    final Set<String> currentWantedIds =
+    _repository
+        .getWantedSkillsForUser(
+      currentUser.id,
+    )
+        .map(
+          (
+          relationship,
+          ) =>
+      relationship.skillId,
+    )
+        .toSet();
+
+    _DashboardMatch? bestMatch;
+
+    for (final User candidate
+    in _repository.users) {
+      if (candidate.id ==
+          currentUser.id) {
+        continue;
+      }
+
+      final Set<String> candidateOfferedIds =
+      _repository
+          .getOfferedSkillsForUser(
+        candidate.id,
+      )
+          .map(
+            (
+            relationship,
+            ) =>
+        relationship.skillId,
+      )
+          .toSet();
+
+      final Set<String> candidateWantedIds =
+      _repository
+          .getWantedSkillsForUser(
+        candidate.id,
+      )
+          .map(
+            (
+            relationship,
+            ) =>
+        relationship.skillId,
+      )
+          .toSet();
+
+      final Set<String> learnMatches =
+      currentWantedIds.intersection(
+        candidateOfferedIds,
+      );
+
+      final Set<String> teachMatches =
+      currentOfferedIds.intersection(
+        candidateWantedIds,
+      );
+
+      if (learnMatches.isEmpty &&
+          teachMatches.isEmpty) {
+        continue;
+      }
+
+      int score =
+      0;
+
+      if (learnMatches.isNotEmpty) {
+        score +=
+        60;
+      }
+
+      if (teachMatches.isNotEmpty) {
+        score +=
+        30;
+      }
+
+      final int additionalOverlap =
+          learnMatches.length +
+              teachMatches.length -
+              2;
+
+      if (additionalOverlap >
+          0) {
+        score +=
+            additionalOverlap * 3;
+      }
+
+      if (candidate.rating >=
+          4.5) {
+        score +=
+        2;
+      }
+
+      score =
+          score.clamp(
+            0,
+            98,
+          );
+
+      Skill? skillToLearn;
+      Skill? skillToTeach;
+
+      if (learnMatches.isNotEmpty) {
+        skillToLearn =
+            _repository.findSkillById(
+              learnMatches.first,
+            );
+      }
+
+      if (teachMatches.isNotEmpty) {
+        skillToTeach =
+            _repository.findSkillById(
+              teachMatches.first,
+            );
+      }
+
+      final _DashboardMatch match =
+      _DashboardMatch(
+        user:
+        candidate,
+        score:
+        score,
+        skillToLearn:
+        skillToLearn,
+        skillToTeach:
+        skillToTeach,
+      );
+
+      if (bestMatch == null ||
+          match.score >
+              bestMatch.score) {
+        bestMatch =
+            match;
+      }
+    }
+
+    return bestMatch;
+  }
+
+  Widget _buildMatchCard(
+      _DashboardMatch? match,
+      ) {
+    if (match == null) {
+      return _buildNoMatchCard();
+    }
+
+    final String subtitle;
+
+    if (match.skillToLearn != null &&
+        match.skillToTeach != null) {
+      subtitle =
+      '${match.skillToLearn!.title} ↔ ${match.skillToTeach!.title}';
+    } else if (match.skillToLearn != null) {
+      subtitle =
+      '${match.skillToLearn!.title} • Learning match';
+    } else if (match.skillToTeach != null) {
+      subtitle =
+      '${match.skillToTeach!.title} • Teaching match';
+    } else {
+      subtitle =
+      'Potential skill exchange';
+    }
+
+    final String explanation;
+
+    if (match.skillToLearn != null &&
+        match.skillToTeach != null) {
+      explanation =
+      '${match.user.name} can help you with ${match.skillToLearn!.title}, while you can offer ${match.skillToTeach!.title} in return.';
+    } else if (match.skillToLearn != null) {
+      explanation =
+      '${match.user.name} offers ${match.skillToLearn!.title}, which matches one of your learning interests.';
+    } else {
+      explanation =
+      '${match.user.name} wants to learn ${match.skillToTeach!.title}, a skill you currently offer.';
+    }
+
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         14,
@@ -425,8 +769,10 @@ class _DashboardScreenState
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width:
+                48,
+                height:
+                48,
                 decoration:
                 const BoxDecoration(
                   color:
@@ -434,35 +780,56 @@ class _DashboardScreenState
                   shape:
                   BoxShape.circle,
                 ),
+                alignment:
+                Alignment.center,
+                child: Text(
+                  match.user.initials,
+                  style:
+                  const TextStyle(
+                    fontSize:
+                    12,
+                    fontWeight:
+                    FontWeight.w800,
+                    color:
+                    Colors.white,
+                  ),
+                ),
               ),
+
               const SizedBox(
                 width: 12,
               ),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Alex Rivera',
+                      match.user.name,
                       style:
-                      AppTextStyles
-                          .cardTitle
+                      AppTextStyles.cardTitle
                           .copyWith(
                         color:
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height: 3,
                     ),
+
                     Text(
-                      'Video Editing • Advanced',
+                      subtitle,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
-                      AppTextStyles
-                          .secondary
+                      AppTextStyles.secondary
                           .copyWith(
-                        fontSize: 12,
+                        fontSize:
+                        12,
                         color:
                         _mutedColor,
                       ),
@@ -470,6 +837,7 @@ class _DashboardScreenState
                   ],
                 ),
               ),
+
               Container(
                 padding:
                 const EdgeInsets.symmetric(
@@ -486,10 +854,9 @@ class _DashboardScreenState
                   ),
                 ),
                 child: Text(
-                  '92% Match',
+                  '${match.score}% Match',
                   style:
-                  AppTextStyles
-                      .caption
+                  AppTextStyles.caption
                       .copyWith(
                     color:
                     _primaryColor,
@@ -500,27 +867,32 @@ class _DashboardScreenState
               ),
             ],
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Row(
             crossAxisAlignment:
             CrossAxisAlignment.center,
             children: [
               Image.asset(
                 'assets/images/mascot/tubi_happy.png',
-                width: 52,
-                height: 52,
+                width:
+                52,
+                height:
+                52,
               ),
+
               const SizedBox(
                 width: 10,
               ),
+
               Expanded(
                 child: Text(
-                  'Great fit! You teach Photography, while Alex can teach Video Editing.',
+                  explanation,
                   style:
-                  AppTextStyles
-                      .bodyMuted
+                  AppTextStyles.bodyMuted
                       .copyWith(
                     color:
                     _mutedColor,
@@ -529,16 +901,130 @@ class _DashboardScreenState
               ),
             ],
           ),
+
           const SizedBox(
             height: 14,
           ),
+
           SizedBox(
-            width: double.infinity,
-            height: 44,
+            width:
+            double.infinity,
+            height:
+            44,
             child: ElevatedButton(
-              onPressed: () {},
-              child: const Text(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/user-profile',
+                  arguments:
+                  match.user,
+                );
+              },
+              child:
+              const Text(
                 'VIEW MATCH',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoMatchCard() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          18,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Column(
+        children: [
+          Image.asset(
+            'assets/images/mascot/tubi_thinking.png',
+            width:
+            82,
+            height:
+            82,
+            fit:
+            BoxFit.contain,
+          ),
+
+          const SizedBox(
+            height: 8,
+          ),
+
+          Text(
+            'No strong match yet',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor,
+            ),
+          ),
+
+          const SizedBox(
+            height: 6,
+          ),
+
+          Text(
+            'Add both offered skills and learning interests so TubiLearn can find a useful two-way match.',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
+          ),
+
+          const SizedBox(
+            height: 14,
+          ),
+
+          SizedBox(
+            width:
+            double.infinity,
+            height:
+            42,
+            child:
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/my-skills',
+                );
+              },
+              icon:
+              const Icon(
+                Icons.add_rounded,
+                size:
+                18,
+              ),
+              label:
+              const Text(
+                'UPDATE MY SKILLS',
                 style:
                 AppTextStyles.button,
               ),
@@ -555,8 +1041,10 @@ class _DashboardScreenState
 
   Widget _buildPopularSkills() {
     return SizedBox(
-      height: 138,
-      child: ListView.separated(
+      height:
+      138,
+      child:
+      ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
@@ -564,18 +1052,25 @@ class _DashboardScreenState
         itemCount:
         skills.length,
         separatorBuilder:
-            (_, _) {
+            (
+            _,
+            _,
+            ) {
           return const SizedBox(
-            width: 12,
+            width:
+            12,
           );
         },
-        itemBuilder: (
-            context,
-            index,
+        itemBuilder:
+            (
+            BuildContext context,
+            int index,
             ) {
-          final Map<String, dynamic>
-          skill =
+          final Map<String, dynamic> skill =
           skills[index];
+
+          final String title =
+          skill['title'] as String;
 
           return InkWell(
             borderRadius:
@@ -583,13 +1078,13 @@ class _DashboardScreenState
               17,
             ),
             onTap: () {
-              Navigator.pushNamed(
-                context,
-                '/explore',
+              _openPopularSkill(
+                title,
               );
             },
             child: Container(
-              width: 132,
+              width:
+              132,
               padding:
               const EdgeInsets.all(
                 14,
@@ -613,8 +1108,10 @@ class _DashboardScreenState
                 MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width:
+                    50,
+                    height:
+                    50,
                     decoration:
                     BoxDecoration(
                       color:
@@ -634,26 +1131,29 @@ class _DashboardScreenState
                       as IconData,
                       color:
                       _primaryColor,
-                      size: 25,
+                      size:
+                      25,
                     ),
                   ),
+
                   const SizedBox(
-                    height: 11,
+                    height:
+                    11,
                   ),
+
                   Text(
-                    skill['title']
-                    as String,
-                    maxLines: 1,
+                    title,
+                    maxLines:
+                    1,
                     overflow:
-                    TextOverflow
-                        .ellipsis,
+                    TextOverflow.ellipsis,
                     textAlign:
                     TextAlign.center,
                     style:
-                    AppTextStyles
-                        .cardTitle
+                    AppTextStyles.cardTitle
                         .copyWith(
-                      fontSize: 13,
+                      fontSize:
+                      13,
                       color:
                       _textColor,
                     ),
@@ -667,13 +1167,120 @@ class _DashboardScreenState
     );
   }
 
+  void _openPopularSkill(
+      String title,
+      ) {
+    Skill? matchedSkill;
+
+    for (final Skill skill
+    in _repository.skills) {
+      if (skill.title
+          .trim()
+          .toLowerCase() ==
+          title
+              .trim()
+              .toLowerCase()) {
+        matchedSkill =
+            skill;
+        break;
+      }
+    }
+
+    if (matchedSkill != null) {
+      Navigator.pushNamed(
+        context,
+        '/skill-details',
+        arguments:
+        matchedSkill,
+      );
+
+      return;
+    }
+
+    Navigator.pushNamed(
+      context,
+      '/explore',
+    );
+  }
+
   // ============================================================
   // UPCOMING SESSION
   // ============================================================
 
-  Widget _buildUpcomingSession() {
+  SwapRequest? _findUpcomingSession() {
+    final User? currentUser =
+        _currentUser;
+
+    if (currentUser == null) {
+      return null;
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    final List<SwapRequest> sessions =
+    _swapService.requests.where(
+          (
+          SwapRequest request,
+          ) {
+        return request.status ==
+            SwapRequestStatus.scheduled &&
+            request.involvesUser(
+              currentUser.id,
+            ) &&
+            request.proposedAt.isAfter(
+              now,
+            );
+      },
+    ).toList();
+
+    if (sessions.isEmpty) {
+      return null;
+    }
+
+    sessions.sort(
+          (
+          SwapRequest a,
+          SwapRequest b,
+          ) =>
+          a.proposedAt.compareTo(
+            b.proposedAt,
+          ),
+    );
+
+    return sessions.first;
+  }
+
+  Widget _buildUpcomingSession(
+      SwapRequest? request,
+      ) {
+    if (request == null) {
+      return _buildNoUpcomingSession();
+    }
+
+    final User? currentUser =
+        _currentUser;
+
+    final User? otherUser =
+    _findOtherUser(
+      request,
+      currentUser,
+    );
+
+    final String displayName =
+        otherUser?.name ??
+            request.providerName;
+
+    final String initials =
+        otherUser?.initials ??
+            request.providerInitials;
+
+    final String skillText =
+        '${request.skillToLearn} ↔ ${request.skillToOffer}';
+
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         14,
@@ -695,8 +1302,10 @@ class _DashboardScreenState
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width:
+            46,
+            height:
+            46,
             decoration:
             const BoxDecoration(
               color:
@@ -704,47 +1313,73 @@ class _DashboardScreenState
               shape:
               BoxShape.circle,
             ),
+            alignment:
+            Alignment.center,
+            child: Text(
+              initials,
+              style:
+              const TextStyle(
+                fontSize:
+                11,
+                fontWeight:
+                FontWeight.w800,
+                color:
+                Colors.white,
+              ),
+            ),
           ),
+
           const SizedBox(
             width: 12,
           ),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Alex Rivera',
+                  displayName,
+                  maxLines:
+                  1,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
-                  AppTextStyles
-                      .cardTitle
+                  AppTextStyles.cardTitle
                       .copyWith(
                     color:
                     _textColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 3,
                 ),
+
                 Text(
-                  'Video Editing Session',
+                  skillText,
+                  maxLines:
+                  1,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
-                  AppTextStyles
-                      .secondary
+                  AppTextStyles.secondary
                       .copyWith(
-                    fontSize: 12,
+                    fontSize:
+                    12,
                     color:
                     _mutedColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 3,
                 ),
+
                 Text(
-                  'Today • 4:00 PM',
+                  '${_formatSessionDate(request.proposedAt)} • ${request.mode}',
                   style:
-                  AppTextStyles
-                      .caption
+                  AppTextStyles.caption
                       .copyWith(
                     color:
                     _mutedColor,
@@ -753,12 +1388,21 @@ class _DashboardScreenState
               ],
             ),
           ),
+
+          const SizedBox(
+            width: 10,
+          ),
+
           SizedBox(
-            width: 100,
-            height: 38,
-            child:
-            ElevatedButton(
-              onPressed: () {},
+            height:
+            38,
+            child: ElevatedButton(
+              onPressed: () {
+                _showSessionDetails(
+                  request,
+                  displayName,
+                );
+              },
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
@@ -770,22 +1414,18 @@ class _DashboardScreenState
                 )
                     : Colors.white,
                 padding:
-                EdgeInsets.zero,
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    20,
-                  ),
+                const EdgeInsets.symmetric(
+                  horizontal:
+                  12,
                 ),
               ),
               child: Text(
-                'JOIN CALL',
+                'SESSION INFO',
                 style:
-                AppTextStyles
-                    .button
+                AppTextStyles.button
                     .copyWith(
-                  fontSize: 11,
+                  fontSize:
+                  9.5,
                 ),
               ),
             ),
@@ -795,13 +1435,541 @@ class _DashboardScreenState
     );
   }
 
+  Widget _buildNoUpcomingSession() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width:
+            48,
+            height:
+            48,
+            decoration:
+            BoxDecoration(
+              color:
+              _softPrimaryColor,
+              borderRadius:
+              BorderRadius.circular(
+                14,
+              ),
+            ),
+            child: Icon(
+              Icons.event_available_outlined,
+              color:
+              _primaryColor,
+              size:
+              24,
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No scheduled session yet',
+                  style:
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
+                Text(
+                  'Accept a swap request and schedule it to make the session appear here.',
+                  style:
+                  AppTextStyles.secondary
+                      .copyWith(
+                    fontSize:
+                    11.5,
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(
+            width: 10,
+          ),
+
+          SizedBox(
+            height:
+            38,
+            child:
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/swap-requests',
+                );
+              },
+              style:
+              OutlinedButton.styleFrom(
+                padding:
+                const EdgeInsets.symmetric(
+                  horizontal:
+                  12,
+                ),
+              ),
+              child:
+              Text(
+                'VIEW',
+                style:
+                AppTextStyles.button
+                    .copyWith(
+                  fontSize:
+                  10,
+                  color:
+                  _primaryColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  User? _findOtherUser(
+      SwapRequest request,
+      User? currentUser,
+      ) {
+    if (currentUser == null ||
+        !request.hasStableIdentity) {
+      return null;
+    }
+
+    final String? otherUserId;
+
+    if (request.isRequester(
+      currentUser.id,
+    )) {
+      otherUserId =
+          request.providerUserId;
+    } else if (request.isProvider(
+      currentUser.id,
+    )) {
+      otherUserId =
+          request.requesterUserId;
+    } else {
+      return null;
+    }
+
+    if (otherUserId == null ||
+        otherUserId.trim().isEmpty) {
+      return null;
+    }
+
+    return _repository.findUserById(
+      otherUserId,
+    );
+  }
+
+  void _showSessionDetails(
+      SwapRequest request,
+      String displayName,
+      ) {
+    final String meetingDetails =
+    request.meetingDetails
+        ?.trim()
+        .isNotEmpty ==
+        true
+        ? request.meetingDetails!.trim()
+        : 'No meeting details provided.';
+
+    showDialog<void>(
+      context:
+      context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Row(
+            children: [
+              Container(
+                width:
+                38,
+                height:
+                38,
+                decoration:
+                BoxDecoration(
+                  color:
+                  _softPrimaryColor,
+                  borderRadius:
+                  BorderRadius.circular(
+                    11,
+                  ),
+                ),
+                child: Icon(
+                  request.mode ==
+                      'Online'
+                      ? Icons.videocam_outlined
+                      : Icons.place_outlined,
+                  color:
+                  _primaryColor,
+                  size:
+                  20,
+                ),
+              ),
+
+              const SizedBox(
+                width: 10,
+              ),
+
+              Expanded(
+                child: Text(
+                  'Session with $displayName',
+                  style:
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content:
+          Column(
+            mainAxisSize:
+            MainAxisSize.min,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              _buildSessionDetailRow(
+                icon:
+                Icons.schedule_rounded,
+                label:
+                'Schedule',
+                value:
+                _formatSessionDate(
+                  request.proposedAt,
+                ),
+              ),
+
+              const SizedBox(
+                height: 14,
+              ),
+
+              _buildSessionDetailRow(
+                icon:
+                request.mode ==
+                    'Online'
+                    ? Icons.language_rounded
+                    : Icons.location_on_outlined,
+                label:
+                'Mode',
+                value:
+                request.mode,
+              ),
+
+              const SizedBox(
+                height: 14,
+              ),
+
+              _buildSessionDetailRow(
+                icon:
+                Icons.info_outline_rounded,
+                label:
+                request.mode ==
+                    'Online'
+                    ? 'Meeting details'
+                    : 'Location details',
+                value:
+                meetingDetails,
+              ),
+
+              const SizedBox(
+                height: 14,
+              ),
+
+              _buildSessionDetailRow(
+                icon:
+                Icons.swap_horiz_rounded,
+                label:
+                'Skill exchange',
+                value:
+                '${request.skillToLearn} ↔ ${request.skillToOffer}',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop();
+              },
+              child:
+              Text(
+                'CLOSE',
+                style:
+                AppTextStyles.button
+                    .copyWith(
+                  color:
+                  _primaryColor,
+                ),
+              ),
+            ),
+
+            FilledButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop();
+
+                Navigator.pushNamed(
+                  context,
+                  '/swap-requests',
+                );
+              },
+              child:
+              const Text(
+                'VIEW REQUEST',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSessionDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size:
+          18,
+          color:
+          _primaryColor,
+        ),
+
+        const SizedBox(
+          width: 10,
+        ),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style:
+                AppTextStyles.caption
+                    .copyWith(
+                  color:
+                  _mutedColor,
+                  fontWeight:
+                  FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(
+                height: 2,
+              ),
+
+              Text(
+                value,
+                style:
+                AppTextStyles.secondary
+                    .copyWith(
+                  color:
+                  _textColor,
+                  fontWeight:
+                  FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatSessionDate(
+      DateTime date,
+      ) {
+    final DateTime now =
+    DateTime.now();
+
+    final DateTime today =
+    DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    final DateTime target =
+    DateTime(
+      date.year,
+      date.month,
+      date.day,
+    );
+
+    final int difference =
+        target.difference(
+          today,
+        ).inDays;
+
+    final String dayLabel;
+
+    if (difference ==
+        0) {
+      dayLabel =
+      'Today';
+    } else if (difference ==
+        1) {
+      dayLabel =
+      'Tomorrow';
+    } else {
+      const List<String> months =
+      <String>[
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+
+      dayLabel =
+      '${months[date.month - 1]} ${date.day}, ${date.year}';
+    }
+
+    final int hour12 =
+    date.hour == 0
+        ? 12
+        : date.hour > 12
+        ? date.hour - 12
+        : date.hour;
+
+    final String minute =
+    date.minute
+        .toString()
+        .padLeft(
+      2,
+      '0',
+    );
+
+    final String period =
+    date.hour >= 12
+        ? 'PM'
+        : 'AM';
+
+    return '$dayLabel • $hour12:$minute $period';
+  }
+
+  // ============================================================
+  // NAVIGATION HELPERS
+  // ============================================================
+
+  Future<void> _scrollToHome() async {
+    setState(() {
+      _selectedNav =
+      0;
+    });
+
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    await _scrollController.animateTo(
+      0,
+      duration:
+      const Duration(
+        milliseconds:
+        280,
+      ),
+      curve:
+      Curves.easeOut,
+    );
+  }
+
+  Future<void> _scrollToMatch() async {
+    setState(() {
+      _selectedNav =
+      2;
+    });
+
+    final BuildContext? matchContext =
+        _matchSectionKey.currentContext;
+
+    if (matchContext == null) {
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      matchContext,
+      duration:
+      const Duration(
+        milliseconds:
+        280,
+      ),
+      curve:
+      Curves.easeOut,
+      alignment:
+      0.08,
+    );
+  }
+
   // ============================================================
   // BOTTOM NAVIGATION
   // ============================================================
 
   Widget _buildBottomNavigation() {
-    final List<Map<String, dynamic>>
-    items = [
+    final List<Map<String, dynamic>> items = [
       {
         'icon':
         Icons.home_outlined,
@@ -824,15 +1992,13 @@ class _DashboardScreenState
         'selected':
         Icons.auto_awesome,
         'label':
-        'AI Match',
+        'Match',
       },
       {
         'icon':
-        Icons
-            .chat_bubble_outline_rounded,
+        Icons.chat_bubble_outline_rounded,
         'selected':
-        Icons
-            .chat_bubble_rounded,
+        Icons.chat_bubble_rounded,
         'label':
         'Chat',
       },
@@ -847,7 +2013,8 @@ class _DashboardScreenState
     ];
 
     return Container(
-      height: 76,
+      height:
+      76,
       decoration:
       BoxDecoration(
         color:
@@ -879,10 +2046,7 @@ class _DashboardScreenState
               child: InkWell(
                 onTap: () {
                   if (index == 0) {
-                    setState(() {
-                      _selectedNav = 0;
-                    });
-
+                    _scrollToHome();
                     return;
                   }
 
@@ -891,15 +2055,11 @@ class _DashboardScreenState
                       context,
                       '/explore',
                     );
-
                     return;
                   }
 
                   if (index == 2) {
-                    setState(() {
-                      _selectedNav = 2;
-                    });
-
+                    _scrollToMatch();
                     return;
                   }
 
@@ -908,7 +2068,6 @@ class _DashboardScreenState
                       context,
                       '/chat',
                     );
-
                     return;
                   }
 
@@ -917,8 +2076,6 @@ class _DashboardScreenState
                       context,
                       '/profile',
                     );
-
-                    return;
                   }
                 },
                 child: Column(
@@ -931,46 +2088,46 @@ class _DashboardScreenState
                         milliseconds:
                         180,
                       ),
-                      width: 36,
-                      height: 29,
+                      width:
+                      36,
+                      height:
+                      29,
                       decoration:
                       BoxDecoration(
                         color:
                         selected
                             ? _softPrimaryColor
-                            : Colors
-                            .transparent,
+                            : Colors.transparent,
                         borderRadius:
-                        BorderRadius
-                            .circular(
+                        BorderRadius.circular(
                           12,
                         ),
                       ),
                       child: Icon(
                         selected
-                            ? items[index][
-                        'selected']
+                            ? items[index]['selected']
                         as IconData
-                            : items[index][
-                        'icon']
+                            : items[index]['icon']
                         as IconData,
-                        size: 20,
+                        size:
+                        20,
                         color:
                         selected
                             ? _primaryColor
                             : _mutedColor,
                       ),
                     ),
+
                     const SizedBox(
-                      height: 3,
+                      height:
+                      3,
                     ),
+
                     Text(
-                      items[index]
-                      ['label']
+                      items[index]['label']
                       as String,
                       style:
-                      AppTextStyles
-                          .navLabel
+                      AppTextStyles.navLabel
                           .copyWith(
                         color:
                         selected
@@ -978,10 +2135,8 @@ class _DashboardScreenState
                             : _mutedColor,
                         fontWeight:
                         selected
-                            ? FontWeight
-                            .w700
-                            : FontWeight
-                            .w600,
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                       ),
                     ),
                   ],
@@ -993,4 +2148,18 @@ class _DashboardScreenState
       ),
     );
   }
+}
+
+class _DashboardMatch {
+  final User user;
+  final int score;
+  final Skill? skillToLearn;
+  final Skill? skillToTeach;
+
+  const _DashboardMatch({
+    required this.user,
+    required this.score,
+    required this.skillToLearn,
+    required this.skillToTeach,
+  });
 }

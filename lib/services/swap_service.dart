@@ -99,10 +99,8 @@ class SwapService {
 
     try {
       savedRequests =
-      await _repository
-          .getAllSwapRequests(
-        userId:
-        currentUserId,
+      await _repository.getAllSwapRequests(
+        userId: currentUserId,
       );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
@@ -943,8 +941,7 @@ class SwapService {
       return;
     }
 
-    final Future<SwapRequest>?
-    pendingRestore =
+    final Future<SwapRequest>? pendingRestore =
     _pendingRestores[
     cleanRequestId
     ];
@@ -1037,7 +1034,6 @@ class SwapService {
     );
   }
 
-  // Backward-compatible wrapper for existing callers.
   Future<void> deleteRequest({
     required String requestId,
     required String actorUserId,
@@ -1070,8 +1066,7 @@ class SwapService {
       actorUserId,
     );
 
-    final Future<SwapRequest>?
-    existingRestore =
+    final Future<SwapRequest>? existingRestore =
     _pendingRestores[
     cleanRequestId
     ];
@@ -1135,8 +1130,7 @@ class SwapService {
     );
 
     if (visibleRequest != null) {
-      if (!visibleRequest
-          .involvesUser(
+      if (!visibleRequest.involvesUser(
         actorUserId,
       )) {
         throw const SwapServiceException(
@@ -1152,8 +1146,7 @@ class SwapService {
 
     try {
       allRequests =
-      await _repository
-          .getAllSwapRequests(
+      await _repository.getAllSwapRequests(
         includeHidden:
         true,
       );
