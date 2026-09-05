@@ -25,7 +25,8 @@ class _SmartMatchesScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
-  bool _isLoading = true;
+  bool _isLoading =
+  true;
 
   String? _errorMessage;
 
@@ -65,7 +66,8 @@ class _SmartMatchesScreenState
   Color get _softPrimaryColor =>
       _isDarkMode
           ? _primaryColor.withValues(
-        alpha: 0.16,
+        alpha:
+        0.16,
       )
           : const Color(
         0xFFE4F0EF,
@@ -79,7 +81,8 @@ class _SmartMatchesScreenState
           : Colors.white;
 
   bool get _hasPendingAction =>
-      _openingSwapUserId != null;
+      _openingSwapUserId !=
+          null;
 
   @override
   void initState() {
@@ -91,8 +94,11 @@ class _SmartMatchesScreenState
   Future<void> _loadMatches() async {
     if (mounted) {
       setState(() {
-        _isLoading = true;
-        _errorMessage = null;
+        _isLoading =
+        true;
+
+        _errorMessage =
+        null;
       });
     }
 
@@ -114,8 +120,10 @@ class _SmartMatchesScreenState
       setState(() {
         _matches =
             matches;
+
         _isLoading =
         false;
+
         _errorMessage =
         null;
       });
@@ -127,6 +135,7 @@ class _SmartMatchesScreenState
       setState(() {
         _isLoading =
         false;
+
         _errorMessage =
         'Smart matches could not be loaded. Please try again.';
       });
@@ -218,13 +227,15 @@ class _SmartMatchesScreenState
           28,
         ),
         itemCount:
-        _matches.length + 1,
+        _matches.length +
+            1,
         separatorBuilder:
             (
             _,
             index,
             ) {
-          if (index == 0) {
+          if (index ==
+              0) {
             return const SizedBox(
               height:
               16,
@@ -241,7 +252,8 @@ class _SmartMatchesScreenState
             BuildContext context,
             int index,
             ) {
-          if (index == 0) {
+          if (index ==
+              0) {
             return _buildHeaderCard();
           }
 
@@ -343,7 +355,8 @@ class _SmartMatchesScreenState
             user.id;
 
     final bool canRequestSwap =
-        match.skillToLearn != null;
+        match.skillToLearn !=
+            null;
 
     return Container(
       width:
@@ -781,7 +794,8 @@ class _SmartMatchesScreenState
     final skillToLearn =
         match.skillToLearn;
 
-    if (skillToLearn == null) {
+    if (skillToLearn ==
+        null) {
       _showMessage(
         '${match.user.name} does not currently offer one of your learning interests.',
       );
@@ -808,6 +822,8 @@ class _SmartMatchesScreenState
                 match.user.id,
                 skillToLearnId:
                 skillToLearn.id,
+                skillToOfferId:
+                match.skillToTeach?.id,
                 providerName:
                 match.user.name,
                 providerInitials:

@@ -12,6 +12,8 @@ import '../theme/app_theme.dart';
 class CreateSwapRequestScreen extends StatefulWidget {
   final String? providerUserId;
   final String? skillToLearnId;
+  final String? skillToOfferId;
+  final String? skillToOffer;
 
   final String providerName;
   final String providerInitials;
@@ -22,6 +24,8 @@ class CreateSwapRequestScreen extends StatefulWidget {
     super.key,
     this.providerUserId,
     this.skillToLearnId,
+    this.skillToOfferId,
+    this.skillToOffer,
     required this.providerName,
     required this.providerInitials,
     required this.providerCity,
@@ -64,12 +68,13 @@ class _CreateSwapRequestScreenState
 
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasUnsavedChanges = false;
+  bool _isShowingLeaveDialog = false;
 
   String? _loadError;
 
   bool get _isDarkMode =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      Theme.of(context).brightness == Brightness.dark;
 
   Color get _primaryColor =>
       Theme.of(context).colorScheme.primary;
@@ -144,6 +149,8 @@ class _CreateSwapRequestScreenState
 
       await _swapService.initialize();
 
+      await _exploreRepository.refresh();
+
       final List<ManagedSkill> managedSkills =
       await _mySkillsRepository.getOfferedSkills(
         currentUserId,
@@ -159,15 +166,11 @@ class _CreateSwapRequestScreenState
       final List<Skill> availableSkills =
       managedSkills
           .map(
-            (
-            ManagedSkill item,
-            ) =>
+            (ManagedSkill item) =>
         item.skill,
       )
           .where(
-            (
-            Skill skill,
-            ) =>
+            (Skill skill) =>
         skill.id != learnSkillId,
       )
           .toList();
@@ -184,6 +187,11 @@ class _CreateSwapRequestScreenState
             ),
       );
 
+      final Skill? preselectedSkill =
+      _resolveBestOfferSkill(
+        availableSkills,
+      );
+
       setState(() {
         _mySkills
           ..clear()
@@ -193,14 +201,15 @@ class _CreateSwapRequestScreenState
 
         if (_selectedSkillToOffer != null &&
             !_mySkills.any(
-                  (
-                  Skill skill,
-                  ) =>
+                  (Skill skill) =>
               skill.id ==
                   _selectedSkillToOffer!.id,
             )) {
           _selectedSkillToOffer = null;
         }
+
+        _selectedSkillToOffer ??=
+            preselectedSkill;
 
         _isLoading = false;
         _loadError = null;
@@ -237,6 +246,253 @@ class _CreateSwapRequestScreenState
   }
 
   // ============================================================
+  // PRESELECT BEST OFFER SKILL
+  // ============================================================
+
+  Skill? _resolveBestOfferSkill(
+      List<Skill> availableSkills,
+      ) {
+    if (availableSkills.isEmpty) {
+      return null;
+    }
+
+    final String? preferredId =
+    _cleanOptionalId(
+      widget.skillToOfferId,
+    );
+
+    if (preferredId != null) {
+      for (final Skill skill in availableSkills) {
+        if (skill.id == preferredId) {
+          return skill;
+        }
+      }
+    }
+
+    final String preferredTitle =
+        widget.skillToOffer
+            ?.trim()
+            .toLowerCase() ??
+            '';
+
+    if (preferredTitle.isNotEmpty) {
+      final List<Skill> titleMatches =
+      availableSkills
+          .where(
+            (Skill skill) =>
+        skill.title
+            .trim()
+            .toLowerCase() ==
+            preferredTitle,
+      )
+          .toList();
+
+      if (titleMatches.length == 1) {
+        return titleMatches.single;
+      }
+    }
+
+    final User? provider =
+        _resolvedProvider;
+
+    if (provider == null) {
+      return null;
+    }
+
+    final Set<String> providerWantedSkillIds =
+    _exploreRepository
+        .getWantedSkillsForUser(
+      provider.id,
+    )
+        .map(
+          (relationship) =>
+      relationship.skillId,
+    )
+        .toSet();
+
+    if (providerWantedSkillIds.isEmpty) {
+      return null;
+    }
+
+    final List<Skill> reciprocalMatches =
+    availableSkills
+        .where(
+          (Skill skill) =>
+          providerWantedSkillIds.contains(
+            skill.id,
+          ),
+    )
+        .toList();
+
+    if (reciprocalMatches.length == 1) {
+      return reciprocalMatches.single;
+    }
+
+    if (reciprocalMatches.isEmpty) {
+      return null;
+    }
+
+    reciprocalMatches.sort(
+          (
+          Skill first,
+          Skill second,
+          ) =>
+          first.title
+              .toLowerCase()
+              .compareTo(
+            second.title.toLowerCase(),
+          ),
+    );
+
+    return reciprocalMatches.first;
+  }
+
+  // ============================================================
+  // UNSAVED CHANGES
+  // ============================================================
+
+  void _markChanged() {
+    if (_hasUnsavedChanges ||
+        _isLoading ||
+        _isSending) {
+      return;
+    }
+
+    setState(() {
+      _hasUnsavedChanges = true;
+    });
+  }
+
+  Future<void> _handleBackPressed() async {
+    if (_isSending ||
+        _isShowingLeaveDialog) {
+      return;
+    }
+
+    if (!_hasUnsavedChanges) {
+      if (mounted) {
+        Navigator.pop(
+          context,
+        );
+      }
+
+      return;
+    }
+
+    _isShowingLeaveDialog = true;
+
+    final bool shouldDiscard =
+    await _showDiscardConfirmation();
+
+    _isShowingLeaveDialog = false;
+
+    if (!mounted ||
+        !shouldDiscard) {
+      return;
+    }
+
+    setState(() {
+      _hasUnsavedChanges = false;
+    });
+
+    Navigator.pop(
+      context,
+    );
+  }
+
+  Future<bool> _showDiscardConfirmation() async {
+    final bool? result =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              18,
+            ),
+          ),
+          title:
+          Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color:
+                AppTheme.accent,
+              ),
+              const SizedBox(
+                width:
+                10,
+              ),
+              Expanded(
+                child:
+                Text(
+                  'Discard this request?',
+                  style:
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    color:
+                    _textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content:
+          Text(
+            'You have unsaved changes. If you leave now, your request details will be lost.',
+            style:
+            AppTextStyles.body
+                .copyWith(
+              color:
+              _textColor,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'KEEP EDITING',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'DISCARD',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  // ============================================================
   // RESOLVED PROVIDER
   // ============================================================
 
@@ -264,9 +520,7 @@ class _CreateSwapRequestScreenState
     final List<User> matches =
     _exploreRepository.users
         .where(
-          (
-          User user,
-          ) =>
+          (User user) =>
       user.name
           .trim()
           .toLowerCase() ==
@@ -312,9 +566,7 @@ class _CreateSwapRequestScreenState
     final List<Skill> matches =
     _exploreRepository.skills
         .where(
-          (
-          Skill skill,
-          ) =>
+          (Skill skill) =>
       skill.title
           .trim()
           .toLowerCase() ==
@@ -351,7 +603,19 @@ class _CreateSwapRequestScreenState
       ) {
     return PopScope(
       canPop:
-      !_isSending,
+      !_isSending &&
+          !_hasUnsavedChanges,
+      onPopInvokedWithResult:
+          (
+          bool didPop,
+          Object? result,
+          ) {
+        if (didPop) {
+          return;
+        }
+
+        _handleBackPressed();
+      },
       child: Scaffold(
         backgroundColor:
         Theme.of(context)
@@ -367,14 +631,9 @@ class _CreateSwapRequestScreenState
             onPressed:
             _isSending
                 ? null
-                : () {
-              Navigator.pop(
-                context,
-              );
-            },
+                : _handleBackPressed,
             icon: Icon(
-              Icons
-                  .arrow_back_ios_new_rounded,
+              Icons.arrow_back_ios_new_rounded,
               size:
               19,
               color:
@@ -480,7 +739,8 @@ class _CreateSwapRequestScreenState
           _buildIntroduction(),
 
           const SizedBox(
-            height: 26,
+            height:
+            26,
           ),
 
           _buildSectionLabel(
@@ -488,13 +748,15 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 8,
+            height:
+            8,
           ),
 
           _buildReadOnlySkill(),
 
           const SizedBox(
-            height: 22,
+            height:
+            22,
           ),
 
           _buildSectionLabel(
@@ -502,7 +764,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 5,
+            height:
+            5,
           ),
 
           Text(
@@ -516,13 +779,15 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           _buildSkillDropdown(),
 
           const SizedBox(
-            height: 22,
+            height:
+            22,
           ),
 
           _buildSectionLabel(
@@ -530,7 +795,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 5,
+            height:
+            5,
           ),
 
           Text(
@@ -544,7 +810,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           Row(
@@ -554,7 +821,8 @@ class _CreateSwapRequestScreenState
                 _buildDateSelector(),
               ),
               const SizedBox(
-                width: 10,
+                width:
+                10,
               ),
               Expanded(
                 child:
@@ -564,7 +832,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 22,
+            height:
+            22,
           ),
 
           _buildSectionLabel(
@@ -572,7 +841,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 5,
+            height:
+            5,
           ),
 
           Text(
@@ -586,19 +856,22 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           _buildModeSelector(),
 
           const SizedBox(
-            height: 16,
+            height:
+            16,
           ),
 
           _buildMeetingDetails(),
 
           const SizedBox(
-            height: 22,
+            height:
+            22,
           ),
 
           _buildSectionLabel(
@@ -606,7 +879,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 5,
+            height:
+            5,
           ),
 
           Text(
@@ -620,7 +894,8 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           TextField(
@@ -635,6 +910,10 @@ class _CreateSwapRequestScreenState
             maxLengthEnforcement:
             MaxLengthEnforcement
                 .enforced,
+            onChanged:
+                (_) {
+              _markChanged();
+            },
             style:
             AppTextStyles.input
                 .copyWith(
@@ -659,13 +938,15 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height: 10,
+            height:
+            10,
           ),
 
           _buildRequestSummary(),
 
           const SizedBox(
-            height: 24,
+            height:
+            24,
           ),
 
           SizedBox(
@@ -741,8 +1022,7 @@ class _CreateSwapRequestScreenState
           MainAxisSize.min,
           children: [
             Icon(
-              Icons
-                  .error_outline_rounded,
+              Icons.error_outline_rounded,
               size:
               42,
               color:
@@ -855,11 +1135,8 @@ class _CreateSwapRequestScreenState
               18,
             ),
             OutlinedButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                );
-              },
+              onPressed:
+              _handleBackPressed,
               child:
               const Text(
                 'GO BACK',
@@ -1104,6 +1381,9 @@ class _CreateSwapRequestScreenState
     }
 
     return DropdownButtonFormField<Skill>(
+      key: ValueKey<String?>(
+        _selectedSkillToOffer?.id,
+      ),
       initialValue:
       _selectedSkillToOffer,
       dropdownColor:
@@ -1137,13 +1417,12 @@ class _CreateSwapRequestScreenState
       ),
       items:
       _mySkills.map(
-            (
-            Skill skill,
-            ) {
+            (Skill skill) {
           return DropdownMenuItem<Skill>(
             value:
             skill,
-            child: Text(
+            child:
+            Text(
               skill.title,
             ),
           );
@@ -1158,6 +1437,9 @@ class _CreateSwapRequestScreenState
         setState(() {
           _selectedSkillToOffer =
               value;
+
+          _hasUnsavedChanges =
+          true;
         });
       },
     );
@@ -1221,14 +1503,12 @@ class _CreateSwapRequestScreenState
                 ),
                 style:
                 _selectedDate == null
-                    ? AppTextStyles
-                    .inputHint
+                    ? AppTextStyles.inputHint
                     .copyWith(
                   color:
                   _mutedColor,
                 )
-                    : AppTextStyles
-                    .input
+                    : AppTextStyles.input
                     .copyWith(
                   color:
                   _textColor,
@@ -1287,6 +1567,9 @@ class _CreateSwapRequestScreenState
     setState(() {
       _selectedDate =
           result;
+
+      _hasUnsavedChanges =
+      true;
     });
   }
 
@@ -1348,14 +1631,12 @@ class _CreateSwapRequestScreenState
                 ),
                 style:
                 _selectedTime == null
-                    ? AppTextStyles
-                    .inputHint
+                    ? AppTextStyles.inputHint
                     .copyWith(
                   color:
                   _mutedColor,
                 )
-                    : AppTextStyles
-                    .input
+                    : AppTextStyles.input
                     .copyWith(
                   color:
                   _textColor,
@@ -1396,6 +1677,9 @@ class _CreateSwapRequestScreenState
     setState(() {
       _selectedTime =
           result;
+
+      _hasUnsavedChanges =
+      true;
     });
   }
 
@@ -1437,8 +1721,7 @@ class _CreateSwapRequestScreenState
     required IconData icon,
   }) {
     final bool selected =
-        _selectedMode ==
-            label;
+        _selectedMode == label;
 
     return InkWell(
       borderRadius:
@@ -1449,17 +1732,16 @@ class _CreateSwapRequestScreenState
       _isSending
           ? null
           : () {
-        if (_selectedMode ==
-            label) {
+        if (_selectedMode == label) {
           return;
         }
 
         setState(() {
-          _selectedMode =
-              label;
+          _selectedMode = label;
 
-          _meetingDetailsController
-              .clear();
+          _meetingDetailsController.clear();
+
+          _hasUnsavedChanges = true;
         });
       },
       child: AnimatedContainer(
@@ -1539,8 +1821,7 @@ class _CreateSwapRequestScreenState
 
   Widget _buildMeetingDetails() {
     final bool online =
-        _selectedMode ==
-            'Online';
+        _selectedMode == 'Online';
 
     return Column(
       crossAxisAlignment:
@@ -1559,12 +1840,10 @@ class _CreateSwapRequestScreenState
             _textColor,
           ),
         ),
-
         const SizedBox(
           height:
           8,
         ),
-
         TextField(
           controller:
           _meetingDetailsController,
@@ -1575,6 +1854,10 @@ class _CreateSwapRequestScreenState
           maxLengthEnforcement:
           MaxLengthEnforcement
               .enforced,
+          onChanged:
+              (_) {
+            _markChanged();
+          },
           style:
           AppTextStyles.input
               .copyWith(
@@ -1609,7 +1892,6 @@ class _CreateSwapRequestScreenState
             _surfaceColor,
           ),
         ),
-
         if (!online) ...[
           const SizedBox(
             height:
@@ -1668,23 +1950,19 @@ class _CreateSwapRequestScreenState
               _textColor,
             ),
           ),
-
           const SizedBox(
             height:
             12,
           ),
-
           _buildSummaryRow(
             'Learn',
             _resolvedSkillToLearn!.title,
           ),
-
           _buildSummaryRow(
             'Offer',
             _selectedSkillToOffer?.title ??
                 'Not selected',
           ),
-
           _buildSummaryRow(
             'Schedule',
             _selectedDate == null ||
@@ -1693,7 +1971,6 @@ class _CreateSwapRequestScreenState
                 : '${_formatDate(_selectedDate!)} • '
                 '${_selectedTime!.format(context)}',
           ),
-
           _buildSummaryRow(
             'Mode',
             _selectedMode,
@@ -1796,6 +2073,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'We could not identify the current user. Please sign in again.',
       );
+
       return;
     }
 
@@ -1804,6 +2082,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'We could not safely identify this provider. Please go back and try again.',
       );
+
       return;
     }
 
@@ -1812,6 +2091,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'You cannot send a swap request to yourself.',
       );
+
       return;
     }
 
@@ -1819,6 +2099,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'We could not identify the skill you want to learn. Please go back and try again.',
       );
+
       return;
     }
 
@@ -1838,9 +2119,7 @@ class _CreateSwapRequestScreenState
 
     final bool stillOwnsOfferedSkill =
     _mySkills.any(
-          (
-          Skill skill,
-          ) =>
+          (Skill skill) =>
       skill.id ==
           skillToOffer.id,
     );
@@ -1849,6 +2128,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'The selected offered skill is no longer available. Please reload and try again.',
       );
+
       return;
     }
 
@@ -1857,6 +2137,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'Please offer a different skill from the one you want to learn.',
       );
+
       return;
     }
 
@@ -1865,6 +2146,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'Please choose your preferred date and time.',
       );
+
       return;
     }
 
@@ -1883,16 +2165,16 @@ class _CreateSwapRequestScreenState
       _showError(
         'Please choose a future date and time.',
       );
+
       return;
     }
 
-    if (_selectedMode !=
-        'Online' &&
-        _selectedMode !=
-            'In-person') {
+    if (_selectedMode != 'Online' &&
+        _selectedMode != 'In-person') {
       _showError(
         'Please select a valid session mode.',
       );
+
       return;
     }
 
@@ -1901,11 +2183,11 @@ class _CreateSwapRequestScreenState
 
     if (meetingDetails.isEmpty) {
       _showError(
-        _selectedMode ==
-            'Online'
+        _selectedMode == 'Online'
             ? 'Please enter your preferred online platform.'
             : 'Please enter a preferred public meeting area.',
       );
+
       return;
     }
 
@@ -1914,6 +2196,7 @@ class _CreateSwapRequestScreenState
       _showError(
         'Meeting details must be 150 characters or less.',
       );
+
       return;
     }
 
@@ -1925,12 +2208,12 @@ class _CreateSwapRequestScreenState
       _showError(
         'Message must be 300 characters or less.',
       );
+
       return;
     }
 
     setState(() {
-      _isSending =
-      true;
+      _isSending = true;
     });
 
     try {
@@ -1975,6 +2258,10 @@ class _CreateSwapRequestScreenState
         return;
       }
 
+      setState(() {
+        _hasUnsavedChanges = false;
+      });
+
       Navigator.pop(
         context,
         true,
@@ -1998,8 +2285,7 @@ class _CreateSwapRequestScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isSending =
-          false;
+          _isSending = false;
         });
       }
     }
