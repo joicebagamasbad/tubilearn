@@ -21,6 +21,7 @@ import 'view/profile_screen.dart';
 import 'view/chat_screen.dart';
 import 'view/conversation_screen.dart';
 import 'view/swap_requests_screen.dart';
+import 'view/smart_matches_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,7 +60,8 @@ class TubiLearnApp extends StatelessWidget {
           Widget? child,
           ) {
         return MaterialApp(
-          title: 'TubiLearn',
+          title:
+          'TubiLearn',
           debugShowCheckedModeBanner:
           false,
 
@@ -95,6 +97,9 @@ class TubiLearnApp extends StatelessWidget {
 
             '/profile': (context) =>
             const ProfileScreen(),
+
+            '/smart-matches': (context) =>
+            const SmartMatchesScreen(),
           },
 
           onGenerateRoute: (settings) {
@@ -111,7 +116,8 @@ class TubiLearnApp extends StatelessWidget {
               return MaterialPageRoute(
                 builder: (context) =>
                     SkillDetailsScreen(
-                      skill: skill,
+                      skill:
+                      skill,
                     ),
               );
             }
@@ -129,7 +135,8 @@ class TubiLearnApp extends StatelessWidget {
               return MaterialPageRoute(
                 builder: (context) =>
                     UserProfileScreen(
-                      user: user,
+                      user:
+                      user,
                     ),
               );
             }

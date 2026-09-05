@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/current_user_service.dart';
 import '../database/app_database.dart';
 import '../skill.dart';
+import '../skill_match.dart';
 import '../user.dart';
 import '../user_skill.dart';
 
@@ -31,11 +32,14 @@ class ExploreRepository {
   // STATE
   // ============================================================
 
-  final List<User> _users = [];
+  final List<User> _users =
+  <User>[];
 
-  final List<Skill> _skills = [];
+  final List<Skill> _skills =
+  <Skill>[];
 
-  final List<UserSkill> _userSkills = [];
+  final List<UserSkill> _userSkills =
+  <UserSkill>[];
 
   Future<void>? _loadingFuture;
 
@@ -64,7 +68,8 @@ class ExploreRepository {
     final Future<void> loading =
     _loadFromDatabase();
 
-    _loadingFuture = loading;
+    _loadingFuture =
+        loading;
 
     try {
       await loading;
@@ -93,7 +98,8 @@ class ExploreRepository {
     final Future<void> loading =
     _loadFromDatabase();
 
-    _loadingFuture = loading;
+    _loadingFuture =
+        loading;
 
     try {
       await loading;
@@ -109,10 +115,6 @@ class ExploreRepository {
 
   // ============================================================
   // LOAD FROM DATABASE
-  //
-  // Loads everything into temporary collections first.
-  // Existing in-memory data is replaced only after the complete
-  // read, parsing, and relationship validation succeeds.
   // ============================================================
 
   Future<void> _loadFromDatabase() async {
@@ -353,7 +355,9 @@ class ExploreRepository {
           relationship.userId,
           relationship.skillId,
           relationship.type.name,
-        ].join('|');
+        ].join(
+          '|',
+        );
 
         if (!userSkillKeys.add(
           relationshipKey,
@@ -616,6 +620,784 @@ class ExploreRepository {
   }
 
   // ============================================================
+  // SMART MATCHES
+  // ============================================================
+
+  List<SkillMatch> getSmartMatchesForUser(
+      String userId, {
+        int? limit,
+      }) {
+    final String normalizedUserId =
+    userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      return <SkillMatch>[];
+    }
+
+    final User? currentUser =
+    findUserById(
+      normalizedUserId,
+    );
+
+    if (currentUser == null) {
+      return <SkillMatch>[];
+    }
+
+    final List<UserSkill> currentOffered =
+    getOfferedSkillsForUser(
+      currentUser.id,
+    );
+
+    final List<UserSkill> currentWanted =
+    getWantedSkillsForUser(
+      currentUser.id,
+    );
+
+    final Set<String> currentOfferedIds =
+    currentOffered
+        .map(
+          (
+          UserSkill relationship,
+          ) =>
+      relationship.skillId,
+    )
+        .toSet();
+
+    final Set<String> currentWantedIds =
+    currentWanted
+        .map(
+          (
+          UserSkill relationship,
+          ) =>
+      relationship.skillId,
+    )
+        .toSet();
+
+    if (currentOfferedIds.isEmpty &&
+        currentWantedIds.isEmpty) {
+      return <SkillMatch>[];
+    }
+
+    final List<SkillMatch> matches =
+    <SkillMatch>[];
+
+    for (final User candidate
+    in _users) {
+      if (candidate.id ==
+          currentUser.id) {
+        continue;
+      }
+
+      final List<UserSkill> candidateOffered =
+      getOfferedSkillsForUser(
+        candidate.id,
+      );
+
+      final List<UserSkill> candidateWanted =
+      getWantedSkillsForUser(
+        candidate.id,
+      );
+
+      final Set<String> candidateOfferedIds =
+      candidateOffered
+          .map(
+            (
+            UserSkill relationship,
+            ) =>
+        relationship.skillId,
+      )
+          .toSet();
+
+      final Set<String> candidateWantedIds =
+      candidateWanted
+          .map(
+            (
+            UserSkill relationship,
+            ) =>
+        relationship.skillId,
+      )
+          .toSet();
+
+      final Set<String> learnMatchIds =
+      currentWantedIds.intersection(
+        candidateOfferedIds,
+      );
+
+      final Set<String> teachMatchIds =
+      currentOfferedIds.intersection(
+        candidateWantedIds,
+      );
+
+      if (learnMatchIds.isEmpty &&
+          teachMatchIds.isEmpty) {
+        continue;
+      }
+
+      final bool hasLearningMatch =
+          learnMatchIds.isNotEmpty;
+
+      final bool hasTeachingMatch =
+          teachMatchIds.isNotEmpty;
+
+      final bool isTwoWayMatch =
+          hasLearningMatch &&
+              hasTeachingMatch;
+
+      final bool sameCity =
+      _textEquals(
+        currentUser.city,
+        candidate.city,
+      );
+
+      final bool modeCompatible =
+      _preferenceCompatible(
+        currentUser.preferredMode,
+        candidate.preferredMode,
+      );
+
+      final bool languageCompatible =
+      _languageCompatible(
+        currentUser.language,
+        candidate.language,
+      );
+
+      final bool availabilityCompatible =
+      _availabilityCompatible(
+        currentUser.availability,
+        candidate.availability,
+      );
+
+      int score =
+      0;
+
+      if (hasLearningMatch) {
+        score +=
+        40;
+      }
+
+      if (hasTeachingMatch) {
+        score +=
+        25;
+      }
+
+      if (modeCompatible) {
+        score +=
+        8;
+      }
+
+      if (availabilityCompatible) {
+        score +=
+        6;
+      }
+
+      if (languageCompatible) {
+        score +=
+        5;
+      }
+
+      if (sameCity) {
+        score +=
+        4;
+      }
+
+      score +=
+          _responseRateScore(
+            candidate.responseRate,
+          );
+
+      score +=
+          _ratingScore(
+            candidate.rating,
+          );
+
+      score +=
+          _trustScore(
+            candidate,
+          );
+
+      score =
+          score.clamp(
+            0,
+            100,
+          );
+
+      final Skill? skillToLearn =
+      _firstSkillFromIds(
+        learnMatchIds,
+      );
+
+      final Skill? skillToTeach =
+      _firstSkillFromIds(
+        teachMatchIds,
+      );
+
+      final List<String> reasons =
+      _buildMatchReasons(
+        candidate:
+        candidate,
+        learningMatchCount:
+        learnMatchIds.length,
+        teachingMatchCount:
+        teachMatchIds.length,
+        isTwoWayMatch:
+        isTwoWayMatch,
+        sameCity:
+        sameCity,
+        modeCompatible:
+        modeCompatible,
+        languageCompatible:
+        languageCompatible,
+        availabilityCompatible:
+        availabilityCompatible,
+      );
+
+      matches.add(
+        SkillMatch(
+          user:
+          candidate,
+          score:
+          score,
+          skillToLearn:
+          skillToLearn,
+          skillToTeach:
+          skillToTeach,
+          isTwoWayMatch:
+          isTwoWayMatch,
+          sameCity:
+          sameCity,
+          modeCompatible:
+          modeCompatible,
+          languageCompatible:
+          languageCompatible,
+          availabilityCompatible:
+          availabilityCompatible,
+          reasons:
+          List<String>.unmodifiable(
+            reasons,
+          ),
+        ),
+      );
+    }
+
+    matches.sort(
+          (
+          SkillMatch first,
+          SkillMatch second,
+          ) {
+        final int scoreComparison =
+        second.score.compareTo(
+          first.score,
+        );
+
+        if (scoreComparison != 0) {
+          return scoreComparison;
+        }
+
+        final int twoWayComparison =
+        _boolRank(
+          second.isTwoWayMatch,
+        ).compareTo(
+          _boolRank(
+            first.isTwoWayMatch,
+          ),
+        );
+
+        if (twoWayComparison != 0) {
+          return twoWayComparison;
+        }
+
+        final int ratingComparison =
+        second.user.rating.compareTo(
+          first.user.rating,
+        );
+
+        if (ratingComparison != 0) {
+          return ratingComparison;
+        }
+
+        final int responseComparison =
+        second.user.responseRate.compareTo(
+          first.user.responseRate,
+        );
+
+        if (responseComparison != 0) {
+          return responseComparison;
+        }
+
+        return first.user.name
+            .toLowerCase()
+            .compareTo(
+          second.user.name
+              .toLowerCase(),
+        );
+      },
+    );
+
+    if (limit == null) {
+      return List<SkillMatch>.unmodifiable(
+        matches,
+      );
+    }
+
+    if (limit <= 0) {
+      return <SkillMatch>[];
+    }
+
+    return List<SkillMatch>.unmodifiable(
+      matches.take(
+        limit,
+      ),
+    );
+  }
+
+  // ============================================================
+  // SMART MATCH HELPERS
+  // ============================================================
+
+  Skill? _firstSkillFromIds(
+      Set<String> skillIds,
+      ) {
+    if (skillIds.isEmpty) {
+      return null;
+    }
+
+    final List<Skill> matchingSkills =
+    _skills.where(
+          (
+          Skill skill,
+          ) =>
+          skillIds.contains(
+            skill.id,
+          ),
+    ).toList();
+
+    if (matchingSkills.isEmpty) {
+      return null;
+    }
+
+    matchingSkills.sort(
+          (
+          Skill first,
+          Skill second,
+          ) =>
+          first.title
+              .toLowerCase()
+              .compareTo(
+            second.title
+                .toLowerCase(),
+          ),
+    );
+
+    return matchingSkills.first;
+  }
+
+  List<String> _buildMatchReasons({
+    required User candidate,
+    required int learningMatchCount,
+    required int teachingMatchCount,
+    required bool isTwoWayMatch,
+    required bool sameCity,
+    required bool modeCompatible,
+    required bool languageCompatible,
+    required bool availabilityCompatible,
+  }) {
+    final List<String> reasons =
+    <String>[];
+
+    if (isTwoWayMatch) {
+      reasons.add(
+        'Two-way skill exchange',
+      );
+    } else if (learningMatchCount > 0) {
+      reasons.add(
+        'Offers a skill you want to learn',
+      );
+    } else if (teachingMatchCount > 0) {
+      reasons.add(
+        'Wants a skill you can teach',
+      );
+    }
+
+    if (learningMatchCount > 1) {
+      reasons.add(
+        '$learningMatchCount learning interests match',
+      );
+    }
+
+    if (teachingMatchCount > 1) {
+      reasons.add(
+        '$teachingMatchCount offered skills match',
+      );
+    }
+
+    if (modeCompatible) {
+      reasons.add(
+        'Compatible session mode',
+      );
+    }
+
+    if (availabilityCompatible) {
+      reasons.add(
+        'Compatible availability',
+      );
+    }
+
+    if (languageCompatible) {
+      reasons.add(
+        'Compatible language',
+      );
+    }
+
+    if (sameCity) {
+      reasons.add(
+        'Same city',
+      );
+    }
+
+    if (candidate.responseRate >= 90) {
+      reasons.add(
+        'High response rate',
+      );
+    }
+
+    if (candidate.rating >= 4.5 &&
+        candidate.reviewCount > 0) {
+      reasons.add(
+        'Strong community rating',
+      );
+    }
+
+    if (candidate.completedSwaps > 0) {
+      reasons.add(
+        'Has completed swaps',
+      );
+    }
+
+    return reasons;
+  }
+
+  int _responseRateScore(
+      int responseRate,
+      ) {
+    final int safeRate =
+    responseRate.clamp(
+      0,
+      100,
+    );
+
+    return ((safeRate / 100) * 5)
+        .round();
+  }
+
+  int _ratingScore(
+      double rating,
+      ) {
+    final double safeRating =
+    rating.clamp(
+      0,
+      5,
+    );
+
+    return ((safeRating / 5) * 4)
+        .round();
+  }
+
+  int _trustScore(
+      User user,
+      ) {
+    int score =
+    0;
+
+    if (user.emailVerified) {
+      score +=
+      1;
+    }
+
+    if (user.profileCompleted) {
+      score +=
+      1;
+    }
+
+    if (user.completedSwaps > 0) {
+      score +=
+      1;
+    }
+
+    return score;
+  }
+
+  int _boolRank(
+      bool value,
+      ) {
+    return value
+        ? 1
+        : 0;
+  }
+
+  bool _textEquals(
+      String first,
+      String second,
+      ) {
+    final String normalizedFirst =
+    _normalizeText(
+      first,
+    );
+
+    final String normalizedSecond =
+    _normalizeText(
+      second,
+    );
+
+    if (normalizedFirst.isEmpty ||
+        normalizedSecond.isEmpty) {
+      return false;
+    }
+
+    return normalizedFirst ==
+        normalizedSecond;
+  }
+
+  bool _preferenceCompatible(
+      String first,
+      String second,
+      ) {
+    final Set<String> firstModes =
+    _extractPreferenceTokens(
+      first,
+    );
+
+    final Set<String> secondModes =
+    _extractPreferenceTokens(
+      second,
+    );
+
+    if (firstModes.isEmpty ||
+        secondModes.isEmpty) {
+      return false;
+    }
+
+    if (_containsFlexibleValue(
+      firstModes,
+    ) ||
+        _containsFlexibleValue(
+          secondModes,
+        )) {
+      return true;
+    }
+
+    return firstModes.intersection(
+      secondModes,
+    ).isNotEmpty;
+  }
+
+  bool _languageCompatible(
+      String first,
+      String second,
+      ) {
+    final Set<String> firstLanguages =
+    _extractPreferenceTokens(
+      first,
+    );
+
+    final Set<String> secondLanguages =
+    _extractPreferenceTokens(
+      second,
+    );
+
+    if (firstLanguages.isEmpty ||
+        secondLanguages.isEmpty) {
+      return false;
+    }
+
+    if (_containsFlexibleValue(
+      firstLanguages,
+    ) ||
+        _containsFlexibleValue(
+          secondLanguages,
+        )) {
+      return true;
+    }
+
+    return firstLanguages.intersection(
+      secondLanguages,
+    ).isNotEmpty;
+  }
+
+  bool _availabilityCompatible(
+      String first,
+      String second,
+      ) {
+    final String normalizedFirst =
+    _normalizeText(
+      first,
+    );
+
+    final String normalizedSecond =
+    _normalizeText(
+      second,
+    );
+
+    if (normalizedFirst.isEmpty ||
+        normalizedSecond.isEmpty) {
+      return false;
+    }
+
+    if (normalizedFirst ==
+        normalizedSecond) {
+      return true;
+    }
+
+    final Set<String> firstTokens =
+    _meaningfulAvailabilityTokens(
+      normalizedFirst,
+    );
+
+    final Set<String> secondTokens =
+    _meaningfulAvailabilityTokens(
+      normalizedSecond,
+    );
+
+    if (firstTokens.isEmpty ||
+        secondTokens.isEmpty) {
+      return false;
+    }
+
+    if (_containsFlexibleValue(
+      firstTokens,
+    ) ||
+        _containsFlexibleValue(
+          secondTokens,
+        )) {
+      return true;
+    }
+
+    return firstTokens.intersection(
+      secondTokens,
+    ).isNotEmpty;
+  }
+
+  Set<String> _extractPreferenceTokens(
+      String value,
+      ) {
+    final String normalized =
+    _normalizeText(
+      value,
+    );
+
+    if (normalized.isEmpty) {
+      return <String>{};
+    }
+
+    return normalized
+        .split(
+      RegExp(
+        r'[,/&|]+',
+      ),
+    )
+        .map(
+          (
+          String token,
+          ) =>
+          token.trim(),
+    )
+        .where(
+          (
+          String token,
+          ) =>
+      token.isNotEmpty,
+    )
+        .toSet();
+  }
+
+  Set<String> _meaningfulAvailabilityTokens(
+      String value,
+      ) {
+    const Set<String> ignored =
+    <String>{
+      'and',
+      'or',
+      'the',
+      'on',
+      'at',
+      'from',
+      'to',
+      'available',
+      'availability',
+    };
+
+    return value
+        .split(
+      RegExp(
+        r'[^a-z0-9]+',
+      ),
+    )
+        .map(
+          (
+          String token,
+          ) =>
+          token.trim(),
+    )
+        .where(
+          (
+          String token,
+          ) =>
+      token.isNotEmpty &&
+          !ignored.contains(
+            token,
+          ),
+    )
+        .toSet();
+  }
+
+  bool _containsFlexibleValue(
+      Set<String> values,
+      ) {
+    const Set<String> flexibleValues =
+    <String>{
+      'any',
+      'anytime',
+      'flexible',
+      'both',
+      'either',
+      'all',
+    };
+
+    for (final String value
+    in values) {
+      if (flexibleValues.contains(
+        value,
+      )) {
+        return true;
+      }
+
+      if (value.contains(
+        'flexible',
+      ) ||
+          value.contains(
+            'anytime',
+          )) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  String _normalizeText(
+      String value,
+      ) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll(
+      RegExp(
+        r'\s+',
+      ),
+      ' ',
+    );
+  }
+
+  // ============================================================
   // PROFILE INITIALS
   // ============================================================
 
@@ -647,8 +1429,7 @@ class ExploreRepository {
           parts.first;
 
       if (first.length == 1) {
-        return first
-            .toUpperCase();
+        return first.toUpperCase();
       }
 
       return first

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
 import '../model/skill.dart';
+import '../model/skill_match.dart';
 import '../model/swap_request.dart';
 import '../model/user.dart';
 import '../services/current_user_service.dart';
@@ -140,8 +141,8 @@ class _DashboardScreenState
   Widget build(
       BuildContext context,
       ) {
-    final _DashboardMatch? match =
-    _findBestMatch();
+    final SkillMatch? match =
+    _findBestSmartMatch();
 
     final SwapRequest? upcomingSession =
     _findUpcomingSession();
@@ -189,13 +190,13 @@ class _DashboardScreenState
                         children: [
                           _buildSectionHeader(
                             title:
-                            '✦ Your Best Match',
+                            '✦ Your Smart Match',
                             action:
-                            'Explore',
+                            'See all',
                             onAction: () {
                               Navigator.pushNamed(
                                 context,
-                                '/explore',
+                                '/smart-matches',
                               );
                             },
                           ),
@@ -542,10 +543,10 @@ class _DashboardScreenState
   }
 
   // ============================================================
-  // BEST MATCH
+  // SMART MATCH
   // ============================================================
 
-  _DashboardMatch? _findBestMatch() {
+  SkillMatch? _findBestSmartMatch() {
     final User? currentUser =
         _currentUser;
 
@@ -553,194 +554,25 @@ class _DashboardScreenState
       return null;
     }
 
-    final Set<String> currentOfferedIds =
-    _repository
-        .getOfferedSkillsForUser(
+    final List<SkillMatch> matches =
+    _repository.getSmartMatchesForUser(
       currentUser.id,
-    )
-        .map(
-          (
-          relationship,
-          ) =>
-      relationship.skillId,
-    )
-        .toSet();
+      limit:
+      1,
+    );
 
-    final Set<String> currentWantedIds =
-    _repository
-        .getWantedSkillsForUser(
-      currentUser.id,
-    )
-        .map(
-          (
-          relationship,
-          ) =>
-      relationship.skillId,
-    )
-        .toSet();
-
-    _DashboardMatch? bestMatch;
-
-    for (final User candidate
-    in _repository.users) {
-      if (candidate.id ==
-          currentUser.id) {
-        continue;
-      }
-
-      final Set<String> candidateOfferedIds =
-      _repository
-          .getOfferedSkillsForUser(
-        candidate.id,
-      )
-          .map(
-            (
-            relationship,
-            ) =>
-        relationship.skillId,
-      )
-          .toSet();
-
-      final Set<String> candidateWantedIds =
-      _repository
-          .getWantedSkillsForUser(
-        candidate.id,
-      )
-          .map(
-            (
-            relationship,
-            ) =>
-        relationship.skillId,
-      )
-          .toSet();
-
-      final Set<String> learnMatches =
-      currentWantedIds.intersection(
-        candidateOfferedIds,
-      );
-
-      final Set<String> teachMatches =
-      currentOfferedIds.intersection(
-        candidateWantedIds,
-      );
-
-      if (learnMatches.isEmpty &&
-          teachMatches.isEmpty) {
-        continue;
-      }
-
-      int score =
-      0;
-
-      if (learnMatches.isNotEmpty) {
-        score +=
-        60;
-      }
-
-      if (teachMatches.isNotEmpty) {
-        score +=
-        30;
-      }
-
-      final int additionalOverlap =
-          learnMatches.length +
-              teachMatches.length -
-              2;
-
-      if (additionalOverlap >
-          0) {
-        score +=
-            additionalOverlap * 3;
-      }
-
-      if (candidate.rating >=
-          4.5) {
-        score +=
-        2;
-      }
-
-      score =
-          score.clamp(
-            0,
-            98,
-          );
-
-      Skill? skillToLearn;
-      Skill? skillToTeach;
-
-      if (learnMatches.isNotEmpty) {
-        skillToLearn =
-            _repository.findSkillById(
-              learnMatches.first,
-            );
-      }
-
-      if (teachMatches.isNotEmpty) {
-        skillToTeach =
-            _repository.findSkillById(
-              teachMatches.first,
-            );
-      }
-
-      final _DashboardMatch match =
-      _DashboardMatch(
-        user:
-        candidate,
-        score:
-        score,
-        skillToLearn:
-        skillToLearn,
-        skillToTeach:
-        skillToTeach,
-      );
-
-      if (bestMatch == null ||
-          match.score >
-              bestMatch.score) {
-        bestMatch =
-            match;
-      }
+    if (matches.isEmpty) {
+      return null;
     }
 
-    return bestMatch;
+    return matches.first;
   }
 
   Widget _buildMatchCard(
-      _DashboardMatch? match,
+      SkillMatch? match,
       ) {
     if (match == null) {
       return _buildNoMatchCard();
-    }
-
-    final String subtitle;
-
-    if (match.skillToLearn != null &&
-        match.skillToTeach != null) {
-      subtitle =
-      '${match.skillToLearn!.title} ↔ ${match.skillToTeach!.title}';
-    } else if (match.skillToLearn != null) {
-      subtitle =
-      '${match.skillToLearn!.title} • Learning match';
-    } else if (match.skillToTeach != null) {
-      subtitle =
-      '${match.skillToTeach!.title} • Teaching match';
-    } else {
-      subtitle =
-      'Potential skill exchange';
-    }
-
-    final String explanation;
-
-    if (match.skillToLearn != null &&
-        match.skillToTeach != null) {
-      explanation =
-      '${match.user.name} can help you with ${match.skillToLearn!.title}, while you can offer ${match.skillToTeach!.title} in return.';
-    } else if (match.skillToLearn != null) {
-      explanation =
-      '${match.user.name} offers ${match.skillToLearn!.title}, which matches one of your learning interests.';
-    } else {
-      explanation =
-      '${match.user.name} wants to learn ${match.skillToTeach!.title}, a skill you currently offer.';
     }
 
     return Container(
@@ -765,6 +597,8 @@ class _DashboardScreenState
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -820,7 +654,7 @@ class _DashboardScreenState
                     ),
 
                     Text(
-                      subtitle,
+                      match.headline,
                       maxLines:
                       1,
                       overflow:
@@ -836,6 +670,10 @@ class _DashboardScreenState
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(
+                width: 8,
               ),
 
               Container(
@@ -890,7 +728,7 @@ class _DashboardScreenState
 
               Expanded(
                 child: Text(
-                  explanation,
+                  match.explanation,
                   style:
                   AppTextStyles.bodyMuted
                       .copyWith(
@@ -901,6 +739,49 @@ class _DashboardScreenState
               ),
             ],
           ),
+
+          if (match.reasons.isNotEmpty) ...[
+            const SizedBox(
+              height: 14,
+            ),
+
+            Text(
+              'Why this match',
+              style:
+              AppTextStyles.caption
+                  .copyWith(
+                color:
+                _textColor,
+                fontWeight:
+                FontWeight.w700,
+              ),
+            ),
+
+            const SizedBox(
+              height: 8,
+            ),
+
+            Wrap(
+              spacing:
+              7,
+              runSpacing:
+              7,
+              children:
+              match.reasons
+                  .take(
+                4,
+              )
+                  .map(
+                    (
+                    String reason,
+                    ) =>
+                    _buildReasonChip(
+                      reason,
+                    ),
+              )
+                  .toList(),
+            ),
+          ],
 
           const SizedBox(
             height: 14,
@@ -926,6 +807,68 @@ class _DashboardScreenState
                 style:
                 AppTextStyles.button,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReasonChip(
+      String reason,
+      ) {
+    return Container(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal:
+        9,
+        vertical:
+        6,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _softPrimaryColor,
+        borderRadius:
+        BorderRadius.circular(
+          20,
+        ),
+        border:
+        Border.all(
+          color:
+          _primaryColor.withValues(
+            alpha:
+            0.18,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle_outline_rounded,
+            size:
+            13,
+            color:
+            _primaryColor,
+          ),
+
+          const SizedBox(
+            width: 5,
+          ),
+
+          Text(
+            reason,
+            style:
+            AppTextStyles.caption
+                .copyWith(
+              fontSize:
+              10,
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w600,
             ),
           ),
         ],
@@ -972,7 +915,7 @@ class _DashboardScreenState
           ),
 
           Text(
-            'No strong match yet',
+            'No smart match yet',
             textAlign:
             TextAlign.center,
             style:
@@ -988,7 +931,7 @@ class _DashboardScreenState
           ),
 
           Text(
-            'Add both offered skills and learning interests so TubiLearn can find a useful two-way match.',
+            'Add offered skills and learning interests so TubiLearn can compare skills, availability, mode, language, location, and trust signals.',
             textAlign:
             TextAlign.center,
             style:
@@ -1137,8 +1080,7 @@ class _DashboardScreenState
                   ),
 
                   const SizedBox(
-                    height:
-                    11,
+                    height: 11,
                   ),
 
                   Text(
@@ -1396,7 +1338,8 @@ class _DashboardScreenState
           SizedBox(
             height:
             38,
-            child: ElevatedButton(
+            child:
+            ElevatedButton(
               onPressed: () {
                 _showSessionDetails(
                   request,
@@ -1419,7 +1362,8 @@ class _DashboardScreenState
                   12,
                 ),
               ),
-              child: Text(
+              child:
+              Text(
                 'SESSION INFO',
                 style:
                 AppTextStyles.button
@@ -1859,12 +1803,10 @@ class _DashboardScreenState
 
     final String dayLabel;
 
-    if (difference ==
-        0) {
+    if (difference == 0) {
       dayLabel =
       'Today';
-    } else if (difference ==
-        1) {
+    } else if (difference == 1) {
       dayLabel =
       'Tomorrow';
     } else {
@@ -2148,18 +2090,4 @@ class _DashboardScreenState
       ),
     );
   }
-}
-
-class _DashboardMatch {
-  final User user;
-  final int score;
-  final Skill? skillToLearn;
-  final Skill? skillToTeach;
-
-  const _DashboardMatch({
-    required this.user,
-    required this.score,
-    required this.skillToLearn,
-    required this.skillToTeach,
-  });
 }
