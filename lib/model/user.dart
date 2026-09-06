@@ -22,6 +22,8 @@ class User {
   final bool emailVerified;
   final bool profileCompleted;
 
+  final String? profileImagePath;
+
   const User({
     required this.id,
     required this.name,
@@ -39,7 +41,16 @@ class User {
     required this.teachingStyle,
     required this.emailVerified,
     required this.profileCompleted,
+    this.profileImagePath,
   });
+
+  bool get hasProfileImage {
+    final String? path =
+        profileImagePath;
+
+    return path != null &&
+        path.trim().isNotEmpty;
+  }
 
   User copyWith({
     String? id,
@@ -58,15 +69,24 @@ class User {
     String? teachingStyle,
     bool? emailVerified,
     bool? profileCompleted,
+    String? profileImagePath,
+    bool clearProfileImagePath = false,
   }) {
     return User(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      initials: initials ?? this.initials,
-      city: city ?? this.city,
-      bio: bio ?? this.bio,
-      rating: rating ?? this.rating,
-      reviewCount: reviewCount ?? this.reviewCount,
+      id:
+      id ?? this.id,
+      name:
+      name ?? this.name,
+      initials:
+      initials ?? this.initials,
+      city:
+      city ?? this.city,
+      bio:
+      bio ?? this.bio,
+      rating:
+      rating ?? this.rating,
+      reviewCount:
+      reviewCount ?? this.reviewCount,
       completedSwaps:
       completedSwaps ?? this.completedSwaps,
       responseRate:
@@ -85,6 +105,11 @@ class User {
       emailVerified ?? this.emailVerified,
       profileCompleted:
       profileCompleted ?? this.profileCompleted,
+      profileImagePath:
+      clearProfileImagePath
+          ? null
+          : profileImagePath ??
+          this.profileImagePath,
     );
   }
 }

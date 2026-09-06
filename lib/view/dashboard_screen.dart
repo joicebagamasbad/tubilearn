@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
@@ -272,6 +274,109 @@ class _DashboardScreenState
   }
 
   // ============================================================
+  // PROFILE AVATAR
+  // ============================================================
+
+  Widget _buildUserAvatar(
+      User? user, {
+        required double size,
+        String fallbackInitials = 'TL',
+      }) {
+    final String? path =
+    user?.profileImagePath?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child: hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder:
+              (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              initials:
+              user?.initials ??
+                  fallbackInitials,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          initials:
+          user?.initials ??
+              fallbackInitials,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar({
+    required String initials,
+    required double size,
+  }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontSize:
+          size >= 48
+              ? 12
+              : 11,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ============================================================
   // HEADER
   // ============================================================
 
@@ -315,7 +420,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height: 4,
+                height:
+                4,
               ),
 
               Text(
@@ -372,39 +478,49 @@ class _DashboardScreenState
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
-        Container(
-          width:
-          42,
-          height:
-          42,
-          decoration:
-          const BoxDecoration(
-            color:
-            AppTheme.accent,
-            shape:
-            BoxShape.circle,
-          ),
-          alignment:
-          Alignment.center,
-          child: Text(
-            currentUser?.initials ??
-                'TL',
-            style:
-            const TextStyle(
-              fontSize:
-              12,
-              fontWeight:
-              FontWeight.w800,
-              color:
-              Colors.white,
-            ),
+        InkWell(
+          customBorder:
+          const CircleBorder(),
+          onTap:
+          _openProfile,
+          child: _buildUserAvatar(
+            currentUser,
+            size:
+            42,
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.pushNamed(
+      context,
+      '/profile',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      await _repository.refresh();
+    } catch (_) {
+      // Existing cached profile remains usable if refresh fails.
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedNav =
+      0;
+    });
   }
 
   // ============================================================
@@ -443,7 +559,8 @@ class _DashboardScreenState
         child: Row(
           children: [
             const SizedBox(
-              width: 14,
+              width:
+              14,
             ),
 
             Icon(
@@ -455,7 +572,8 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              width: 10,
+              width:
+              10,
             ),
 
             Expanded(
@@ -479,7 +597,8 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              width: 14,
+              width:
+              14,
             ),
           ],
         ),
@@ -522,8 +641,10 @@ class _DashboardScreenState
             child: Padding(
               padding:
               const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 4,
+                horizontal:
+                4,
+                vertical:
+                4,
               ),
               child: Text(
                 action,
@@ -602,36 +723,17 @@ class _DashboardScreenState
         children: [
           Row(
             children: [
-              Container(
-                width:
+              _buildUserAvatar(
+                match.user,
+                size:
                 48,
-                height:
-                48,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  AppTheme.accent,
-                  shape:
-                  BoxShape.circle,
-                ),
-                alignment:
-                Alignment.center,
-                child: Text(
-                  match.user.initials,
-                  style:
-                  const TextStyle(
-                    fontSize:
-                    12,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    Colors.white,
-                  ),
-                ),
+                fallbackInitials:
+                match.user.initials,
               ),
 
               const SizedBox(
-                width: 12,
+                width:
+                12,
               ),
 
               Expanded(
@@ -650,7 +752,8 @@ class _DashboardScreenState
                     ),
 
                     const SizedBox(
-                      height: 3,
+                      height:
+                      3,
                     ),
 
                     Text(
@@ -673,14 +776,17 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width: 8,
+                width:
+                8,
               ),
 
               Container(
                 padding:
                 const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal:
+                  10,
+                  vertical:
+                  6,
                 ),
                 decoration:
                 BoxDecoration(
@@ -707,7 +813,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height: 12,
+            height:
+            12,
           ),
 
           Row(
@@ -723,7 +830,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width: 10,
+                width:
+                10,
               ),
 
               Expanded(
@@ -742,7 +850,8 @@ class _DashboardScreenState
 
           if (match.reasons.isNotEmpty) ...[
             const SizedBox(
-              height: 14,
+              height:
+              14,
             ),
 
             Text(
@@ -758,7 +867,8 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              height: 8,
+              height:
+              8,
             ),
 
             Wrap(
@@ -784,7 +894,8 @@ class _DashboardScreenState
           ],
 
           const SizedBox(
-            height: 14,
+            height:
+            14,
           ),
 
           SizedBox(
@@ -855,7 +966,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width: 5,
+            width:
+            5,
           ),
 
           Text(
@@ -911,7 +1023,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height: 8,
+            height:
+            8,
           ),
 
           Text(
@@ -927,7 +1040,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height: 6,
+            height:
+            6,
           ),
 
           Text(
@@ -943,7 +1057,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height: 14,
+            height:
+            14,
           ),
 
           SizedBox(
@@ -951,8 +1066,7 @@ class _DashboardScreenState
             double.infinity,
             height:
             42,
-            child:
-            OutlinedButton.icon(
+            child: OutlinedButton.icon(
               onPressed: () {
                 Navigator.pushNamed(
                   context,
@@ -986,8 +1100,7 @@ class _DashboardScreenState
     return SizedBox(
       height:
       138,
-      child:
-      ListView.separated(
+      child: ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
@@ -1080,7 +1193,8 @@ class _DashboardScreenState
                   ),
 
                   const SizedBox(
-                    height: 11,
+                    height:
+                    11,
                   ),
 
                   Text(
@@ -1243,36 +1357,17 @@ class _DashboardScreenState
       ),
       child: Row(
         children: [
-          Container(
-            width:
+          _buildUserAvatar(
+            otherUser,
+            size:
             46,
-            height:
-            46,
-            decoration:
-            const BoxDecoration(
-              color:
-              AppTheme.accent,
-              shape:
-              BoxShape.circle,
-            ),
-            alignment:
-            Alignment.center,
-            child: Text(
-              initials,
-              style:
-              const TextStyle(
-                fontSize:
-                11,
-                fontWeight:
-                FontWeight.w800,
-                color:
-                Colors.white,
-              ),
-            ),
+            fallbackInitials:
+            initials,
           ),
 
           const SizedBox(
-            width: 12,
+            width:
+            12,
           ),
 
           Expanded(
@@ -1295,7 +1390,8 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height: 3,
+                  height:
+                  3,
                 ),
 
                 Text(
@@ -1315,7 +1411,8 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height: 3,
+                  height:
+                  3,
                 ),
 
                 Text(
@@ -1332,14 +1429,14 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width: 10,
+            width:
+            10,
           ),
 
           SizedBox(
             height:
             38,
-            child:
-            ElevatedButton(
+            child: ElevatedButton(
               onPressed: () {
                 _showSessionDetails(
                   request,
@@ -1362,8 +1459,7 @@ class _DashboardScreenState
                   12,
                 ),
               ),
-              child:
-              Text(
+              child: Text(
                 'SESSION INFO',
                 style:
                 AppTextStyles.button
@@ -1427,7 +1523,8 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width: 12,
+            width:
+            12,
           ),
 
           Expanded(
@@ -1446,7 +1543,8 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height: 4,
+                  height:
+                  4,
                 ),
 
                 Text(
@@ -1465,14 +1563,14 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width: 10,
+            width:
+            10,
           ),
 
           SizedBox(
             height:
             38,
-            child:
-            OutlinedButton(
+            child: OutlinedButton(
               onPressed: () {
                 Navigator.pushNamed(
                   context,
@@ -1487,8 +1585,7 @@ class _DashboardScreenState
                   12,
                 ),
               ),
-              child:
-              Text(
+              child: Text(
                 'VIEW',
                 style:
                 AppTextStyles.button
@@ -1563,8 +1660,7 @@ class _DashboardScreenState
         return AlertDialog(
           backgroundColor:
           _surfaceColor,
-          title:
-          Row(
+          title: Row(
             children: [
               Container(
                 width:
@@ -1593,7 +1689,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width: 10,
+                width:
+                10,
               ),
 
               Expanded(
@@ -1609,8 +1706,7 @@ class _DashboardScreenState
               ),
             ],
           ),
-          content:
-          Column(
+          content: Column(
             mainAxisSize:
             MainAxisSize.min,
             crossAxisAlignment:
@@ -1628,7 +1724,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildSessionDetailRow(
@@ -1644,7 +1741,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildSessionDetailRow(
@@ -1660,7 +1758,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildSessionDetailRow(
@@ -1680,8 +1779,7 @@ class _DashboardScreenState
                   dialogContext,
                 ).pop();
               },
-              child:
-              Text(
+              child: Text(
                 'CLOSE',
                 style:
                 AppTextStyles.button
@@ -1734,7 +1832,8 @@ class _DashboardScreenState
         ),
 
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
 
         Expanded(
@@ -1755,7 +1854,8 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height: 2,
+                height:
+                2,
               ),
 
               Text(
@@ -1797,9 +1897,11 @@ class _DashboardScreenState
     );
 
     final int difference =
-        target.difference(
+        target
+            .difference(
           today,
-        ).inDays;
+        )
+            .inDays;
 
     final String dayLabel;
 
@@ -1986,38 +2088,45 @@ class _DashboardScreenState
 
             return Expanded(
               child: InkWell(
-                onTap: () {
+                onTap: () async {
                   if (index == 0) {
-                    _scrollToHome();
+                    await _scrollToHome();
                     return;
                   }
 
                   if (index == 1) {
-                    Navigator.pushNamed(
+                    await Navigator.pushNamed(
                       context,
                       '/explore',
                     );
+
+                    if (mounted) {
+                      setState(() {});
+                    }
+
                     return;
                   }
 
                   if (index == 2) {
-                    _scrollToMatch();
+                    await _scrollToMatch();
                     return;
                   }
 
                   if (index == 3) {
-                    Navigator.pushNamed(
+                    await Navigator.pushNamed(
                       context,
                       '/chat',
                     );
+
+                    if (mounted) {
+                      setState(() {});
+                    }
+
                     return;
                   }
 
                   if (index == 4) {
-                    Navigator.pushNamed(
-                      context,
-                      '/profile',
-                    );
+                    await _openProfile();
                   }
                 },
                 child: Column(

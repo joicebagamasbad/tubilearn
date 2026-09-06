@@ -619,6 +619,112 @@ class ExploreRepository {
     return updatedUser;
   }
 
+
+  // ============================================================
+  // UPDATE CURRENT USER PROFILE IMAGE
+  // ============================================================
+
+  Future<User> updateCurrentUserProfileImagePath({
+    String? profileImagePath,
+  }) async {
+    await initialize();
+
+    final String currentUserId;
+
+    try {
+      currentUserId =
+          CurrentUserService.instance
+              .requireUserId();
+    } on CurrentUserServiceException catch (_) {
+      throw const ExploreRepositoryException(
+        'No active local user is available.',
+      );
+    }
+
+    final User? existing =
+    findUserById(
+      currentUserId,
+    );
+
+    if (existing == null) {
+      throw const ExploreRepositoryException(
+        'Your profile could not be found.',
+      );
+    }
+
+    final String? cleanProfileImagePath =
+    _normalizeNullableString(
+      profileImagePath,
+    );
+
+    if (cleanProfileImagePath != null &&
+        cleanProfileImagePath.length > 1000) {
+      throw const ExploreRepositoryException(
+        'Profile image path is too long.',
+      );
+    }
+
+    try {
+      final db =
+      await AppDatabase.instance.database;
+
+      final int updatedRows =
+      await db.update(
+        'users',
+        <String, Object?>{
+          'profile_image_path':
+          cleanProfileImagePath,
+        },
+        where:
+        'id = ?',
+        whereArgs:
+        <Object?>[
+          currentUserId,
+        ],
+      );
+
+      if (updatedRows != 1) {
+        throw const ExploreRepositoryException(
+          'Your profile photo could not be saved.',
+        );
+      }
+    } on ExploreRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ExploreRepositoryException(
+        'Your profile photo could not be saved. Please try again.',
+      );
+    }
+
+    final User updatedUser =
+    existing.copyWith(
+      profileImagePath:
+      cleanProfileImagePath,
+      clearProfileImagePath:
+      cleanProfileImagePath == null,
+    );
+
+    final int userIndex =
+    _users.indexWhere(
+          (
+          User user,
+          ) =>
+      user.id ==
+          currentUserId,
+    );
+
+    if (userIndex < 0) {
+      throw const ExploreRepositoryException(
+        'Your profile photo was saved but could not be refreshed.',
+      );
+    }
+
+    _users[userIndex] =
+        updatedUser;
+
+    return updatedUser;
+  }
+
   // ============================================================
   // SMART MATCHES
   // ============================================================
@@ -1563,6 +1669,13 @@ class ExploreRepository {
       'User profile completion',
     );
 
+    final String? profileImagePath =
+    _readNullableString(
+      map,
+      'profile_image_path',
+      'User profile image path',
+    );
+
     if (rating < 0 ||
         rating > 5) {
       throw const ExploreRepositoryException(
@@ -1622,6 +1735,8 @@ class ExploreRepository {
       emailVerified,
       profileCompleted:
       profileCompleted,
+      profileImagePath:
+      profileImagePath,
     );
   }
 
@@ -1879,6 +1994,56 @@ class ExploreRepository {
     }
 
     return cleaned;
+  }
+
+
+  String? _readNullableString(
+      Map<String, Object?> row,
+      String key,
+      String label,
+      ) {
+    if (!row.containsKey(
+      key,
+    )) {
+      throw ExploreRepositoryException(
+        '$label is missing.',
+      );
+    }
+
+    final Object? value =
+    row[key];
+
+    if (value == null) {
+      return null;
+    }
+
+    if (value is! String) {
+      throw ExploreRepositoryException(
+        '$label is invalid.',
+      );
+    }
+
+    final String cleaned =
+    value.trim();
+
+    return cleaned.isEmpty
+        ? null
+        : cleaned;
+  }
+
+  String? _normalizeNullableString(
+      String? value,
+      ) {
+    if (value == null) {
+      return null;
+    }
+
+    final String cleaned =
+    value.trim();
+
+    return cleaned.isEmpty
+        ? null
+        : cleaned;
   }
 
   String _readStringAllowEmpty(

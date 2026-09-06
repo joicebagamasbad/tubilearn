@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
@@ -5,6 +7,7 @@ import '../model/skill.dart';
 import '../model/user.dart';
 import '../model/user_skill.dart';
 import '../services/current_user_service.dart';
+import '../services/profile_image_service.dart';
 import '../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
@@ -27,6 +30,9 @@ class _ProfileScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
+  final ProfileImageService _profileImageService =
+      ProfileImageService.instance;
+
   User? _currentUser;
 
   List<Skill> _offeredSkills = <Skill>[];
@@ -34,6 +40,7 @@ class _ProfileScreenState
 
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _isUpdatingProfileImage = false;
 
   String? _loadError;
 
@@ -203,8 +210,11 @@ class _ProfileScreenState
   List<Skill> _resolveSkills(
       List<UserSkill> relationships,
       ) {
-    final List<Skill> result = <Skill>[];
-    final Set<String> seenSkillIds = <String>{};
+    final List<Skill> result =
+    <Skill>[];
+
+    final Set<String> seenSkillIds =
+    <String>{};
 
     for (final UserSkill relationship
     in relationships) {
@@ -247,7 +257,8 @@ class _ProfileScreenState
 
   Future<void> _refreshProfile() async {
     if (_isRefreshing ||
-        _isLoading) {
+        _isLoading ||
+        _isUpdatingProfileImage) {
       return;
     }
 
@@ -261,10 +272,422 @@ class _ProfileScreenState
   }
 
   // ============================================================
+  // PROFILE IMAGE
+  // ============================================================
+
+  Future<void> _openProfileImageOptions() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
+    final User? user =
+        _currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    final bool hasExistingPhoto =
+    _hasUsableProfileImage(
+      user,
+    );
+
+    final String? action =
+    await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor:
+      _surfaceColor,
+      showDragHandle: true,
+      builder:
+          (
+          BuildContext sheetContext,
+          ) {
+        return SafeArea(
+          child: Padding(
+            padding:
+            const EdgeInsets.fromLTRB(
+              12,
+              0,
+              12,
+              14,
+            ),
+            child: Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(
+                    Icons.photo_library_outlined,
+                    color:
+                    _primaryColor,
+                  ),
+                  title: Text(
+                    hasExistingPhoto
+                        ? 'Change profile photo'
+                        : 'Choose profile photo',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color:
+                      _textColor,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Select a photo from your gallery',
+                    style: TextStyle(
+                      color:
+                      _mutedColor,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      sheetContext,
+                      'choose',
+                    );
+                  },
+                ),
+                if (hasExistingPhoto)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color:
+                      AppTheme.error,
+                    ),
+                    title: const Text(
+                      'Remove profile photo',
+                      style: TextStyle(
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        AppTheme.error,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(
+                        sheetContext,
+                        'remove',
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted ||
+        action == null) {
+      return;
+    }
+
+    if (action == 'choose') {
+      await _pickProfileImage();
+      return;
+    }
+
+    if (action == 'remove') {
+      await _confirmRemoveProfileImage();
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingProfileImage = true;
+    });
+
+    try {
+      final User? updatedUser =
+      await _profileImageService
+          .pickAndSaveCurrentUserProfileImage();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (updatedUser == null) {
+        return;
+      }
+
+      setState(() {
+        _currentUser =
+            updatedUser;
+      });
+
+      _showMessage(
+        'Profile photo updated.',
+      );
+    } on ProfileImageServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Profile photo could not be updated. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfileImage =
+          false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmRemoveProfileImage() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context: context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
+            'Remove profile photo?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content: Text(
+            'Your initials will be shown again instead.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: Text(
+                'CANCEL',
+                style:
+                AppTextStyles.button.copyWith(
+                  color:
+                  _mutedColor,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                'REMOVE',
+                style: TextStyle(
+                  fontWeight:
+                  FontWeight.w800,
+                  color:
+                  AppTheme.error,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true ||
+        !mounted) {
+      return;
+    }
+
+    await _removeProfileImage();
+  }
+
+  Future<void> _removeProfileImage() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingProfileImage = true;
+    });
+
+    try {
+      final User updatedUser =
+      await _profileImageService
+          .removeCurrentUserProfileImage();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUser =
+            updatedUser;
+      });
+
+      _showMessage(
+        'Profile photo removed.',
+      );
+    } on ProfileImageServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Profile photo could not be removed. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfileImage =
+          false;
+        });
+      }
+    }
+  }
+
+  bool _hasUsableProfileImage(
+      User user,
+      ) {
+    final String? path =
+    user.profileImagePath?.trim();
+
+    if (path == null ||
+        path.isEmpty) {
+      return false;
+    }
+
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Widget _buildProfileAvatar(
+      User user, {
+        required double size,
+      }) {
+    final String? path =
+    user.profileImagePath?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _hasUsableProfileImage(
+              user,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child: hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder:
+              (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              user,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          user,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      User user, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        user.initials,
+        style: TextStyle(
+          fontSize:
+          size >= 70
+              ? 20
+              : 16,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
   // EDIT PROFILE
   // ============================================================
 
   Future<void> _openEditProfile() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
     final bool? updated =
     await Navigator.push<bool>(
       context,
@@ -299,6 +722,10 @@ class _ProfileScreenState
   // ============================================================
 
   Future<void> _openMySkills() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
     await Navigator.pushNamed(
       context,
       '/my-skills',
@@ -318,6 +745,10 @@ class _ProfileScreenState
   // ============================================================
 
   Future<void> _openSettings() async {
+    if (_isUpdatingProfileImage) {
+      return;
+    }
+
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
@@ -368,11 +799,15 @@ class _ProfileScreenState
               tooltip:
               'Settings',
               onPressed:
-              _openSettings,
+              _isUpdatingProfileImage
+                  ? null
+                  : _openSettings,
               icon: Icon(
                 Icons.settings_outlined,
                 color:
-                _textColor,
+                _isUpdatingProfileImage
+                    ? _mutedColor
+                    : _textColor,
               ),
             ),
         ],
@@ -425,13 +860,15 @@ class _ProfileScreenState
               user,
             ),
             const SizedBox(
-              height: 20,
+              height:
+              20,
             ),
             _buildStats(
               user,
             ),
             const SizedBox(
-              height: 26,
+              height:
+              26,
             ),
             _buildSectionTitle(
               title:
@@ -442,13 +879,15 @@ class _ProfileScreenState
               _openEditProfile,
             ),
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             _buildAboutCard(
               user,
             ),
             const SizedBox(
-              height: 26,
+              height:
+              26,
             ),
             _buildSectionTitle(
               title:
@@ -459,7 +898,8 @@ class _ProfileScreenState
               _openMySkills,
             ),
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             _buildSkillsCard(
               skills:
@@ -472,7 +912,8 @@ class _ProfileScreenState
               Icons.school_outlined,
             ),
             const SizedBox(
-              height: 26,
+              height:
+              26,
             ),
             _buildSectionTitle(
               title:
@@ -483,7 +924,8 @@ class _ProfileScreenState
               _openMySkills,
             ),
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             _buildSkillsCard(
               skills:
@@ -498,7 +940,8 @@ class _ProfileScreenState
               true,
             ),
             const SizedBox(
-              height: 26,
+              height:
+              26,
             ),
             Text(
               'Your activity',
@@ -510,7 +953,8 @@ class _ProfileScreenState
               ),
             ),
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             _buildMenuCard(
               children: [
@@ -532,6 +976,10 @@ class _ProfileScreenState
                   subtitle:
                   'View active and previous skill exchanges',
                   onTap: () {
+                    if (_isUpdatingProfileImage) {
+                      return;
+                    }
+
                     Navigator.pushNamed(
                       context,
                       '/swap-requests',
@@ -547,6 +995,10 @@ class _ProfileScreenState
                   subtitle:
                   'Open your conversations with other learners',
                   onTap: () {
+                    if (_isUpdatingProfileImage) {
+                      return;
+                    }
+
                     Navigator.pushNamed(
                       context,
                       '/chat',
@@ -556,7 +1008,8 @@ class _ProfileScreenState
               ],
             ),
             const SizedBox(
-              height: 26,
+              height:
+              26,
             ),
             Text(
               'Account & preferences',
@@ -568,7 +1021,8 @@ class _ProfileScreenState
               ),
             ),
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
             _buildMenuCard(
               children: [
@@ -595,7 +1049,8 @@ class _ProfileScreenState
               ],
             ),
             const SizedBox(
-              height: 24,
+              height:
+              24,
             ),
             _buildPrototypeNotice(),
           ],
@@ -636,35 +1091,71 @@ class _ProfileScreenState
         children: [
           Row(
             children: [
-              Container(
-                width:
-                72,
-                height:
-                72,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  AppTheme.accent,
-                  shape:
-                  BoxShape.circle,
-                ),
-                alignment:
-                Alignment.center,
-                child: Text(
-                  user.initials,
-                  style:
-                  const TextStyle(
-                    fontSize:
-                    20,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    Colors.white,
+              Stack(
+                clipBehavior:
+                Clip.none,
+                children: [
+                  _buildProfileAvatar(
+                    user,
+                    size:
+                    72,
                   ),
-                ),
+                  Positioned(
+                    right:
+                    -2,
+                    bottom:
+                    -2,
+                    child: Material(
+                      color:
+                      _primaryColor,
+                      shape:
+                      const CircleBorder(),
+                      elevation:
+                      2,
+                      child: InkWell(
+                        customBorder:
+                        const CircleBorder(),
+                        onTap:
+                        _isUpdatingProfileImage
+                            ? null
+                            : _openProfileImageOptions,
+                        child: SizedBox(
+                          width:
+                          30,
+                          height:
+                          30,
+                          child: Center(
+                            child: _isUpdatingProfileImage
+                                ? const SizedBox(
+                              width:
+                              14,
+                              height:
+                              14,
+                              child:
+                              CircularProgressIndicator(
+                                strokeWidth:
+                                2,
+                                color:
+                                Colors.white,
+                              ),
+                            )
+                                : const Icon(
+                              Icons.camera_alt_rounded,
+                              size:
+                              16,
+                              color:
+                              Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(
-                width: 15,
+                width:
+                15,
               ),
               Expanded(
                 child: Column(
@@ -681,13 +1172,13 @@ class _ProfileScreenState
                       ),
                     ),
                     const SizedBox(
-                      height: 5,
+                      height:
+                      5,
                     ),
                     Row(
                       children: [
                         Icon(
-                          Icons
-                              .location_on_outlined,
+                          Icons.location_on_outlined,
                           size:
                           15,
                           color:
@@ -738,7 +1229,8 @@ class _ProfileScreenState
             ],
           ),
           const SizedBox(
-            height: 16,
+            height:
+            16,
           ),
           SizedBox(
             width:
@@ -748,7 +1240,9 @@ class _ProfileScreenState
             child:
             OutlinedButton.icon(
               onPressed:
-              _openEditProfile,
+              _isUpdatingProfileImage
+                  ? null
+                  : _openEditProfile,
               icon:
               const Icon(
                 Icons.edit_outlined,
@@ -791,7 +1285,8 @@ class _ProfileScreenState
           ),
         ),
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
         Expanded(
           child: _buildStatCard(
@@ -804,7 +1299,8 @@ class _ProfileScreenState
           ),
         ),
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
         Expanded(
           child: _buildStatCard(
@@ -919,7 +1415,9 @@ class _ProfileScreenState
             onAction != null)
           TextButton(
             onPressed:
-            onAction,
+            _isUpdatingProfileImage
+                ? null
+                : onAction,
             style:
             TextButton.styleFrom(
               padding:
@@ -1244,7 +1742,9 @@ class _ProfileScreenState
               10,
             ),
             onTap:
-            _openMySkills,
+            _isUpdatingProfileImage
+                ? null
+                : _openMySkills,
             child: Padding(
               padding:
               const EdgeInsets.symmetric(
@@ -1413,7 +1913,9 @@ class _ProfileScreenState
           ),
           OutlinedButton.icon(
             onPressed:
-            _openMySkills,
+            _isUpdatingProfileImage
+                ? null
+                : _openMySkills,
             icon:
             const Icon(
               Icons.add_rounded,
@@ -1623,6 +2125,7 @@ class _ProfileScreenState
                 setState(() {
                   _isLoading =
                   true;
+
                   _loadError =
                   null;
                 });

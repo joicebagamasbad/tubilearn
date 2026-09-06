@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import '../model/repositories/explore_repository.dart';
 import '../model/repositories/swap_repository.dart';
 import '../model/swap_request.dart';
+
 import 'current_user_service.dart';
 
 class SwapServiceException implements Exception {
@@ -23,6 +25,9 @@ class SwapService {
 
   final SwapRepository _repository =
   SwapRepository();
+
+  final ExploreRepository _exploreRepository =
+      ExploreRepository.instance;
 
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
@@ -110,7 +115,8 @@ class SwapService {
     try {
       savedRequests =
       await _repository.getAllSwapRequests(
-        userId: currentUserId,
+        userId:
+        currentUserId,
       );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
@@ -287,15 +293,9 @@ class SwapService {
       );
     }
 
-    if (request.createdAt
-        .millisecondsSinceEpoch <=
-        0 ||
-        request.updatedAt
-            .millisecondsSinceEpoch <=
-            0 ||
-        request.proposedAt
-            .millisecondsSinceEpoch <=
-            0) {
+    if (request.createdAt.millisecondsSinceEpoch <= 0 ||
+        request.updatedAt.millisecondsSinceEpoch <= 0 ||
+        request.proposedAt.millisecondsSinceEpoch <= 0) {
       throw const SwapServiceException(
         'Saved swap data contains an invalid timestamp.',
       );
@@ -781,28 +781,161 @@ class SwapService {
     );
   }
 
+  // ============================================================
+  // COMPLETE SWAP
+  // ============================================================
+
   Future<void> completeRequest({
     required String requestId,
     required String actorUserId,
   }) async {
-    await _performActorTransition(
-      requestId:
+    await initialize();
+
+    final String cleanRequestId =
+    _requireRequestId(
       requestId,
-      actorUserId:
-      actorUserId,
-      target:
-      SwapRequestStatus.completed,
-      permission:
-          (
-          request,
-          actor,
-          ) =>
-          request.canComplete(
-            actor,
-          ),
-      permissionError:
-      'You are not allowed to complete this swap request.',
     );
+
+    final String actor =
+    _requireCurrentActor(
+      actorUserId,
+    );
+
+    _throwIfRequestHidingOrRestoring(
+      cleanRequestId,
+    );
+
+    while (true) {
+      final Future<void>? pending =
+      _pendingStatusChanges[
+      cleanRequestId
+      ];
+
+      if (pending == null) {
+        break;
+      }
+
+      try {
+        await pending;
+      } catch (_) {}
+
+      _throwIfRequestHidingOrRestoring(
+        cleanRequestId,
+      );
+    }
+
+    final SwapRequest request =
+    _requireRequest(
+      cleanRequestId,
+    );
+
+    _requireActiveStableRequest(
+      request,
+    );
+
+    if (!request.canComplete(
+      actor,
+    )) {
+      throw const SwapServiceException(
+        'You are not allowed to complete this swap request.',
+      );
+    }
+
+    if (DateTime.now().isBefore(
+      request.proposedAt,
+    )) {
+      throw const SwapServiceException(
+        'This session is still upcoming.',
+      );
+    }
+
+    final Future<void> operation =
+    _completeRequestInternal(
+      requestId:
+      cleanRequestId,
+    );
+
+    _pendingStatusChanges[
+    cleanRequestId
+    ] = operation;
+
+    try {
+      await operation;
+    } finally {
+      if (identical(
+        _pendingStatusChanges[
+        cleanRequestId
+        ],
+        operation,
+      )) {
+        _pendingStatusChanges.remove(
+          cleanRequestId,
+        );
+      }
+    }
+  }
+
+  Future<void> _completeRequestInternal({
+    required String requestId,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
+
+    _requireActiveStableRequest(
+      request,
+    );
+
+    if (request.status !=
+        SwapRequestStatus.scheduled) {
+      throw const SwapServiceException(
+        'Only scheduled swaps can be completed.',
+      );
+    }
+
+    if (!request.status.canTransitionTo(
+      SwapRequestStatus.completed,
+    )) {
+      throw const SwapServiceException(
+        'This swap request cannot be completed.',
+      );
+    }
+
+    final DateTime updatedAt =
+    DateTime.now();
+
+    try {
+      await _repository.completeSwap(
+        requestId:
+        request.id,
+        updatedAt:
+        updatedAt,
+      );
+    } on SwapRepositoryException catch (error) {
+      throw SwapServiceException(
+        error.message,
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Could not complete the swap request. Please try again.',
+      );
+    }
+
+    request.status =
+        SwapRequestStatus.completed;
+
+    request.updatedAt =
+        updatedAt;
+
+    _sortRequests();
+
+    try {
+      await _exploreRepository.refresh();
+    } catch (_) {
+      // The completion itself is already safely stored.
+      // Explore data can refresh again on the next screen load.
+    }
   }
 
   // ============================================================
@@ -831,7 +964,8 @@ class SwapService {
     );
   }
 
-  Future<void> _executeSerializedScheduleConfirmation({
+  Future<void>
+  _executeSerializedScheduleConfirmation({
     required Future<void> previous,
     required Completer<void> release,
     required Future<void> Function() action,
@@ -1528,13 +1662,15 @@ class SwapService {
     }
 
     final List<SwapRequest> matches =
-    allRequests.where(
+    allRequests
+        .where(
           (
           SwapRequest request,
           ) =>
       request.id ==
           requestId,
-    ).toList();
+    )
+        .toList();
 
     if (matches.length != 1) {
       throw const SwapServiceException(
@@ -1769,13 +1905,15 @@ class SwapService {
           providerUserId,
           skillToLearnId,
           skillToOfferId,
-        ].where(
+        ]
+            .where(
               (
               String? value,
               ) =>
           value != null &&
               value.trim().isNotEmpty,
-        ).length;
+        )
+            .length;
 
     if (present == 0) {
       if (allowNoIdentity) {

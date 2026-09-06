@@ -12,8 +12,7 @@ class SwapRepositoryException implements Exception {
       );
 
   @override
-  String toString() =>
-      message;
+  String toString() => message;
 }
 
 class SwapRepository {
@@ -267,17 +266,17 @@ class SwapRepository {
             providerUserId,
             skillToLearnId,
             skillToOfferId,
-          ].where(
+          ]
+              .where(
                 (
                 String? value,
                 ) =>
             value != null,
-          ).length;
+          )
+              .length;
 
-      if (presentIdentityValues !=
-          0 &&
-          presentIdentityValues !=
-              4) {
+      if (presentIdentityValues != 0 &&
+          presentIdentityValues != 4) {
         throw SwapRepositoryException(
           'Swap request "$id" has incomplete identity data.',
         );
@@ -432,8 +431,7 @@ class SwapRepository {
       'Updated timestamp',
     );
 
-    if (updatedAt <
-        createdAt) {
+    if (updatedAt < createdAt) {
       throw const SwapRepositoryException(
         'Updated timestamp cannot be before created timestamp.',
       );
@@ -450,16 +448,14 @@ class SwapRepository {
     );
 
     if (meetingDetails != null &&
-        meetingDetails.length >
-            150) {
+        meetingDetails.length > 150) {
       throw const SwapRepositoryException(
         'Meeting details must be 150 characters or less.',
       );
     }
 
     if (note != null &&
-        note.length >
-            300) {
+        note.length > 300) {
       throw const SwapRepositoryException(
         'Message must be 300 characters or less.',
       );
@@ -523,8 +519,7 @@ class SwapRepository {
         ConflictAlgorithm.abort,
       );
 
-      if (insertedRowId <=
-          0) {
+      if (insertedRowId <= 0) {
         throw const SwapRepositoryException(
           'Swap request was not saved.',
         );
@@ -584,8 +579,7 @@ class SwapRepository {
         ],
       );
 
-      if (affectedRows !=
-          1) {
+      if (affectedRows != 1) {
         throw SwapRepositoryException(
           'Expected to update exactly 1 swap request, but updated $affectedRows.',
         );
@@ -599,6 +593,225 @@ class SwapRepository {
     } catch (_) {
       throw const SwapRepositoryException(
         'Swap request status could not be updated.',
+      );
+    }
+  }
+
+  // ============================================================
+  // COMPLETE SWAP + RECALCULATE PARTICIPANT COUNTS
+  // ============================================================
+
+  Future<void> completeSwap({
+    required String requestId,
+    required DateTime updatedAt,
+  }) async {
+    final String cleanRequestId =
+    _requireText(
+      requestId,
+      'Swap request ID',
+    );
+
+    final int cleanUpdatedAt =
+    _dateTimeToMilliseconds(
+      updatedAt,
+      'Updated timestamp',
+    );
+
+    try {
+      final Database db =
+      await _appDatabase.database;
+
+      await db.transaction(
+            (
+            Transaction txn,
+            ) async {
+          final List<Map<String, Object?>> rows =
+          await txn.query(
+            'swap_requests',
+            columns:
+            <String>[
+              'requester_user_id',
+              'provider_user_id',
+              'status',
+            ],
+            where:
+            'id = ?',
+            whereArgs:
+            <Object?>[
+              cleanRequestId,
+            ],
+            limit:
+            1,
+          );
+
+          if (rows.length != 1) {
+            throw const SwapRepositoryException(
+              'Swap request could not be found for completion.',
+            );
+          }
+
+          final Map<String, Object?> row =
+              rows.single;
+
+          final String status =
+          _readRequiredString(
+            row,
+            'status',
+          );
+
+          if (status !=
+              SwapRequestStatus.scheduled.databaseValue) {
+            throw const SwapRepositoryException(
+              'Only scheduled swaps can be completed.',
+            );
+          }
+
+          final String? requesterUserId =
+          _readNullableStoredString(
+            row,
+            'requester_user_id',
+          );
+
+          final String? providerUserId =
+          _readNullableStoredString(
+            row,
+            'provider_user_id',
+          );
+
+          if (requesterUserId == null ||
+              providerUserId == null) {
+            throw const SwapRepositoryException(
+              'Swap participants could not be identified.',
+            );
+          }
+
+          if (requesterUserId ==
+              providerUserId) {
+            throw const SwapRepositoryException(
+              'Swap participants are invalid.',
+            );
+          }
+
+          final int affectedRows =
+          await txn.update(
+            'swap_requests',
+            <String, Object?>{
+              'status':
+              SwapRequestStatus
+                  .completed
+                  .databaseValue,
+              'updated_at':
+              cleanUpdatedAt,
+            },
+            where:
+            'id = ? AND status = ?',
+            whereArgs:
+            <Object?>[
+              cleanRequestId,
+              SwapRequestStatus
+                  .scheduled
+                  .databaseValue,
+            ],
+          );
+
+          if (affectedRows != 1) {
+            throw const SwapRepositoryException(
+              'Swap could not be completed safely.',
+            );
+          }
+
+          await _recalculateCompletedSwapsForUser(
+            txn,
+            requesterUserId,
+          );
+
+          await _recalculateCompletedSwapsForUser(
+            txn,
+            providerUserId,
+          );
+        },
+      );
+    } on SwapRepositoryException {
+      rethrow;
+    } on DatabaseException catch (_) {
+      throw const SwapRepositoryException(
+        'Swap completion could not be saved.',
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Swap completion could not be saved.',
+      );
+    }
+  }
+
+  Future<void> _recalculateCompletedSwapsForUser(
+      Transaction txn,
+      String userId,
+      ) async {
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
+    final List<Map<String, Object?>> rows =
+    await txn.rawQuery(
+      '''
+      SELECT COUNT(*) AS completed_count
+      FROM swap_requests
+      WHERE
+        status = ?
+        AND (
+          requester_user_id = ?
+          OR provider_user_id = ?
+        )
+      ''',
+      <Object?>[
+        SwapRequestStatus
+            .completed
+            .databaseValue,
+        cleanUserId,
+        cleanUserId,
+      ],
+    );
+
+    if (rows.length != 1) {
+      throw const SwapRepositoryException(
+        'Completed swap total could not be calculated.',
+      );
+    }
+
+    final int completedCount =
+    _readExactInteger(
+      rows.single[
+      'completed_count'],
+      'Completed swap count',
+    );
+
+    if (completedCount < 0) {
+      throw const SwapRepositoryException(
+        'Completed swap total is invalid.',
+      );
+    }
+
+    final int updatedUsers =
+    await txn.update(
+      'users',
+      <String, Object?>{
+        'completed_swaps':
+        completedCount,
+      },
+      where:
+      'id = ?',
+      whereArgs:
+      <Object?>[
+        cleanUserId,
+      ],
+    );
+
+    if (updatedUsers != 1) {
+      throw const SwapRepositoryException(
+        'Participant completed-swap total could not be updated.',
       );
     }
   }
@@ -688,8 +901,7 @@ class SwapRepository {
         ],
       );
 
-      if (affectedRows !=
-          1) {
+      if (affectedRows != 1) {
         throw SwapRepositoryException(
           'Expected to update exactly 1 swap request, but updated $affectedRows.',
         );
@@ -813,8 +1025,7 @@ class SwapRepository {
         ],
       );
 
-      if (affectedRows !=
-          1) {
+      if (affectedRows != 1) {
         throw SwapRepositoryException(
           'Expected to delete exactly 1 swap request, but deleted $affectedRows.',
         );
@@ -893,8 +1104,7 @@ class SwapRepository {
         )
             .length;
 
-    if (presentCount ==
-        0) {
+    if (presentCount == 0) {
       return false;
     }
 
@@ -936,17 +1146,14 @@ class SwapRepository {
         )
             .length;
 
-    if (presentCount !=
-        0 &&
-        presentCount !=
-            4) {
+    if (presentCount != 0 &&
+        presentCount != 4) {
       throw const SwapRepositoryException(
         'Swap request identity is incomplete.',
       );
     }
 
-    if (presentCount ==
-        0) {
+    if (presentCount == 0) {
       return;
     }
 
@@ -1063,8 +1270,7 @@ class SwapRepository {
       key,
     );
 
-    if (milliseconds <=
-        0) {
+    if (milliseconds <= 0) {
       throw SwapRepositoryException(
         'Stored swap request has an invalid "$key".',
       );
@@ -1131,8 +1337,7 @@ class SwapRepository {
     final int milliseconds =
         value.millisecondsSinceEpoch;
 
-    if (milliseconds <=
-        0) {
+    if (milliseconds <= 0) {
       throw SwapRepositoryException(
         '$label is invalid.',
       );

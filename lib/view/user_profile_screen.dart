@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/review_repository.dart';
+import '../model/review.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
 import '../services/chat_service.dart';
@@ -11,6 +16,12 @@ enum _PreviousConversationAction {
   cancel,
   restore,
   startNew,
+}
+
+enum _ProfileMenuAction {
+  message,
+  requestSwap,
+  copyProfile,
 }
 
 class UserProfileScreen extends StatefulWidget {
@@ -28,14 +39,31 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState
     extends State<UserProfileScreen> {
-  static final ExploreRepository _repository =
-  ExploreRepository();
+  final ExploreRepository _repository =
+      ExploreRepository.instance;
+
+  final ReviewRepository _reviewRepository =
+      ReviewRepository.instance;
 
   bool _isOpeningConversation = false;
   bool _isOpeningSwapRequest = false;
 
-  User get user =>
-      widget.user;
+  bool _isLoadingReviews = true;
+  String? _reviewsError;
+
+  List<Review> _reviews = <Review>[];
+
+  bool _showAllReviews = false;
+
+  User get user {
+    final User? latestUser =
+    _repository.findUserById(
+      widget.user.id,
+    );
+
+    return latestUser ??
+        widget.user;
+  }
 
   bool get _hasPendingAction =>
       _isOpeningConversation ||
@@ -122,6 +150,70 @@ class _UserProfileScreenState
           : Colors.white;
 
   @override
+  void initState() {
+    super.initState();
+
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    try {
+      await _repository.initialize();
+
+      await _repository.refresh();
+    } catch (_) {
+      // Keep navigation data usable if refresh fails.
+    }
+
+    await _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingReviews = true;
+        _reviewsError = null;
+      });
+    }
+
+    try {
+      final List<Review> reviews =
+      await _reviewRepository.getReviewsForUser(
+        widget.user.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reviews = reviews;
+        _isLoadingReviews = false;
+        _reviewsError = null;
+      });
+    } on ReviewRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingReviews = false;
+        _reviewsError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingReviews = false;
+        _reviewsError =
+        'Reviews could not be loaded.';
+      });
+    }
+  }
+
+  @override
   Widget build(
       BuildContext context,
       ) {
@@ -140,174 +232,186 @@ class _UserProfileScreenState
           children: [
             _buildTopBar(),
             Expanded(
-              child:
-              SingleChildScrollView(
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  18,
-                  20,
-                  30,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildProfileHeader(),
+              child: RefreshIndicator(
+                onRefresh:
+                _refreshProfile,
+                child: SingleChildScrollView(
+                  physics:
+                  const AlwaysScrollableScrollPhysics(
+                    parent:
+                    BouncingScrollPhysics(),
+                  ),
+                  padding:
+                  const EdgeInsets.fromLTRB(
+                    20,
+                    18,
+                    20,
+                    30,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      _buildProfileHeader(),
 
-                    const SizedBox(
-                      height: 22,
-                    ),
-
-                    _buildStatsRow(),
-
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    Text(
-                      'About',
-                      style:
-                      AppTextStyles.cardTitle
-                          .copyWith(
-                        color:
-                        _textColor,
+                      const SizedBox(
+                        height: 22,
                       ),
-                    ),
 
-                    const SizedBox(
-                      height: 8,
-                    ),
+                      _buildStatsRow(),
 
-                    Text(
-                      user.bio,
-                      style:
-                      AppTextStyles.bodyMuted
-                          .copyWith(
-                        color:
-                        _mutedColor,
+                      const SizedBox(
+                        height: 24,
                       ),
-                    ),
 
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    _buildInfoCard(),
-
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    Text(
-                      'Skills offered',
-                      style:
-                      AppTextStyles.cardTitle
-                          .copyWith(
-                        color:
-                        _textColor,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 10,
-                    ),
-
-                    if (offeredSkills.isEmpty)
                       Text(
-                        'No offered skills yet.',
+                        'About',
+                        style:
+                        AppTextStyles.cardTitle
+                            .copyWith(
+                          color:
+                          _textColor,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 8,
+                      ),
+
+                      Text(
+                        user.bio,
                         style:
                         AppTextStyles.bodyMuted
                             .copyWith(
                           color:
                           _mutedColor,
                         ),
-                      )
-                    else
-                      Wrap(
-                        spacing:
-                        8,
-                        runSpacing:
-                        8,
-                        children:
-                        offeredSkills.map(
-                              (
-                              Skill skill,
-                              ) {
-                            return _skillChip(
-                              skill.title,
-                              _softPrimaryColor,
-                              _primaryColor,
-                            );
-                          },
-                        ).toList(),
                       ),
 
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    Text(
-                      'Wants to learn',
-                      style:
-                      AppTextStyles.cardTitle
-                          .copyWith(
-                        color:
-                        _textColor,
+                      const SizedBox(
+                        height: 24,
                       ),
-                    ),
 
-                    const SizedBox(
-                      height: 10,
-                    ),
+                      _buildInfoCard(),
 
-                    if (wantedSkills.isEmpty)
+                      const SizedBox(
+                        height: 24,
+                      ),
+
                       Text(
-                        'No learning interests yet.',
+                        'Skills offered',
                         style:
-                        AppTextStyles.bodyMuted
+                        AppTextStyles.cardTitle
                             .copyWith(
                           color:
-                          _mutedColor,
+                          _textColor,
                         ),
-                      )
-                    else
-                      Wrap(
-                        spacing:
-                        8,
-                        runSpacing:
-                        8,
-                        children:
-                        wantedSkills.map(
-                              (
-                              Skill skill,
-                              ) {
-                            return _skillChip(
-                              skill.title,
-                              _wantedBackgroundColor,
-                              _wantedTextColor,
-                            );
-                          },
-                        ).toList(),
                       ),
 
-                    const SizedBox(
-                      height: 24,
-                    ),
+                      const SizedBox(
+                        height: 10,
+                      ),
 
-                    _buildTrustCard(),
+                      if (offeredSkills.isEmpty)
+                        Text(
+                          'No offered skills yet.',
+                          style:
+                          AppTextStyles.bodyMuted
+                              .copyWith(
+                            color:
+                            _mutedColor,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing:
+                          8,
+                          runSpacing:
+                          8,
+                          children:
+                          offeredSkills.map(
+                                (
+                                Skill skill,
+                                ) {
+                              return _skillChip(
+                                skill.title,
+                                _softPrimaryColor,
+                                _primaryColor,
+                              );
+                            },
+                          ).toList(),
+                        ),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                      const SizedBox(
+                        height: 24,
+                      ),
 
-                    _buildActionButtons(
-                      offeredSkills,
-                      wantedSkills,
-                    ),
-                  ],
+                      Text(
+                        'Wants to learn',
+                        style:
+                        AppTextStyles.cardTitle
+                            .copyWith(
+                          color:
+                          _textColor,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 10,
+                      ),
+
+                      if (wantedSkills.isEmpty)
+                        Text(
+                          'No learning interests yet.',
+                          style:
+                          AppTextStyles.bodyMuted
+                              .copyWith(
+                            color:
+                            _mutedColor,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing:
+                          8,
+                          runSpacing:
+                          8,
+                          children:
+                          wantedSkills.map(
+                                (
+                                Skill skill,
+                                ) {
+                              return _skillChip(
+                                skill.title,
+                                _wantedBackgroundColor,
+                                _wantedTextColor,
+                              );
+                            },
+                          ).toList(),
+                        ),
+
+                      const SizedBox(
+                        height: 24,
+                      ),
+
+                      _buildTrustCard(),
+
+                      const SizedBox(
+                        height: 26,
+                      ),
+
+                      _buildReviewsSection(),
+
+                      const SizedBox(
+                        height: 28,
+                      ),
+
+                      _buildActionButtons(
+                        offeredSkills,
+                        wantedSkills,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -315,6 +419,26 @@ class _UserProfileScreenState
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  Future<void> _refreshProfile() async {
+    try {
+      await _repository.refresh();
+    } catch (_) {
+      // Review refresh can still continue.
+    }
+
+    await _loadReviews();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
   }
 
   // ============================================================
@@ -343,8 +467,7 @@ class _UserProfileScreenState
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           IconButton(
             onPressed:
@@ -355,8 +478,7 @@ class _UserProfileScreenState
                 context,
               );
             },
-            icon:
-            Icon(
+            icon: Icon(
               Icons.arrow_back_ios_new_rounded,
               size:
               18,
@@ -368,10 +490,8 @@ class _UserProfileScreenState
           ),
 
           Expanded(
-            child:
-            Center(
-              child:
-              Text(
+            child: Center(
+              child: Text(
                 'Profile',
                 style:
                 AppTextStyles.cardTitle
@@ -383,21 +503,203 @@ class _UserProfileScreenState
             ),
           ),
 
-          IconButton(
-            onPressed:
-            _hasPendingAction
-                ? null
-                : () {},
-            icon:
-            Icon(
+          PopupMenuButton<_ProfileMenuAction>(
+            enabled:
+            !_hasPendingAction,
+            tooltip:
+            'More profile actions',
+            color:
+            _surfaceColor,
+            surfaceTintColor:
+            Colors.transparent,
+            icon: Icon(
               Icons.more_horiz_rounded,
               color:
-              _mutedColor,
+              _hasPendingAction
+                  ? _mutedColor.withValues(
+                alpha: 0.5,
+              )
+                  : _mutedColor,
             ),
+            onSelected:
+            _handleProfileMenuAction,
+            itemBuilder:
+                (
+                BuildContext menuContext,
+                ) {
+              return <PopupMenuEntry<_ProfileMenuAction>>[
+                PopupMenuItem<_ProfileMenuAction>(
+                  value:
+                  _ProfileMenuAction.message,
+                  child: _buildMenuItem(
+                    icon:
+                    Icons.chat_bubble_outline_rounded,
+                    label:
+                    'Message',
+                  ),
+                ),
+                PopupMenuItem<_ProfileMenuAction>(
+                  value:
+                  _ProfileMenuAction.requestSwap,
+                  child: _buildMenuItem(
+                    icon:
+                    Icons.swap_horiz_rounded,
+                    label:
+                    'Request swap',
+                  ),
+                ),
+                PopupMenuItem<_ProfileMenuAction>(
+                  value:
+                  _ProfileMenuAction.copyProfile,
+                  child: _buildMenuItem(
+                    icon:
+                    Icons.copy_rounded,
+                    label:
+                    'Copy profile summary',
+                  ),
+                ),
+              ];
+            },
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String label,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size:
+          19,
+          color:
+          _primaryColor,
+        ),
+        const SizedBox(
+          width:
+          11,
+        ),
+        Text(
+          label,
+          style:
+          AppTextStyles.secondary.copyWith(
+            color:
+            _textColor,
+            fontWeight:
+            FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleProfileMenuAction(
+      _ProfileMenuAction action,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    final List<Skill> offeredSkills =
+    _getOfferedSkills();
+
+    final List<Skill> wantedSkills =
+    _getWantedSkills();
+
+    switch (action) {
+      case _ProfileMenuAction.message:
+        await _openConversation(
+          offeredSkills,
+          wantedSkills,
+        );
+        return;
+
+      case _ProfileMenuAction.requestSwap:
+        await _openSwapRequest(
+          offeredSkills,
+        );
+        return;
+
+      case _ProfileMenuAction.copyProfile:
+        await _copyProfileSummary(
+          offeredSkills,
+          wantedSkills,
+        );
+        return;
+    }
+  }
+
+  Future<void> _copyProfileSummary(
+      List<Skill> offeredSkills,
+      List<Skill> wantedSkills,
+      ) async {
+    final String offered =
+    offeredSkills.isEmpty
+        ? 'None listed'
+        : offeredSkills
+        .map(
+          (
+          Skill skill,
+          ) =>
+      skill.title,
+    )
+        .join(
+      ', ',
+    );
+
+    final String wanted =
+    wantedSkills.isEmpty
+        ? 'None listed'
+        : wantedSkills
+        .map(
+          (
+          Skill skill,
+          ) =>
+      skill.title,
+    )
+        .join(
+      ', ',
+    );
+
+    final String summary =
+        '${user.name}\n'
+        '${user.city}\n'
+        'Rating: ${user.rating.toStringAsFixed(1)} '
+        '(${user.reviewCount} reviews)\n'
+        'Completed swaps: ${user.completedSwaps}\n'
+        'Skills offered: $offered\n'
+        'Wants to learn: $wanted\n'
+        'Availability: ${user.availability}\n'
+        'Preferred mode: ${user.preferredMode}';
+
+    try {
+      await Clipboard.setData(
+        ClipboardData(
+          text:
+          summary,
+        ),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '${user.name}\'s profile summary copied.',
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Profile summary could not be copied.',
+      );
+    }
   }
 
   // ============================================================
@@ -407,33 +709,10 @@ class _UserProfileScreenState
   Widget _buildProfileHeader() {
     return Row(
       children: [
-        Container(
-          width:
+        _buildProfileAvatar(
+          user,
+          size:
           78,
-          height:
-          78,
-          decoration:
-          const BoxDecoration(
-            color:
-            AppTheme.accent,
-            shape:
-            BoxShape.circle,
-          ),
-          alignment:
-          Alignment.center,
-          child:
-          Text(
-            user.initials,
-            style:
-            const TextStyle(
-              fontSize:
-              20,
-              fontWeight:
-              FontWeight.w800,
-              color:
-              Colors.white,
-            ),
-          ),
         ),
 
         const SizedBox(
@@ -442,8 +721,7 @@ class _UserProfileScreenState
         ),
 
         Expanded(
-          child:
-          Column(
+          child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -471,15 +749,12 @@ class _UserProfileScreenState
                     color:
                     _mutedColor,
                   ),
-
                   const SizedBox(
                     width:
                     4,
                   ),
-
                   Expanded(
-                    child:
-                    Text(
+                    child: Text(
                       user.city,
                       style:
                       AppTextStyles.secondary
@@ -506,12 +781,10 @@ class _UserProfileScreenState
                     color:
                     AppTheme.accent,
                   ),
-
                   const SizedBox(
                     width:
                     3,
                   ),
-
                   Text(
                     user.rating.toStringAsFixed(
                       1,
@@ -525,12 +798,10 @@ class _UserProfileScreenState
                       FontWeight.w700,
                     ),
                   ),
-
                   const SizedBox(
                     width:
                     5,
                   ),
-
                   Text(
                     '(${user.reviewCount} reviews)',
                     style:
@@ -557,6 +828,133 @@ class _UserProfileScreenState
     );
   }
 
+  Widget _buildProfileAvatar(
+      User profileUser, {
+        required double size,
+      }) {
+    final String? path =
+    profileUser.profileImagePath?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child: hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder:
+              (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              profileUser,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          profileUser,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      User profileUser, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        profileUser.initials,
+        style: TextStyle(
+          fontSize:
+          size >= 70
+              ? 20
+              : 16,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewerAvatar(
+      User? reviewer, {
+        required double size,
+      }) {
+    if (reviewer != null) {
+      return _buildProfileAvatar(
+        reviewer,
+        size:
+        size,
+      );
+    }
+
+    return ClipOval(
+      child: Container(
+        width:
+        size,
+        height:
+        size,
+        color:
+        AppTheme.accent,
+        alignment:
+        Alignment.center,
+        child: const Icon(
+          Icons.person_rounded,
+          color:
+          Colors.white,
+          size:
+          18,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ============================================================
   // STATS
   // ============================================================
@@ -565,34 +963,27 @@ class _UserProfileScreenState
     return Row(
       children: [
         Expanded(
-          child:
-          _statBox(
+          child: _statBox(
             '${user.completedSwaps}',
             'Completed swaps',
           ),
         ),
-
         const SizedBox(
           width:
           10,
         ),
-
         Expanded(
-          child:
-          _statBox(
+          child: _statBox(
             '${user.responseRate}%',
             'Response rate',
           ),
         ),
-
         const SizedBox(
           width:
           10,
         ),
-
         Expanded(
-          child:
-          _statBox(
+          child: _statBox(
             user.memberSince,
             'Member since',
           ),
@@ -627,8 +1018,7 @@ class _UserProfileScreenState
           _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         children: [
           Text(
             value,
@@ -639,12 +1029,10 @@ class _UserProfileScreenState
               _textColor,
             ),
           ),
-
           const SizedBox(
             height:
             4,
           ),
-
           Text(
             label,
             textAlign:
@@ -685,48 +1073,41 @@ class _UserProfileScreenState
           _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         children: [
           _infoRow(
             Icons.language_rounded,
             'Languages',
             user.language,
           ),
-
           Divider(
             height:
             22,
             color:
             _borderColor,
           ),
-
           _infoRow(
             Icons.schedule_rounded,
             'Availability',
             user.availability,
           ),
-
           Divider(
             height:
             22,
             color:
             _borderColor,
           ),
-
           _infoRow(
             Icons.devices_rounded,
             'Preferred mode',
             user.preferredMode,
           ),
-
           Divider(
             height:
             22,
             color:
             _borderColor,
           ),
-
           _infoRow(
             Icons.school_outlined,
             'Teaching style',
@@ -753,15 +1134,12 @@ class _UserProfileScreenState
           color:
           _primaryColor,
         ),
-
         const SizedBox(
           width:
           10,
         ),
-
         Expanded(
-          child:
-          Column(
+          child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -774,12 +1152,10 @@ class _UserProfileScreenState
                   _mutedColor,
                 ),
               ),
-
               const SizedBox(
                 height:
                 3,
               ),
-
               Text(
                 value,
                 style:
@@ -824,8 +1200,7 @@ class _UserProfileScreenState
           20,
         ),
       ),
-      child:
-      Text(
+      child: Text(
         skill,
         style:
         AppTextStyles.secondary
@@ -899,8 +1274,7 @@ class _UserProfileScreenState
           _trustBorderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -915,34 +1289,28 @@ class _UserProfileScreenState
               _textColor,
             ),
           ),
-
           const SizedBox(
             height:
             10,
           ),
-
           if (user.emailVerified)
             _trustRow(
               'Email verified',
             ),
-
           if (user.emailVerified)
             const SizedBox(
               height:
               7,
             ),
-
           if (user.profileCompleted)
             _trustRow(
               'Profile completed',
             ),
-
           if (user.profileCompleted)
             const SizedBox(
               height:
               7,
             ),
-
           _trustRow(
             '${user.completedSwaps} completed exchanges',
           ),
@@ -963,15 +1331,12 @@ class _UserProfileScreenState
           color:
           AppTheme.success,
         ),
-
         const SizedBox(
           width:
           7,
         ),
-
         Expanded(
-          child:
-          Text(
+          child: Text(
             text,
             style:
             AppTextStyles.secondary
@@ -986,6 +1351,591 @@ class _UserProfileScreenState
   }
 
   // ============================================================
+  // REVIEWS
+  // ============================================================
+
+  Widget _buildReviewsSection() {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Reviews',
+                style:
+                AppTextStyles.cardTitle
+                    .copyWith(
+                  color:
+                  _textColor,
+                ),
+              ),
+            ),
+            if (!_isLoadingReviews &&
+                _reviewsError == null &&
+                _reviews.isNotEmpty)
+              Row(
+                mainAxisSize:
+                MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size:
+                    17,
+                    color:
+                    AppTheme.accent,
+                  ),
+                  const SizedBox(
+                    width:
+                    4,
+                  ),
+                  Text(
+                    user.rating.toStringAsFixed(
+                      1,
+                    ),
+                    style:
+                    AppTextStyles.secondary
+                        .copyWith(
+                      color:
+                      _textColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+
+        const SizedBox(
+          height:
+          12,
+        ),
+
+        if (_isLoadingReviews)
+          _buildReviewsLoadingState()
+        else if (_reviewsError != null)
+          _buildReviewsErrorState()
+        else if (_reviews.isEmpty)
+            _buildNoReviewsState()
+          else
+            _buildReviewList(),
+      ],
+    );
+  }
+
+  Widget _buildReviewsLoadingState() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        18,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width:
+            18,
+            height:
+            18,
+            child: CircularProgressIndicator(
+              strokeWidth:
+              2,
+              color:
+              _primaryColor,
+            ),
+          ),
+          const SizedBox(
+            width:
+            12,
+          ),
+          Text(
+            'Loading reviews...',
+            style:
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewsErrorState() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size:
+            28,
+            color:
+            _mutedColor,
+          ),
+          const SizedBox(
+            height:
+            8,
+          ),
+          Text(
+            _reviewsError ??
+                'Reviews could not be loaded.',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor,
+            ),
+          ),
+          const SizedBox(
+            height:
+            10,
+          ),
+          TextButton.icon(
+            onPressed:
+            _loadReviews,
+            icon:
+            const Icon(
+              Icons.refresh_rounded,
+              size:
+              18,
+            ),
+            label:
+            const Text(
+              'TRY AGAIN',
+              style:
+              AppTextStyles.button,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoReviewsState() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        18,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width:
+            44,
+            height:
+            44,
+            decoration:
+            BoxDecoration(
+              color:
+              _softPrimaryColor,
+              borderRadius:
+              BorderRadius.circular(
+                13,
+              ),
+            ),
+            child: Icon(
+              Icons.reviews_outlined,
+              color:
+              _primaryColor,
+              size:
+              22,
+            ),
+          ),
+          const SizedBox(
+            width:
+            12,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No written reviews yet',
+                  style:
+                  AppTextStyles.cardTitle
+                      .copyWith(
+                    fontSize:
+                    14,
+                    color:
+                    _textColor,
+                  ),
+                ),
+                const SizedBox(
+                  height:
+                  3,
+                ),
+                Text(
+                  user.reviewCount > 0
+                      ? 'This profile has historical rating data, but no individual written reviews are stored on this device yet.'
+                      : 'Reviews will appear after completed skill exchanges.',
+                  style:
+                  AppTextStyles.bodyMuted
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewList() {
+    final List<Review> visibleReviews =
+    _showAllReviews
+        ? _reviews
+        : _reviews
+        .take(
+      3,
+    )
+        .toList();
+
+    return Column(
+      children: [
+        for (int index = 0;
+        index < visibleReviews.length;
+        index++) ...[
+          _buildReviewCard(
+            visibleReviews[index],
+          ),
+          if (index <
+              visibleReviews.length - 1)
+            const SizedBox(
+              height:
+              10,
+            ),
+        ],
+
+        if (_reviews.length > 3) ...[
+          const SizedBox(
+            height:
+            10,
+          ),
+          SizedBox(
+            width:
+            double.infinity,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showAllReviews =
+                  !_showAllReviews;
+                });
+              },
+              icon: Icon(
+                _showAllReviews
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+                size:
+                19,
+              ),
+              label: Text(
+                _showAllReviews
+                    ? 'SHOW FEWER REVIEWS'
+                    : 'SHOW ALL ${_reviews.length} REVIEWS',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReviewCard(
+      Review review,
+      ) {
+    final User? reviewer =
+    _repository.findUserById(
+      review.reviewerUserId,
+    );
+
+    final String reviewerName =
+    reviewer?.name.trim().isNotEmpty ==
+        true
+        ? reviewer!.name.trim()
+        : 'TubiLearn member';
+
+    final String? comment =
+    review.comment?.trim();
+
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildReviewerAvatar(
+                reviewer,
+                size:
+                42,
+              ),
+              const SizedBox(
+                width:
+                11,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reviewerName,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        fontSize:
+                        14,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+                    const SizedBox(
+                      height:
+                      4,
+                    ),
+                    Row(
+                      children: [
+                        _buildStarRating(
+                          review.rating,
+                        ),
+                        const SizedBox(
+                          width:
+                          8,
+                        ),
+                        Expanded(
+                          child: Text(
+                            _formatReviewDate(
+                              review.createdAt,
+                            ),
+                            maxLines:
+                            1,
+                            overflow:
+                            TextOverflow.ellipsis,
+                            style:
+                            AppTextStyles.caption
+                                .copyWith(
+                              color:
+                              _mutedColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (comment != null &&
+              comment.isNotEmpty) ...[
+            const SizedBox(
+              height:
+              12,
+            ),
+            Text(
+              comment,
+              style:
+              AppTextStyles.bodyMuted
+                  .copyWith(
+                color:
+                _textColor,
+                height:
+                1.45,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarRating(
+      int rating,
+      ) {
+    return Row(
+      mainAxisSize:
+      MainAxisSize.min,
+      children:
+      List<Widget>.generate(
+        5,
+            (
+            int index,
+            ) {
+          final bool filled =
+              index <
+                  rating;
+
+          return Icon(
+            filled
+                ? Icons.star_rounded
+                : Icons.star_border_rounded,
+            size:
+            16,
+            color:
+            filled
+                ? AppTheme.accent
+                : _mutedColor,
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatReviewDate(
+      DateTime date,
+      ) {
+    final DateTime local =
+    date.toLocal();
+
+    final DateTime now =
+    DateTime.now();
+
+    final DateTime today =
+    DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    final DateTime reviewDay =
+    DateTime(
+      local.year,
+      local.month,
+      local.day,
+    );
+
+    final int difference =
+        today
+            .difference(
+          reviewDay,
+        )
+            .inDays;
+
+    if (difference == 0) {
+      return 'Today';
+    }
+
+    if (difference == 1) {
+      return 'Yesterday';
+    }
+
+    if (difference > 1 &&
+        difference < 7) {
+      return '$difference days ago';
+    }
+
+    const List<String> months =
+    <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    if (local.year ==
+        now.year) {
+      return '${months[local.month - 1]} ${local.day}';
+    }
+
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
+  }
+
+  // ============================================================
   // ACTION BUTTONS
   // ============================================================
 
@@ -996,12 +1946,10 @@ class _UserProfileScreenState
     return Row(
       children: [
         Expanded(
-          child:
-          SizedBox(
+          child: SizedBox(
             height:
             46,
-            child:
-            OutlinedButton.icon(
+            child: OutlinedButton.icon(
               onPressed:
               _hasPendingAction
                   ? null
@@ -1027,12 +1975,12 @@ class _UserProfileScreenState
                 ),
               )
                   : const Icon(
-                Icons.chat_bubble_outline_rounded,
+                Icons
+                    .chat_bubble_outline_rounded,
                 size:
                 16,
               ),
-              label:
-              Text(
+              label: Text(
                 _isOpeningConversation
                     ? 'OPENING...'
                     : 'MESSAGE',
@@ -1070,12 +2018,10 @@ class _UserProfileScreenState
         ),
 
         Expanded(
-          child:
-          SizedBox(
+          child: SizedBox(
             height:
             46,
-            child:
-            ElevatedButton.icon(
+            child: ElevatedButton.icon(
               onPressed:
               _hasPendingAction
                   ? null
@@ -1104,8 +2050,7 @@ class _UserProfileScreenState
                 size:
                 17,
               ),
-              label:
-              Text(
+              label: Text(
                 _isOpeningSwapRequest
                     ? 'OPENING...'
                     : 'REQUEST SWAP',
@@ -1391,8 +2336,7 @@ class _UserProfileScreenState
               18,
             ),
           ),
-          title:
-          Row(
+          title: Row(
             children: [
               Container(
                 width:
@@ -1406,8 +2350,7 @@ class _UserProfileScreenState
                   shape:
                   BoxShape.circle,
                 ),
-                child:
-                Icon(
+                child: Icon(
                   Icons.history_rounded,
                   color:
                   _primaryColor,
@@ -1415,15 +2358,12 @@ class _UserProfileScreenState
                   21,
                 ),
               ),
-
               const SizedBox(
                 width:
                 12,
               ),
-
               Expanded(
-                child:
-                Text(
+                child: Text(
                   'Previous chat found',
                   style:
                   AppTextStyles.cardTitle
@@ -1435,8 +2375,7 @@ class _UserProfileScreenState
               ),
             ],
           ),
-          content:
-          Text(
+          content: Text(
             'You previously removed your conversation with ${user.name}. '
                 'You can restore that chat and its messages, or start a fresh conversation.',
             style:
@@ -1462,8 +2401,7 @@ class _UserProfileScreenState
                   _PreviousConversationAction.cancel,
                 );
               },
-              child:
-              Text(
+              child: Text(
                 'CANCEL',
                 style:
                 AppTextStyles.button
@@ -1473,7 +2411,6 @@ class _UserProfileScreenState
                 ),
               ),
             ),
-
             TextButton.icon(
               onPressed: () {
                 Navigator.of(
@@ -1500,7 +2437,6 @@ class _UserProfileScreenState
                 _primaryColor,
               ),
             ),
-
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(
@@ -1553,7 +2489,7 @@ class _UserProfileScreenState
   }
 
   // ============================================================
-  // MESSAGE FEEDBACK
+  // FEEDBACK
   // ============================================================
 
   void _showMessage(

@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
 import '../model/user.dart';
 import '../services/current_user_service.dart';
+import '../services/profile_image_service.dart';
 import '../theme/app_theme.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -26,6 +29,9 @@ class _EditProfileScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
+  final ProfileImageService _profileImageService =
+      ProfileImageService.instance;
+
   final TextEditingController _nameController =
   TextEditingController();
 
@@ -47,8 +53,11 @@ class _EditProfileScreenState
   final TextEditingController _teachingStyleController =
   TextEditingController();
 
+  User? _currentUser;
+
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isUpdatingProfileImage = false;
 
   String? _loadError;
 
@@ -72,6 +81,13 @@ class _EditProfileScreenState
       Theme.of(context)
           .colorScheme
           .outlineVariant;
+
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
+  bool get _isBusy =>
+      _isSaving ||
+          _isUpdatingProfileImage;
 
   @override
   void initState() {
@@ -118,6 +134,9 @@ class _EditProfileScreenState
       if (!mounted) {
         return;
       }
+
+      _currentUser =
+          user;
 
       _nameController.text =
           user.name;
@@ -180,7 +199,7 @@ class _EditProfileScreenState
   // ============================================================
 
   Future<void> _saveProfile() async {
-    if (_isSaving ||
+    if (_isBusy ||
         _isLoading) {
       return;
     }
@@ -202,6 +221,7 @@ class _EditProfileScreenState
     });
 
     try {
+      final User updatedUser =
       await _repository.updateCurrentUserProfile(
         name:
         _nameController.text,
@@ -218,6 +238,9 @@ class _EditProfileScreenState
         teachingStyle:
         _teachingStyleController.text,
       );
+
+      _currentUser =
+          updatedUser;
 
       if (!mounted) {
         return;
@@ -253,6 +276,492 @@ class _EditProfileScreenState
   }
 
   // ============================================================
+  // PROFILE IMAGE OPTIONS
+  // ============================================================
+
+  Future<void> _openProfileImageOptions() async {
+    if (_isBusy) {
+      return;
+    }
+
+    final User? user =
+        _currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    final bool hasPhoto =
+    _hasUsableProfileImage(
+      user,
+    );
+
+    final String? action =
+    await showModalBottomSheet<String>(
+      context:
+      context,
+      backgroundColor:
+      _surfaceColor,
+      showDragHandle:
+      true,
+      builder:
+          (
+          BuildContext sheetContext,
+          ) {
+        return SafeArea(
+          child: Padding(
+            padding:
+            const EdgeInsets.fromLTRB(
+              12,
+              0,
+              12,
+              14,
+            ),
+            child: Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(
+                    Icons.photo_library_outlined,
+                    color:
+                    _primaryColor,
+                  ),
+                  title: Text(
+                    hasPhoto
+                        ? 'Change profile photo'
+                        : 'Choose profile photo',
+                    style: TextStyle(
+                      color:
+                      _textColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Select a photo from your gallery',
+                    style: TextStyle(
+                      color:
+                      _mutedColor,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      sheetContext,
+                      'choose',
+                    );
+                  },
+                ),
+                if (hasPhoto)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color:
+                      AppTheme.error,
+                    ),
+                    title: const Text(
+                      'Remove profile photo',
+                      style: TextStyle(
+                        color:
+                        AppTheme.error,
+                        fontWeight:
+                        FontWeight.w700,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(
+                        sheetContext,
+                        'remove',
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted ||
+        action == null) {
+      return;
+    }
+
+    if (action == 'choose') {
+      await _pickProfileImage();
+      return;
+    }
+
+    if (action == 'remove') {
+      await _confirmRemoveProfileImage();
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingProfileImage = true;
+    });
+
+    try {
+      final User? updatedUser =
+      await _profileImageService
+          .pickAndSaveCurrentUserProfileImage();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (updatedUser == null) {
+        return;
+      }
+
+      setState(() {
+        _currentUser =
+            updatedUser;
+      });
+
+      _showMessage(
+        'Profile photo updated.',
+      );
+    } on ProfileImageServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Profile photo could not be updated. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfileImage = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmRemoveProfileImage() async {
+    if (_isBusy) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context:
+      context,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
+            'Remove profile photo?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content: Text(
+            'Your initials will be shown instead.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: Text(
+                'CANCEL',
+                style:
+                AppTextStyles.button.copyWith(
+                  color:
+                  _mutedColor,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                'REMOVE',
+                style: TextStyle(
+                  color:
+                  AppTheme.error,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true ||
+        !mounted) {
+      return;
+    }
+
+    await _removeProfileImage();
+  }
+
+  Future<void> _removeProfileImage() async {
+    if (_isBusy) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingProfileImage = true;
+    });
+
+    try {
+      final User updatedUser =
+      await _profileImageService
+          .removeCurrentUserProfileImage();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUser =
+            updatedUser;
+      });
+
+      _showMessage(
+        'Profile photo removed.',
+      );
+    } on ProfileImageServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Profile photo could not be removed. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingProfileImage = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // PROFILE IMAGE DISPLAY
+  // ============================================================
+
+  bool _hasUsableProfileImage(
+      User user,
+      ) {
+    final String? path =
+    user.profileImagePath?.trim();
+
+    if (path == null ||
+        path.isEmpty) {
+      return false;
+    }
+
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Widget _buildProfileAvatar({
+    required double size,
+  }) {
+    final User? user =
+        _currentUser;
+
+    final String previewName =
+    _nameController.text
+        .trim()
+        .isEmpty
+        ? user?.name ??
+        'Your Profile'
+        : _nameController.text.trim();
+
+    final String initials =
+    _buildPreviewInitials(
+      previewName,
+    );
+
+    final String? path =
+    user?.profileImagePath?.trim();
+
+    final bool hasImage =
+        user != null &&
+            path != null &&
+            path.isNotEmpty &&
+            _hasUsableProfileImage(
+              user,
+            );
+
+    return Stack(
+      clipBehavior:
+      Clip.none,
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width:
+            size,
+            height:
+            size,
+            child: hasImage
+                ? Image.file(
+              File(
+                path,
+              ),
+              width:
+              size,
+              height:
+              size,
+              fit:
+              BoxFit.cover,
+              errorBuilder:
+                  (
+                  BuildContext context,
+                  Object error,
+                  StackTrace? stackTrace,
+                  ) {
+                return _buildInitialAvatar(
+                  initials,
+                  size:
+                  size,
+                );
+              },
+            )
+                : _buildInitialAvatar(
+              initials,
+              size:
+              size,
+            ),
+          ),
+        ),
+        Positioned(
+          right:
+          -2,
+          bottom:
+          -2,
+          child: Material(
+            color:
+            _primaryColor,
+            shape:
+            const CircleBorder(),
+            elevation:
+            2,
+            child: InkWell(
+              customBorder:
+              const CircleBorder(),
+              onTap:
+              _isBusy
+                  ? null
+                  : _openProfileImageOptions,
+              child: SizedBox(
+                width:
+                28,
+                height:
+                28,
+                child: Center(
+                  child: _isUpdatingProfileImage
+                      ? const SizedBox(
+                    width:
+                    13,
+                    height:
+                    13,
+                    child:
+                    CircularProgressIndicator(
+                      strokeWidth:
+                      2,
+                      color:
+                      Colors.white,
+                    ),
+                  )
+                      : const Icon(
+                    Icons.camera_alt_rounded,
+                    size:
+                    15,
+                    color:
+                    Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      String initials, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontSize:
+          size >= 58
+              ? 17
+              : 14,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
   // BUILD
   // ============================================================
 
@@ -262,7 +771,7 @@ class _EditProfileScreenState
       ) {
     return PopScope(
       canPop:
-      !_isSaving,
+      !_isBusy,
       child: Scaffold(
         backgroundColor:
         Theme.of(context)
@@ -273,14 +782,17 @@ class _EditProfileScreenState
               .scaffoldBackgroundColor,
           surfaceTintColor:
           Colors.transparent,
-          elevation: 0,
+          elevation:
+          0,
           title: Text(
             'Edit Profile',
             style: TextStyle(
-              fontSize: 19,
+              fontSize:
+              19,
               fontWeight:
               FontWeight.w800,
-              color: _textColor,
+              color:
+              _textColor,
             ),
           ),
         ),
@@ -304,9 +816,9 @@ class _EditProfileScreenState
 
     return SafeArea(
       child: Form(
-        key: _formKey,
-        child:
-        SingleChildScrollView(
+        key:
+        _formKey,
+        child: SingleChildScrollView(
           physics:
           const BouncingScrollPhysics(),
           padding:
@@ -323,7 +835,15 @@ class _EditProfileScreenState
               _buildHeaderCard(),
 
               const SizedBox(
-                height: 24,
+                height:
+                14,
+              ),
+
+              _buildEditingHint(),
+
+              const SizedBox(
+                height:
+                24,
               ),
 
               Text(
@@ -337,7 +857,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 12,
+                height:
+                12,
               ),
 
               _buildTextField(
@@ -348,14 +869,14 @@ class _EditProfileScreenState
                 hint:
                 'Enter your name',
                 icon:
-                Icons
-                    .person_outline_rounded,
+                Icons.person_outline_rounded,
                 maxLength:
                 80,
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildTextField(
@@ -366,14 +887,14 @@ class _EditProfileScreenState
                 hint:
                 'Enter your city',
                 icon:
-                Icons
-                    .location_on_outlined,
+                Icons.location_on_outlined,
                 maxLength:
                 100,
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildTextField(
@@ -392,7 +913,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 24,
+                height:
+                24,
               ),
 
               Text(
@@ -406,7 +928,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 12,
+                height:
+                12,
               ),
 
               _buildTextField(
@@ -423,7 +946,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildTextField(
@@ -440,7 +964,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildTextField(
@@ -457,7 +982,8 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 14,
+                height:
+                14,
               ),
 
               _buildTextField(
@@ -474,24 +1000,28 @@ class _EditProfileScreenState
               ),
 
               const SizedBox(
-                height: 28,
+                height:
+                28,
               ),
 
               SizedBox(
                 width:
                 double.infinity,
-                height: 48,
+                height:
+                48,
                 child:
                 ElevatedButton.icon(
                   onPressed:
-                  _isSaving
+                  _isBusy
                       ? null
                       : _saveProfile,
                   icon:
                   _isSaving
                       ? const SizedBox(
-                    width: 18,
-                    height: 18,
+                    width:
+                    18,
+                    height:
+                    18,
                     child:
                     CircularProgressIndicator(
                       strokeWidth:
@@ -501,11 +1031,12 @@ class _EditProfileScreenState
                     ),
                   )
                       : const Icon(
-                    Icons
-                        .save_outlined,
-                    size: 19,
+                    Icons.save_outlined,
+                    size:
+                    19,
                   ),
-                  label: Text(
+                  label:
+                  Text(
                     _isSaving
                         ? 'SAVING...'
                         : 'SAVE PROFILE',
@@ -522,7 +1053,8 @@ class _EditProfileScreenState
                     _surfaceVariantColor,
                     disabledForegroundColor:
                     _mutedColor,
-                    elevation: 0,
+                    elevation:
+                    0,
                     shape:
                     RoundedRectangleBorder(
                       borderRadius:
@@ -545,18 +1077,6 @@ class _EditProfileScreenState
   // ============================================================
 
   Widget _buildHeaderCard() {
-    final String previewName =
-    _nameController.text
-        .trim()
-        .isEmpty
-        ? 'Your Profile'
-        : _nameController.text.trim();
-
-    final String initials =
-    _buildPreviewInitials(
-      previewName,
-    );
-
     return Container(
       width:
       double.infinity,
@@ -580,35 +1100,14 @@ class _EditProfileScreenState
       ),
       child: Row(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration:
-            const BoxDecoration(
-              color:
-              Color(
-                0xFFFFAA45,
-              ),
-              shape:
-              BoxShape.circle,
-            ),
-            alignment:
-            Alignment.center,
-            child: Text(
-              initials,
-              style:
-              const TextStyle(
-                fontSize: 17,
-                fontWeight:
-                FontWeight.w800,
-                color:
-                Colors.white,
-              ),
-            ),
+          _buildProfileAvatar(
+            size:
+            62,
           ),
 
           const SizedBox(
-            width: 14,
+            width:
+            16,
           ),
 
           Expanded(
@@ -627,11 +1126,12 @@ class _EditProfileScreenState
                 ),
 
                 const SizedBox(
-                  height: 4,
+                  height:
+                  4,
                 ),
 
                 Text(
-                  'Clear profile details help other learners understand how and when you prefer to exchange skills.',
+                  'Tap your photo to change it, then update any profile details below.',
                   style:
                   AppTextStyles.bodyMuted
                       .copyWith(
@@ -640,6 +1140,74 @@ class _EditProfileScreenState
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // EDITING HINT
+  // ============================================================
+
+  Widget _buildEditingHint() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal:
+        14,
+        vertical:
+        11,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _primaryColor.withValues(
+          alpha:
+          0.10,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          13,
+        ),
+        border:
+        Border.all(
+          color:
+          _primaryColor.withValues(
+            alpha:
+            0.25,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.edit_rounded,
+            size:
+            18,
+            color:
+            _primaryColor,
+          ),
+
+          const SizedBox(
+            width:
+            9,
+          ),
+
+          Expanded(
+            child: Text(
+              'Tap any field below to edit your information.',
+              style:
+              AppTextStyles.secondary
+                  .copyWith(
+                color:
+                _textColor,
+                fontWeight:
+                FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -663,7 +1231,7 @@ class _EditProfileScreenState
       controller:
       controller,
       enabled:
-      !_isSaving,
+      !_isBusy,
       maxLength:
       maxLength,
       maxLines:
@@ -672,9 +1240,13 @@ class _EditProfileScreenState
       maxLines > 1
           ? 3
           : 1,
+      cursorColor:
+      _primaryColor,
       style: TextStyle(
         color:
         _textColor,
+        fontWeight:
+        FontWeight.w500,
       ),
       textCapitalization:
       TextCapitalization.sentences,
@@ -684,10 +1256,14 @@ class _EditProfileScreenState
         label,
         hintText:
         hint,
+        floatingLabelBehavior:
+        FloatingLabelBehavior.always,
         labelStyle:
         TextStyle(
           color:
-          _mutedColor,
+          _primaryColor,
+          fontWeight:
+          FontWeight.w600,
         ),
         hintStyle:
         TextStyle(
@@ -698,8 +1274,17 @@ class _EditProfileScreenState
         Icon(
           icon,
           color:
-          AppTheme.primary,
-          size: 20,
+          _primaryColor,
+          size:
+          20,
+        ),
+        suffixIcon:
+        Icon(
+          Icons.edit_outlined,
+          color:
+          _mutedColor,
+          size:
+          18,
         ),
         alignLabelWithHint:
         maxLines > 1,
@@ -708,8 +1293,7 @@ class _EditProfileScreenState
         fillColor:
         _surfaceColor,
         counterStyle:
-        AppTextStyles.caption
-            .copyWith(
+        AppTextStyles.caption.copyWith(
           color:
           _mutedColor,
         ),
@@ -735,6 +1319,8 @@ class _EditProfileScreenState
           BorderSide(
             color:
             _borderColor,
+            width:
+            1.2,
           ),
         ),
         disabledBorder:
@@ -756,11 +1342,37 @@ class _EditProfileScreenState
             14,
           ),
           borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
+            width:
+            2,
+          ),
+        ),
+        errorBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
           const BorderSide(
             color:
-            AppTheme.primary,
+            AppTheme.error,
+          ),
+        ),
+        focusedErrorBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          const BorderSide(
+            color:
+            AppTheme.error,
             width:
-            1.4,
+            2,
           ),
         ),
       ),
@@ -809,15 +1421,16 @@ class _EditProfileScreenState
           MainAxisSize.min,
           children: [
             Icon(
-              Icons
-                  .error_outline_rounded,
-              size: 42,
+              Icons.error_outline_rounded,
+              size:
+              42,
               color:
               _mutedColor,
             ),
 
             const SizedBox(
-              height: 12,
+              height:
+              12,
             ),
 
             Text(
@@ -826,15 +1439,15 @@ class _EditProfileScreenState
               textAlign:
               TextAlign.center,
               style:
-              AppTextStyles.bodyMuted
-                  .copyWith(
+              AppTextStyles.bodyMuted.copyWith(
                 color:
                 _mutedColor,
               ),
             ),
 
             const SizedBox(
-              height: 16,
+              height:
+              16,
             ),
 
             OutlinedButton.icon(
@@ -867,7 +1480,7 @@ class _EditProfileScreenState
   }
 
   // ============================================================
-  // PREVIEW INITIALS
+  // INITIALS
   // ============================================================
 
   String _buildPreviewInitials(
@@ -898,8 +1511,7 @@ class _EditProfileScreenState
           parts.first;
 
       if (part.length == 1) {
-        return part
-            .toUpperCase();
+        return part.toUpperCase();
       }
 
       return part

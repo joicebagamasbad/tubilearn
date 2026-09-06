@@ -5,6 +5,7 @@ import '../model/swap_request.dart';
 import '../model/user.dart';
 
 import '../services/current_user_service.dart';
+import '../services/review_service.dart';
 import '../services/swap_service.dart';
 
 import '../theme/app_theme.dart';
@@ -30,6 +31,9 @@ class _SwapRequestsScreenState
   final SwapService _swapService =
       SwapService.instance;
 
+  final ReviewService _reviewService =
+      ReviewService.instance;
+
   String _selectedFilter = 'All';
 
   bool _isLoading = true;
@@ -38,6 +42,9 @@ class _SwapRequestsScreenState
 
   final Set<String> _processingRequestIds =
   <String>{};
+
+  final Map<String, bool> _reviewedRequests =
+  <String, bool>{};
 
   final List<String> _filters = const [
     'All',
@@ -110,6 +117,8 @@ class _SwapRequestsScreenState
     try {
       await _swapService.initialize();
 
+      await _loadReviewStatuses();
+
       if (!mounted) {
         return;
       }
@@ -119,6 +128,15 @@ class _SwapRequestsScreenState
         _loadError = null;
       });
     } on SwapServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } on ReviewServiceException catch (error) {
       if (!mounted) {
         return;
       }
@@ -140,11 +158,47 @@ class _SwapRequestsScreenState
     }
   }
 
+  Future<void> _loadReviewStatuses() async {
+    final List<SwapRequest> completedRequests =
+    _swapService.requests
+        .where(
+          (
+          SwapRequest request,
+          ) =>
+      request.status ==
+          SwapRequestStatus.completed &&
+          request.hasStableIdentity &&
+          request.involvesUser(
+            _currentUserId,
+          ),
+    )
+        .toList();
+
+    final Map<String, bool> loaded =
+    <String, bool>{};
+
+    for (final SwapRequest request
+    in completedRequests) {
+      loaded[request.id] =
+      await _reviewService.hasReviewedSwap(
+        request.id,
+      );
+    }
+
+    _reviewedRequests
+      ..clear()
+      ..addAll(
+        loaded,
+      );
+  }
+
   List<SwapRequest> get _filteredRequests {
     final List<SwapRequest> requests =
     _swapService.requests
         .where(
-          (SwapRequest request) =>
+          (
+          SwapRequest request,
+          ) =>
           request.involvesUser(
             _currentUserId,
           ),
@@ -166,7 +220,9 @@ class _SwapRequestsScreenState
     }
 
     return requests.where(
-          (SwapRequest request) {
+          (
+          SwapRequest request,
+          ) {
         switch (_selectedFilter) {
           case 'Pending':
             return request.status ==
@@ -904,6 +960,63 @@ class _SwapRequestsScreenState
             ),
           ],
 
+          if (request.status ==
+              SwapRequestStatus.completed &&
+              _reviewedRequests[
+              request.id] ==
+                  true) ...[
+            const SizedBox(
+              height:
+              10,
+            ),
+            Container(
+              width:
+              double.infinity,
+              padding:
+              const EdgeInsets.all(
+                10,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _softPrimaryColor,
+                borderRadius:
+                BorderRadius.circular(
+                  10,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    size:
+                    18,
+                    color:
+                    _primaryColor,
+                  ),
+                  const SizedBox(
+                    width:
+                    7,
+                  ),
+                  Expanded(
+                    child: Text(
+                      'You reviewed this swap partner.',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        11.5,
+                        fontWeight:
+                        FontWeight.w600,
+                        color:
+                        _primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           if (request.note != null &&
               request.note!
                   .trim()
@@ -990,9 +1103,26 @@ class _SwapRequestsScreenState
         request.canComplete(
           _currentUserId,
         ) ||
+        _canReview(
+          request,
+        ) ||
         _canRemoveFromHistory(
           request,
         );
+  }
+
+  bool _canReview(
+      SwapRequest request,
+      ) {
+    return request.status ==
+        SwapRequestStatus.completed &&
+        request.hasStableIdentity &&
+        request.involvesUser(
+          _currentUserId,
+        ) &&
+        _reviewedRequests[
+        request.id] !=
+            true;
   }
 
   bool _canRemoveFromHistory(
@@ -1037,12 +1167,10 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
-
           const SizedBox(
             width:
             10,
           ),
-
           Expanded(
             child:
             ElevatedButton(
@@ -1068,39 +1196,35 @@ class _SwapRequestsScreenState
         SwapRequestStatus.accepted) {
       return Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child:
-                OutlinedButton.icon(
-                  onPressed:
-                  blocked
-                      ? null
-                      : () {
-                    _editSchedule(
-                      request,
-                    );
-                  },
-                  icon:
-                  const Icon(
-                    Icons.edit_calendar_outlined,
-                    size:
-                    18,
-                  ),
-                  label:
-                  const Text(
-                    'EDIT SCHEDULE',
-                  ),
-                ),
+          SizedBox(
+            width:
+            double.infinity,
+            child:
+            OutlinedButton.icon(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _editSchedule(
+                  request,
+                );
+              },
+              icon:
+              const Icon(
+                Icons.edit_calendar_outlined,
+                size:
+                18,
               ),
-            ],
+              label:
+              const Text(
+                'EDIT SCHEDULE',
+              ),
+            ),
           ),
-
           const SizedBox(
             height:
             9,
           ),
-
           SizedBox(
             width:
             double.infinity,
@@ -1126,7 +1250,6 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
-
           if (isOutgoing &&
               request.canCancel(
                 _currentUserId,
@@ -1174,12 +1297,10 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
-
           const SizedBox(
             height:
             9,
           ),
-
           SizedBox(
             width:
             double.infinity,
@@ -1199,7 +1320,6 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
-
           if (isOutgoing &&
               request.canCancel(
                 _currentUserId,
@@ -1214,6 +1334,80 @@ class _SwapRequestsScreenState
               blocked,
             ),
           ],
+        ],
+      );
+    }
+
+    if (request.status ==
+        SwapRequestStatus.completed) {
+      return Column(
+        children: [
+          if (_canReview(
+            request,
+          ))
+            SizedBox(
+              width:
+              double.infinity,
+              child:
+              ElevatedButton.icon(
+                onPressed:
+                blocked
+                    ? null
+                    : () {
+                  _openReviewDialog(
+                    request,
+                  );
+                },
+                icon:
+                const Icon(
+                  Icons.star_outline_rounded,
+                  size:
+                  19,
+                ),
+                label:
+                const Text(
+                  'RATE SWAP PARTNER',
+                ),
+              ),
+            ),
+          if (_canReview(
+            request,
+          ) &&
+              _canRemoveFromHistory(
+                request,
+              ))
+            const SizedBox(
+              height:
+              9,
+            ),
+          if (_canRemoveFromHistory(
+            request,
+          ))
+            SizedBox(
+              width:
+              double.infinity,
+              child:
+              OutlinedButton.icon(
+                onPressed:
+                blocked
+                    ? null
+                    : () {
+                  _confirmRemoveFromHistory(
+                    request,
+                  );
+                },
+                icon:
+                const Icon(
+                  Icons.archive_outlined,
+                  size:
+                  18,
+                ),
+                label:
+                const Text(
+                  'REMOVE FROM HISTORY',
+                ),
+              ),
+            ),
         ],
       );
     }
@@ -1288,6 +1482,290 @@ class _SwapRequestsScreenState
   }
 
   // ============================================================
+  // REVIEW
+  // ============================================================
+
+  Future<void> _openReviewDialog(
+      SwapRequest request,
+      ) async {
+    if (_processingRequestIds.contains(
+      request.id,
+    )) {
+      return;
+    }
+
+    int selectedRating =
+    0;
+
+    final TextEditingController
+    commentController =
+    TextEditingController();
+
+    final bool? shouldSubmit =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return StatefulBuilder(
+          builder:
+              (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              backgroundColor:
+              _surfaceColor,
+              title:
+              Text(
+                'Rate your swap partner',
+                style:
+                TextStyle(
+                  fontWeight:
+                  FontWeight.w800,
+                  color:
+                  _textColor,
+                ),
+              ),
+              content:
+              SingleChildScrollView(
+                child: Column(
+                  mainAxisSize:
+                  MainAxisSize.min,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'How was your completed skill swap?',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        13,
+                        height:
+                        1.4,
+                        color:
+                        _mutedColor,
+                      ),
+                    ),
+                    const SizedBox(
+                      height:
+                      18,
+                    ),
+                    Row(
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
+                      children:
+                      List<Widget>.generate(
+                        5,
+                            (
+                            int index,
+                            ) {
+                          final int starValue =
+                              index + 1;
+
+                          return IconButton(
+                            onPressed:
+                                () {
+                              setDialogState(() {
+                                selectedRating =
+                                    starValue;
+                              });
+                            },
+                            icon:
+                            Icon(
+                              starValue <=
+                                  selectedRating
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              size:
+                              34,
+                              color:
+                              starValue <=
+                                  selectedRating
+                                  ? const Color(
+                                0xFFF2A65A,
+                              )
+                                  : _mutedColor,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (selectedRating >
+                        0) ...[
+                      const SizedBox(
+                        height:
+                        4,
+                      ),
+                      Center(
+                        child: Text(
+                          '$selectedRating out of 5',
+                          style:
+                          TextStyle(
+                            fontSize:
+                            12,
+                            fontWeight:
+                            FontWeight.w700,
+                            color:
+                            _primaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(
+                      height:
+                      18,
+                    ),
+                    Text(
+                      'Comment (optional)',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+                    const SizedBox(
+                      height:
+                      7,
+                    ),
+                    TextField(
+                      controller:
+                      commentController,
+                      maxLength:
+                      500,
+                      maxLines:
+                      4,
+                      decoration:
+                      const InputDecoration(
+                        hintText:
+                        'Share what went well about the swap...',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      () {
+                    Navigator.pop(
+                      dialogContext,
+                      false,
+                    );
+                  },
+                  child:
+                  const Text(
+                    'CANCEL',
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                  selectedRating <=
+                      0
+                      ? null
+                      : () {
+                    Navigator.pop(
+                      dialogContext,
+                      true,
+                    );
+                  },
+                  child:
+                  const Text(
+                    'SUBMIT REVIEW',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (shouldSubmit !=
+        true) {
+      commentController.dispose();
+      return;
+    }
+
+    final String comment =
+    commentController.text.trim();
+
+    commentController.dispose();
+
+    final String requestId =
+        request.id;
+
+    if (_processingRequestIds.contains(
+      requestId,
+    )) {
+      return;
+    }
+
+    setState(() {
+      _processingRequestIds.add(
+        requestId,
+      );
+    });
+
+    try {
+      await _reviewService.submitReview(
+        swapRequestId:
+        requestId,
+        rating:
+        selectedRating,
+        comment:
+        comment,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reviewedRequests[
+        requestId
+        ] = true;
+      });
+
+      _showMessage(
+        'Review submitted. Thank you!',
+      );
+    } on ReviewServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Review could not be submitted.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingRequestIds.remove(
+            requestId,
+          );
+        });
+      }
+    }
+  }
+
+  // ============================================================
   // EDIT SCHEDULE
   // ============================================================
 
@@ -1318,7 +1796,8 @@ class _SwapRequestsScreenState
     String selectedMode =
         request.mode;
 
-    final TextEditingController detailsController =
+    final TextEditingController
+    detailsController =
     TextEditingController(
       text:
       request.meetingDetails ??
@@ -1403,7 +1882,6 @@ class _SwapRequestsScreenState
                         16,
                       ),
                     ],
-
                     Text(
                       'Date',
                       style:
@@ -1416,12 +1894,10 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       7,
                     ),
-
                     SizedBox(
                       width:
                       double.infinity,
@@ -1489,12 +1965,10 @@ class _SwapRequestsScreenState
                         ),
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       14,
                     ),
-
                     Text(
                       'Time',
                       style:
@@ -1507,12 +1981,10 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       7,
                     ),
-
                     SizedBox(
                       width:
                       double.infinity,
@@ -1551,12 +2023,10 @@ class _SwapRequestsScreenState
                         ),
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       14,
                     ),
-
                     Text(
                       'Session mode',
                       style:
@@ -1569,12 +2039,10 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       8,
                     ),
-
                     Row(
                       children: [
                         Expanded(
@@ -1625,12 +2093,10 @@ class _SwapRequestsScreenState
                         ),
                       ],
                     ),
-
                     const SizedBox(
                       height:
                       14,
                     ),
-
                     Text(
                       selectedMode ==
                           'Online'
@@ -1646,12 +2112,10 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
-
                     const SizedBox(
                       height:
                       7,
                     ),
-
                     TextField(
                       controller:
                       detailsController,
@@ -1671,7 +2135,8 @@ class _SwapRequestsScreenState
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
+                  onPressed:
+                      () {
                     Navigator.pop(
                       dialogContext,
                       false,
@@ -1683,7 +2148,8 @@ class _SwapRequestsScreenState
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed:
+                      () {
                     final String details =
                     detailsController.text
                         .trim();
@@ -2094,7 +2560,8 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   false,
@@ -2106,7 +2573,8 @@ class _SwapRequestsScreenState
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -2213,7 +2681,8 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   false,
@@ -2225,7 +2694,8 @@ class _SwapRequestsScreenState
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -2287,6 +2757,14 @@ class _SwapRequestsScreenState
       successMessage:
       'Swap marked as completed.',
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    _reviewedRequests[
+    request.id
+    ] = false;
   }
 
   Future<void> _confirmRemoveFromHistory(
