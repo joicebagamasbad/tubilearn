@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../model/repositories/swap_repository.dart';
 import '../model/swap_request.dart';
 import 'current_user_service.dart';
@@ -45,6 +47,14 @@ class SwapService {
   final Map<String, Future<SwapRequest>>
   _pendingRestores =
   <String, Future<SwapRequest>>{};
+
+  static const Duration _defaultSessionDuration =
+  Duration(
+    hours: 1,
+  );
+
+  Future<void> _scheduleConfirmationQueue =
+  Future<void>.value();
 
   int _lastRequestIdMicros = 0;
 
@@ -707,23 +717,67 @@ class SwapService {
     required String requestId,
     required String actorUserId,
   }) async {
-    await _performActorTransition(
-      requestId:
-      requestId,
-      actorUserId:
-      actorUserId,
-      target:
-      SwapRequestStatus.scheduled,
-      permission:
-          (
+    await initialize();
+
+    await _runSerializedScheduleConfirmation(
+          () async {
+        final String cleanRequestId =
+        _requireRequestId(
+          requestId,
+        );
+
+        final String actor =
+        _requireCurrentActor(
+          actorUserId,
+        );
+
+        _throwIfRequestHidingOrRestoring(
+          cleanRequestId,
+        );
+
+        await _waitForPendingStatusChange(
+          cleanRequestId,
+        );
+
+        final SwapRequest request =
+        _requireRequest(
+          cleanRequestId,
+        );
+
+        _requireActiveStableRequest(
           request,
+        );
+
+        if (!request.canSchedule(
           actor,
-          ) =>
-          request.canSchedule(
-            actor,
-          ),
-      permissionError:
-      'You are not allowed to schedule this swap request.',
+        )) {
+          throw const SwapServiceException(
+            'You are not allowed to schedule this swap request.',
+          );
+        }
+
+        if (!request.proposedAt.isAfter(
+          DateTime.now(),
+        )) {
+          throw const SwapServiceException(
+            'The proposed schedule has already passed. Edit the schedule first.',
+          );
+        }
+
+        _ensureNoScheduleConflict(
+          request:
+          request,
+          userId:
+          actor,
+        );
+
+        await _changeStatus(
+          request:
+          request,
+          nextStatus:
+          SwapRequestStatus.scheduled,
+        );
+      },
     );
   }
 
@@ -750,6 +804,319 @@ class SwapService {
       'You are not allowed to complete this swap request.',
     );
   }
+
+  // ============================================================
+  // SERIALIZED SCHEDULE CONFIRMATION
+  // ============================================================
+
+  Future<void> _runSerializedScheduleConfirmation(
+      Future<void> Function() action,
+      ) {
+    final Completer<void> release =
+    Completer<void>();
+
+    final Future<void> previous =
+        _scheduleConfirmationQueue;
+
+    _scheduleConfirmationQueue =
+        release.future;
+
+    return _executeSerializedScheduleConfirmation(
+      previous:
+      previous,
+      release:
+      release,
+      action:
+      action,
+    );
+  }
+
+  Future<void> _executeSerializedScheduleConfirmation({
+    required Future<void> previous,
+    required Completer<void> release,
+    required Future<void> Function() action,
+  }) async {
+    try {
+      try {
+        await previous;
+      } catch (_) {}
+
+      await action();
+    } finally {
+      if (!release.isCompleted) {
+        release.complete();
+      }
+    }
+  }
+
+  // ============================================================
+  // SCHEDULE CONFLICT PROTECTION
+  // ============================================================
+
+  void _ensureNoScheduleConflict({
+    required SwapRequest request,
+    required String userId,
+  }) {
+    final DateTime proposedStart =
+        request.proposedAt;
+
+    final DateTime proposedEnd =
+    proposedStart.add(
+      _defaultSessionDuration,
+    );
+
+    for (final SwapRequest existing
+    in _requests) {
+      if (existing.id ==
+          request.id) {
+        continue;
+      }
+
+      if (existing.status !=
+          SwapRequestStatus.scheduled) {
+        continue;
+      }
+
+      if (!existing.involvesUser(
+        userId,
+      )) {
+        continue;
+      }
+
+      final DateTime existingStart =
+          existing.proposedAt;
+
+      final DateTime existingEnd =
+      existingStart.add(
+        _defaultSessionDuration,
+      );
+
+      final bool overlaps =
+          proposedStart.isBefore(
+            existingEnd,
+          ) &&
+              existingStart.isBefore(
+                proposedEnd,
+              );
+
+      if (overlaps) {
+        throw const SwapServiceException(
+          'This schedule overlaps another confirmed session. Please choose a different time.',
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // EDIT / RESCHEDULE
+  // ============================================================
+
+  Future<void> updateSchedule({
+    required String requestId,
+    required String actorUserId,
+    required DateTime proposedAt,
+    required String mode,
+    required String meetingDetails,
+  }) async {
+    await initialize();
+
+    final String cleanRequestId =
+    _requireRequestId(
+      requestId,
+    );
+
+    final String actor =
+    _requireCurrentActor(
+      actorUserId,
+    );
+
+    final String cleanMode =
+    mode.trim();
+
+    final String cleanMeetingDetails =
+    meetingDetails.trim();
+
+    _throwIfRequestHidingOrRestoring(
+      cleanRequestId,
+    );
+
+    await _waitForPendingStatusChange(
+      cleanRequestId,
+    );
+
+    final SwapRequest request =
+    _requireRequest(
+      cleanRequestId,
+    );
+
+    _requireActiveStableRequest(
+      request,
+    );
+
+    if (!request.canEditSchedule(
+      actor,
+    ) &&
+        !request.canReschedule(
+          actor,
+        )) {
+      throw const SwapServiceException(
+        'You are not allowed to edit this session schedule.',
+      );
+    }
+
+    if (!proposedAt.isAfter(
+      DateTime.now(),
+    )) {
+      throw const SwapServiceException(
+        'The proposed schedule must be in the future.',
+      );
+    }
+
+    if (cleanMode != 'Online' &&
+        cleanMode != 'In-person') {
+      throw const SwapServiceException(
+        'Invalid session mode.',
+      );
+    }
+
+    if (cleanMeetingDetails.isEmpty) {
+      throw const SwapServiceException(
+        'Meeting details are required.',
+      );
+    }
+
+    if (cleanMeetingDetails.length >
+        150) {
+      throw const SwapServiceException(
+        'Meeting details must be 150 characters or less.',
+      );
+    }
+
+    final SwapRequestStatus nextStatus =
+        SwapRequestStatus.accepted;
+
+    if (request.status ==
+        SwapRequestStatus.scheduled &&
+        !request.status.canTransitionTo(
+          nextStatus,
+        )) {
+      throw const SwapServiceException(
+        'This scheduled session cannot be moved back for confirmation.',
+      );
+    }
+
+    final Future<void> operation =
+    _updateScheduleInternal(
+      requestId:
+      cleanRequestId,
+      proposedAt:
+      proposedAt,
+      mode:
+      cleanMode,
+      meetingDetails:
+      cleanMeetingDetails,
+      nextStatus:
+      nextStatus,
+    );
+
+    _pendingStatusChanges[
+    cleanRequestId
+    ] = operation;
+
+    try {
+      await operation;
+    } finally {
+      if (identical(
+        _pendingStatusChanges[
+        cleanRequestId
+        ],
+        operation,
+      )) {
+        _pendingStatusChanges.remove(
+          cleanRequestId,
+        );
+      }
+    }
+  }
+
+  Future<void> _updateScheduleInternal({
+    required String requestId,
+    required DateTime proposedAt,
+    required String mode,
+    required String meetingDetails,
+    required SwapRequestStatus nextStatus,
+  }) async {
+    final SwapRequest request =
+    _requireRequest(
+      requestId,
+    );
+
+    _requireActiveStableRequest(
+      request,
+    );
+
+    final DateTime updatedAt =
+    DateTime.now();
+
+    try {
+      await _repository.updateSchedule(
+        requestId:
+        request.id,
+        proposedAt:
+        proposedAt,
+        mode:
+        mode,
+        meetingDetails:
+        meetingDetails,
+        status:
+        nextStatus,
+        updatedAt:
+        updatedAt,
+      );
+    } on SwapRepositoryException catch (_) {
+      throw const SwapServiceException(
+        'Could not update the session schedule. Please try again.',
+      );
+    }
+
+    final SwapRequest updatedRequest =
+    request.copyWith(
+      proposedAt:
+      proposedAt,
+      mode:
+      mode,
+      meetingDetails:
+      meetingDetails,
+      status:
+      nextStatus,
+      updatedAt:
+      updatedAt,
+    );
+
+    final int index =
+    _requests.indexWhere(
+          (
+          SwapRequest item,
+          ) =>
+      item.id ==
+          request.id,
+    );
+
+    if (index < 0) {
+      throw const SwapServiceException(
+        'Swap request not found after schedule update.',
+      );
+    }
+
+    _requests[index] =
+        updatedRequest;
+
+    _sortRequests();
+  }
+
+  // ============================================================
+  // ACTOR TRANSITION
+  // ============================================================
 
   Future<void> _performActorTransition({
     required String requestId,

@@ -867,6 +867,43 @@ class _SwapRequestsScreenState
             ),
           ],
 
+          if (request.status ==
+              SwapRequestStatus.accepted) ...[
+            const SizedBox(
+              height:
+              10,
+            ),
+            Container(
+              width:
+              double.infinity,
+              padding:
+              const EdgeInsets.all(
+                10,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _softPrimaryColor,
+                borderRadius:
+                BorderRadius.circular(
+                  10,
+                ),
+              ),
+              child: Text(
+                'Schedule is awaiting confirmation.',
+                style:
+                TextStyle(
+                  fontSize:
+                  11.5,
+                  fontWeight:
+                  FontWeight.w600,
+                  color:
+                  _primaryColor,
+                ),
+              ),
+            ),
+          ],
+
           if (request.note != null &&
               request.note!
                   .trim()
@@ -939,6 +976,12 @@ class _SwapRequestsScreenState
           _currentUserId,
         ) ||
         request.canCancel(
+          _currentUserId,
+        ) ||
+        request.canEditSchedule(
+          _currentUserId,
+        ) ||
+        request.canReschedule(
           _currentUserId,
         ) ||
         request.canSchedule(
@@ -1021,11 +1064,43 @@ class _SwapRequestsScreenState
       );
     }
 
-    if (request.canSchedule(
-      _currentUserId,
-    )) {
+    if (request.status ==
+        SwapRequestStatus.accepted) {
       return Column(
         children: [
+          Row(
+            children: [
+              Expanded(
+                child:
+                OutlinedButton.icon(
+                  onPressed:
+                  blocked
+                      ? null
+                      : () {
+                    _editSchedule(
+                      request,
+                    );
+                  },
+                  icon:
+                  const Icon(
+                    Icons.edit_calendar_outlined,
+                    size:
+                    18,
+                  ),
+                  label:
+                  const Text(
+                    'EDIT SCHEDULE',
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height:
+            9,
+          ),
+
           SizedBox(
             width:
             double.infinity,
@@ -1070,27 +1145,76 @@ class _SwapRequestsScreenState
       );
     }
 
-    if (request.canComplete(
-      _currentUserId,
-    )) {
-      return SizedBox(
-        width:
-        double.infinity,
-        child:
-        ElevatedButton(
-          onPressed:
-          blocked
-              ? null
-              : () {
-            _confirmComplete(
-              request,
-            );
-          },
-          child:
-          const Text(
-            'MARK AS COMPLETED',
+    if (request.status ==
+        SwapRequestStatus.scheduled) {
+      return Column(
+        children: [
+          SizedBox(
+            width:
+            double.infinity,
+            child:
+            OutlinedButton.icon(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _editSchedule(
+                  request,
+                );
+              },
+              icon:
+              const Icon(
+                Icons.update_rounded,
+                size:
+                18,
+              ),
+              label:
+              const Text(
+                'RESCHEDULE',
+              ),
+            ),
           ),
-        ),
+
+          const SizedBox(
+            height:
+            9,
+          ),
+
+          SizedBox(
+            width:
+            double.infinity,
+            child:
+            ElevatedButton(
+              onPressed:
+              blocked
+                  ? null
+                  : () {
+                _confirmComplete(
+                  request,
+                );
+              },
+              child:
+              const Text(
+                'MARK AS COMPLETED',
+              ),
+            ),
+          ),
+
+          if (isOutgoing &&
+              request.canCancel(
+                _currentUserId,
+              )) ...[
+            const SizedBox(
+              height:
+              9,
+            ),
+            _buildCancelButton(
+              request,
+              blocked:
+              blocked,
+            ),
+          ],
+        ],
       );
     }
 
@@ -1162,6 +1286,494 @@ class _SwapRequestsScreenState
       ),
     );
   }
+
+  // ============================================================
+  // EDIT SCHEDULE
+  // ============================================================
+
+  Future<void> _editSchedule(
+      SwapRequest request,
+      ) async {
+    if (_processingRequestIds.contains(
+      request.id,
+    )) {
+      return;
+    }
+
+    DateTime selectedDate =
+    DateTime(
+      request.proposedAt.year,
+      request.proposedAt.month,
+      request.proposedAt.day,
+    );
+
+    TimeOfDay selectedTime =
+    TimeOfDay(
+      hour:
+      request.proposedAt.hour,
+      minute:
+      request.proposedAt.minute,
+    );
+
+    String selectedMode =
+        request.mode;
+
+    final TextEditingController detailsController =
+    TextEditingController(
+      text:
+      request.meetingDetails ??
+          '',
+    );
+
+    final bool? shouldSave =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder:
+          (
+          BuildContext dialogContext,
+          ) {
+        return StatefulBuilder(
+          builder:
+              (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              backgroundColor:
+              _surfaceColor,
+              title:
+              Text(
+                request.status ==
+                    SwapRequestStatus.scheduled
+                    ? 'Reschedule session'
+                    : 'Edit schedule',
+                style:
+                TextStyle(
+                  fontWeight:
+                  FontWeight.w800,
+                  color:
+                  _textColor,
+                ),
+              ),
+              content:
+              SingleChildScrollView(
+                child: Column(
+                  mainAxisSize:
+                  MainAxisSize.min,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    if (request.status ==
+                        SwapRequestStatus.scheduled) ...[
+                      Container(
+                        width:
+                        double.infinity,
+                        padding:
+                        const EdgeInsets.all(
+                          11,
+                        ),
+                        decoration:
+                        BoxDecoration(
+                          color:
+                          _softPrimaryColor,
+                          borderRadius:
+                          BorderRadius.circular(
+                            10,
+                          ),
+                        ),
+                        child:
+                        Text(
+                          'Changing a scheduled session will require schedule confirmation again.',
+                          style:
+                          TextStyle(
+                            fontSize:
+                            12,
+                            height:
+                            1.4,
+                            color:
+                            _textColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(
+                        height:
+                        16,
+                      ),
+                    ],
+
+                    Text(
+                      'Date',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      7,
+                    ),
+
+                    SizedBox(
+                      width:
+                      double.infinity,
+                      child:
+                      OutlinedButton.icon(
+                        onPressed:
+                            () async {
+                          final DateTime now =
+                          DateTime.now();
+
+                          final DateTime today =
+                          DateTime(
+                            now.year,
+                            now.month,
+                            now.day,
+                          );
+
+                          DateTime initialDate =
+                              selectedDate;
+
+                          if (initialDate.isBefore(
+                            today,
+                          )) {
+                            initialDate =
+                                today;
+                          }
+
+                          final DateTime? result =
+                          await showDatePicker(
+                            context:
+                            dialogContext,
+                            initialDate:
+                            initialDate,
+                            firstDate:
+                            today,
+                            lastDate:
+                            today.add(
+                              const Duration(
+                                days:
+                                180,
+                              ),
+                            ),
+                          );
+
+                          if (result == null) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            selectedDate =
+                                result;
+                          });
+                        },
+                        icon:
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size:
+                          17,
+                        ),
+                        label:
+                        Text(
+                          _formatDateOnly(
+                            selectedDate,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      14,
+                    ),
+
+                    Text(
+                      'Time',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      7,
+                    ),
+
+                    SizedBox(
+                      width:
+                      double.infinity,
+                      child:
+                      OutlinedButton.icon(
+                        onPressed:
+                            () async {
+                          final TimeOfDay? result =
+                          await showTimePicker(
+                            context:
+                            dialogContext,
+                            initialTime:
+                            selectedTime,
+                          );
+
+                          if (result == null) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            selectedTime =
+                                result;
+                          });
+                        },
+                        icon:
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size:
+                          18,
+                        ),
+                        label:
+                        Text(
+                          selectedTime.format(
+                            context,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      14,
+                    ),
+
+                    Text(
+                      'Session mode',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      8,
+                    ),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child:
+                          ChoiceChip(
+                            label:
+                            const Text(
+                              'Online',
+                            ),
+                            selected:
+                            selectedMode ==
+                                'Online',
+                            showCheckmark:
+                            false,
+                            onSelected:
+                                (_) {
+                              setDialogState(() {
+                                selectedMode =
+                                'Online';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(
+                          width:
+                          8,
+                        ),
+                        Expanded(
+                          child:
+                          ChoiceChip(
+                            label:
+                            const Text(
+                              'In-person',
+                            ),
+                            selected:
+                            selectedMode ==
+                                'In-person',
+                            showCheckmark:
+                            false,
+                            onSelected:
+                                (_) {
+                              setDialogState(() {
+                                selectedMode =
+                                'In-person';
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(
+                      height:
+                      14,
+                    ),
+
+                    Text(
+                      selectedMode ==
+                          'Online'
+                          ? 'Online platform'
+                          : 'Meeting area',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
+                        fontWeight:
+                        FontWeight.w700,
+                        color:
+                        _textColor,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      7,
+                    ),
+
+                    TextField(
+                      controller:
+                      detailsController,
+                      maxLength:
+                      150,
+                      decoration:
+                      InputDecoration(
+                        hintText:
+                        selectedMode ==
+                            'Online'
+                            ? 'Example: Google Meet or Messenger'
+                            : 'Example: DCT campus or public café',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      dialogContext,
+                      false,
+                    );
+                  },
+                  child:
+                  const Text(
+                    'CANCEL',
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final String details =
+                    detailsController.text
+                        .trim();
+
+                    if (details.isEmpty) {
+                      _showMessage(
+                        selectedMode ==
+                            'Online'
+                            ? 'Please enter an online platform.'
+                            : 'Please enter a meeting area.',
+                      );
+
+                      return;
+                    }
+
+                    Navigator.pop(
+                      dialogContext,
+                      true,
+                    );
+                  },
+                  child:
+                  const Text(
+                    'SAVE',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (shouldSave !=
+        true) {
+      detailsController.dispose();
+      return;
+    }
+
+    final String meetingDetails =
+    detailsController.text.trim();
+
+    detailsController.dispose();
+
+    final DateTime proposedAt =
+    DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    );
+
+    if (!proposedAt.isAfter(
+      DateTime.now(),
+    )) {
+      _showMessage(
+        'Please choose a future date and time.',
+      );
+
+      return;
+    }
+
+    await _performAction(
+      requestId:
+      request.id,
+      action:
+          () =>
+          _swapService.updateSchedule(
+            requestId:
+            request.id,
+            actorUserId:
+            _currentUserId,
+            proposedAt:
+            proposedAt,
+            mode:
+            selectedMode,
+            meetingDetails:
+            meetingDetails,
+          ),
+      successMessage:
+      request.status ==
+          SwapRequestStatus.scheduled
+          ? 'Session rescheduled. Please confirm the new schedule.'
+          : 'Schedule updated.',
+    );
+  }
+
+  // ============================================================
+  // BADGES / DETAILS
+  // ============================================================
 
   Widget _buildDirectionBadge(
       SwapRequestDirection direction,
@@ -1354,7 +1966,8 @@ class _SwapRequestsScreenState
           ),
         ),
         Expanded(
-          child: Text(
+          child:
+          Text(
             value,
             style:
             TextStyle(
@@ -1391,7 +2004,8 @@ class _SwapRequestsScreenState
           8,
         ),
         Expanded(
-          child: Text(
+          child:
+          Text(
             text,
             style:
             TextStyle(
@@ -1454,6 +2068,10 @@ class _SwapRequestsScreenState
     );
   }
 
+  // ============================================================
+  // REQUEST ACTIONS
+  // ============================================================
+
   Future<void> _confirmAccept(
       SwapRequest request,
       ) async {
@@ -1511,7 +2129,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.acceptRequest(
             requestId:
             request.id,
@@ -1529,7 +2148,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.declineRequest(
             requestId:
             request.id,
@@ -1547,7 +2167,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.cancelRequest(
             requestId:
             request.id,
@@ -1566,7 +2187,7 @@ class _SwapRequestsScreenState
       DateTime.now(),
     )) {
       _showMessage(
-        'The proposed schedule has already passed.',
+        'The proposed schedule has already passed. Edit the schedule first.',
       );
       return;
     }
@@ -1584,7 +2205,8 @@ class _SwapRequestsScreenState
           const Text(
             'Confirm session schedule',
           ),
-          content: Text(
+          content:
+          Text(
             '${_formatDateTime(request.proposedAt)}\n\n'
                 '${request.mode}\n'
                 '${request.meetingDetails ?? ''}',
@@ -1626,7 +2248,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.scheduleRequest(
             requestId:
             request.id,
@@ -1653,7 +2276,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.completeRequest(
             requestId:
             request.id,
@@ -1671,7 +2295,8 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action: () =>
+      action:
+          () =>
           _swapService.deleteRequest(
             requestId:
             request.id,
@@ -1745,6 +2370,10 @@ class _SwapRequestsScreenState
   void _showMessage(
       String message,
       ) {
+    if (!mounted) {
+      return;
+    }
+
     final ScaffoldMessengerState messenger =
     ScaffoldMessenger.of(
       context,
@@ -1762,10 +2391,38 @@ class _SwapRequestsScreenState
     );
   }
 
+  // ============================================================
+  // FORMAT
+  // ============================================================
+
+  String _formatDateOnly(
+      DateTime value,
+      ) {
+    const List<String> months =
+    [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    return '${months[value.month - 1]} '
+        '${value.day}, ${value.year}';
+  }
+
   String _formatDateTime(
       DateTime value,
       ) {
-    const List<String> months = [
+    const List<String> months =
+    [
       'Jan',
       'Feb',
       'Mar',

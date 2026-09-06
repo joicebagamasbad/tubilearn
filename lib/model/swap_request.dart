@@ -31,7 +31,8 @@ on SwapRequestDirection {
 
 extension SwapRequestStatusExtension
 on SwapRequestStatus {
-  String get databaseValue => name;
+  String get databaseValue =>
+      name;
 
   String get label {
     switch (this) {
@@ -69,12 +70,16 @@ on SwapRequestStatus {
     }
   }
 
-  bool get isTerminal => !isActive;
+  bool get isTerminal =>
+      !isActive;
 
   bool get canBeCancelled {
-    return this == SwapRequestStatus.pending ||
-        this == SwapRequestStatus.accepted ||
-        this == SwapRequestStatus.scheduled;
+    return this ==
+        SwapRequestStatus.pending ||
+        this ==
+            SwapRequestStatus.accepted ||
+        this ==
+            SwapRequestStatus.scheduled;
   }
 
   bool canTransitionTo(
@@ -82,17 +87,26 @@ on SwapRequestStatus {
       ) {
     switch (this) {
       case SwapRequestStatus.pending:
-        return next == SwapRequestStatus.accepted ||
-            next == SwapRequestStatus.declined ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.accepted ||
+            next ==
+                SwapRequestStatus.declined ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.accepted:
-        return next == SwapRequestStatus.scheduled ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.scheduled ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.scheduled:
-        return next == SwapRequestStatus.completed ||
-            next == SwapRequestStatus.cancelled;
+        return next ==
+            SwapRequestStatus.accepted ||
+            next ==
+                SwapRequestStatus.completed ||
+            next ==
+                SwapRequestStatus.cancelled;
 
       case SwapRequestStatus.declined:
       case SwapRequestStatus.completed:
@@ -109,7 +123,8 @@ on SwapRequestStatus {
 
     for (final SwapRequestStatus status
     in SwapRequestStatus.values) {
-      if (status.name == cleanValue) {
+      if (status.name ==
+          cleanValue) {
         return status;
       }
     }
@@ -220,8 +235,10 @@ class SwapRequest {
               ),
         ).length;
 
-    return presentValues > 0 &&
-        presentValues < 4;
+    return presentValues >
+        0 &&
+        presentValues <
+            4;
   }
 
   bool get requiresStableIdentityForActions =>
@@ -234,11 +251,21 @@ class SwapRequest {
       !hasPartialStableIdentity;
 
   bool get hasUsableHistoricalSnapshot {
-    return providerName.trim().isNotEmpty &&
-        providerInitials.trim().isNotEmpty &&
-        providerCity.trim().isNotEmpty &&
-        skillToLearn.trim().isNotEmpty &&
-        skillToOffer.trim().isNotEmpty;
+    return providerName
+        .trim()
+        .isNotEmpty &&
+        providerInitials
+            .trim()
+            .isNotEmpty &&
+        providerCity
+            .trim()
+            .isNotEmpty &&
+        skillToLearn
+            .trim()
+            .isNotEmpty &&
+        skillToOffer
+            .trim()
+            .isNotEmpty;
   }
 
   bool isRequester(
@@ -359,6 +386,28 @@ class SwapRequest {
         );
   }
 
+  bool canEditSchedule(
+      String userId,
+      ) {
+    return hasStableIdentity &&
+        involvesUser(
+          userId,
+        ) &&
+        status ==
+            SwapRequestStatus.accepted;
+  }
+
+  bool canReschedule(
+      String userId,
+      ) {
+    return hasStableIdentity &&
+        involvesUser(
+          userId,
+        ) &&
+        status ==
+            SwapRequestStatus.scheduled;
+  }
+
   bool canSchedule(
       String userId,
       ) {
@@ -401,6 +450,12 @@ class SwapRequest {
         canDecline(
           userId,
         ) ||
+        canEditSchedule(
+          userId,
+        ) ||
+        canReschedule(
+          userId,
+        ) ||
         canSchedule(
           userId,
         ) ||
@@ -419,6 +474,56 @@ class SwapRequest {
     return status.isActive &&
         hasStableIdentity &&
         hasStructurallyValidIdentityGroup;
+  }
+
+  SwapRequest copyWith({
+    DateTime? proposedAt,
+    String? mode,
+    String? meetingDetails,
+    SwapRequestStatus? status,
+    DateTime? updatedAt,
+  }) {
+    return SwapRequest(
+      id:
+      id,
+      requesterUserId:
+      requesterUserId,
+      providerUserId:
+      providerUserId,
+      skillToLearnId:
+      skillToLearnId,
+      skillToOfferId:
+      skillToOfferId,
+      providerName:
+      providerName,
+      providerInitials:
+      providerInitials,
+      providerCity:
+      providerCity,
+      skillToLearn:
+      skillToLearn,
+      skillToOffer:
+      skillToOffer,
+      proposedAt:
+      proposedAt ??
+          this.proposedAt,
+      mode:
+      mode ??
+          this.mode,
+      meetingDetails:
+      meetingDetails ??
+          this.meetingDetails,
+      note:
+      note,
+      status:
+      status ??
+          this.status,
+      createdAt:
+      createdAt,
+      updatedAt:
+      updatedAt ??
+          this.updatedAt,
+    );
   }
 
   static bool _hasValue(
