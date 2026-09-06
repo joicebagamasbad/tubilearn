@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dashboard_screen.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
     super.key,
@@ -16,17 +18,29 @@ class _SplashScreenState
   void initState() {
     super.initState();
 
-    Future.delayed(
+    _openDashboard();
+  }
+
+  Future<void> _openDashboard() async {
+    await Future<void>.delayed(
       const Duration(
         seconds: 3,
       ),
-          () {
-        if (!mounted) {
-          return;
-        }
+    );
 
-        // Welcome Screen navigation will go here.
-      },
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (
+            BuildContext context,
+            ) =>
+        const DashboardScreen(),
+      ),
     );
   }
 
@@ -52,26 +66,33 @@ class _SplashScreenState
             children: [
               Image.asset(
                 'assets/images/mascot/tubi_happy.png',
-                width: 220,
+                width:
+                220,
               ),
 
               const SizedBox(
-                height: 24,
+                height:
+                24,
               ),
 
               Image.asset(
                 'assets/images/tubilearn_logo.png',
-                width: 200,
+                width:
+                200,
               ),
 
               const SizedBox(
-                height: 12,
+                height:
+                12,
               ),
 
               Text(
                 'Share a skill. Discover another.',
+                textAlign:
+                TextAlign.center,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize:
+                  15,
                   color:
                   textColor,
                   fontWeight:

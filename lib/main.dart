@@ -11,7 +11,7 @@ import 'services/app_settings_service.dart';
 import 'services/chat_service.dart';
 import 'services/swap_service.dart';
 
-import 'view/dashboard_screen.dart';
+import 'view/splash_screen.dart';
 import 'view/add_skill_screen.dart';
 import 'view/my_skills_screen.dart';
 import 'view/explore_screen.dart';
@@ -77,7 +77,7 @@ class TubiLearnApp extends StatelessWidget {
               .themeMode,
 
           home:
-          const DashboardScreen(),
+          const SplashScreen(),
 
           routes: {
             '/add-skill': (context) =>
