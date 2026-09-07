@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../model/conversation.dart';
 import '../model/message.dart';
+import '../model/repositories/explore_repository.dart';
+import '../model/user.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
 import '../theme/app_theme.dart';
@@ -37,6 +41,9 @@ class _ConversationScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
+  final ExploreRepository _repository =
+      ExploreRepository.instance;
+
   bool _isLoading = true;
   bool _isSending = false;
   bool _isDeleting = false;
@@ -44,7 +51,8 @@ class _ConversationScreenState
   String? _loadError;
 
   bool get _hasPendingAction =>
-      _isSending || _isDeleting;
+      _isSending ||
+          _isDeleting;
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -112,6 +120,8 @@ class _ConversationScreenState
 
   Future<void> _initializeConversation() async {
     try {
+      await _repository.initialize();
+
       await ChatService.instance.initialize();
 
       if (!mounted) {
@@ -136,8 +146,7 @@ class _ConversationScreenState
         _loadError = null;
       });
 
-      WidgetsBinding.instance
-          .addPostFrameCallback(
+      WidgetsBinding.instance.addPostFrameCallback(
             (_) {
           if (!mounted) {
             return;
@@ -155,7 +164,8 @@ class _ConversationScreenState
 
       setState(() {
         _isLoading = false;
-        _loadError = error.message;
+        _loadError =
+            error.message;
       });
     } catch (_) {
       if (!mounted) {
@@ -173,6 +183,28 @@ class _ConversationScreenState
   Conversation? _findConversation() {
     return ChatService.instance.findConversation(
       widget.conversationId,
+    );
+  }
+
+  // ============================================================
+  // PARTICIPANT
+  // ============================================================
+
+  User? _findParticipant(
+      Conversation conversation,
+      ) {
+    final String? participantUserId =
+    conversation
+        .participantUserId
+        ?.trim();
+
+    if (participantUserId == null ||
+        participantUserId.isEmpty) {
+      return null;
+    }
+
+    return _repository.findUserById(
+      participantUserId,
     );
   }
 
@@ -209,7 +241,8 @@ class _ConversationScreenState
     }
 
     return PopScope(
-      canPop: !_hasPendingAction,
+      canPop:
+      !_hasPendingAction,
       child: Scaffold(
         backgroundColor:
         Theme.of(context)
@@ -228,9 +261,7 @@ class _ConversationScreenState
 
               Expanded(
                 child:
-                conversation
-                    .messages
-                    .isEmpty
+                conversation.messages.isEmpty
                     ? _buildNoMessages()
                     : _buildMessageList(
                   conversation,
@@ -263,17 +294,24 @@ class _ConversationScreenState
               const EdgeInsets.symmetric(
                 horizontal: 10,
               ),
-              decoration: BoxDecoration(
-                color: _surfaceColor,
-                border: Border(
-                  bottom: BorderSide(
-                    color: _borderColor,
+              decoration:
+              BoxDecoration(
+                color:
+                _surfaceColor,
+                border:
+                Border(
+                  bottom:
+                  BorderSide(
+                    color:
+                    _borderColor,
                   ),
                 ),
               ),
               child: Row(
                 children: [
                   IconButton(
+                    tooltip:
+                    'Back',
                     onPressed: () {
                       Navigator.pop(
                         context,
@@ -292,11 +330,11 @@ class _ConversationScreenState
                     child: Center(
                       child: Text(
                         'Conversation',
-                        style: TextStyle(
+                        style:
+                        TextStyle(
                           fontSize: 15,
                           fontWeight:
-                          FontWeight
-                              .w800,
+                          FontWeight.w800,
                           color:
                           _textColor,
                         ),
@@ -315,14 +353,12 @@ class _ConversationScreenState
               child: Center(
                 child: Padding(
                   padding:
-                  const EdgeInsets
-                      .symmetric(
+                  const EdgeInsets.symmetric(
                     horizontal: 36,
                   ),
                   child: Column(
                     mainAxisAlignment:
-                    MainAxisAlignment
-                        .center,
+                    MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons
@@ -338,11 +374,11 @@ class _ConversationScreenState
 
                       Text(
                         'Conversation unavailable',
-                        style: TextStyle(
+                        style:
+                        TextStyle(
                           fontSize: 17,
                           fontWeight:
-                          FontWeight
-                              .w800,
+                          FontWeight.w800,
                           color:
                           _textColor,
                         ),
@@ -357,7 +393,8 @@ class _ConversationScreenState
                             'This conversation may have been deleted.',
                         textAlign:
                         TextAlign.center,
-                        style: TextStyle(
+                        style:
+                        TextStyle(
                           fontSize: 11,
                           height: 1.5,
                           color:
@@ -404,17 +441,24 @@ class _ConversationScreenState
       const EdgeInsets.symmetric(
         horizontal: 8,
       ),
-      decoration: BoxDecoration(
-        color: _surfaceColor,
-        border: Border(
-          bottom: BorderSide(
-            color: _borderColor,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        border:
+        Border(
+          bottom:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
       ),
       child: Row(
         children: [
           IconButton(
+            tooltip:
+            'Back',
             onPressed:
             _hasPendingAction
                 ? null
@@ -432,31 +476,9 @@ class _ConversationScreenState
             ),
           ),
 
-          Container(
-            width: 42,
-            height: 42,
-            decoration:
-            const BoxDecoration(
-              color:
-              Color(
-                0xFFFFB45E,
-              ),
-              shape:
-              BoxShape.circle,
-            ),
-            alignment:
-            Alignment.center,
-            child: Text(
-              conversation.initials,
-              style:
-              const TextStyle(
-                fontSize: 11,
-                fontWeight:
-                FontWeight.w800,
-                color:
-                Colors.white,
-              ),
-            ),
+          _buildParticipantAvatar(
+            conversation,
+            size: 42,
           ),
 
           const SizedBox(
@@ -475,7 +497,8 @@ class _ConversationScreenState
                   maxLines: 1,
                   overflow:
                   TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style:
+                  TextStyle(
                     fontSize: 14.5,
                     fontWeight:
                     FontWeight.w800,
@@ -490,7 +513,11 @@ class _ConversationScreenState
 
                 Text(
                   'Skill swap conversation',
-                  style: TextStyle(
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style:
+                  TextStyle(
                     fontSize: 11,
                     color:
                     _mutedColor,
@@ -518,6 +545,8 @@ class _ConversationScreenState
             )
           else
             IconButton(
+              tooltip:
+              'Conversation options',
               onPressed:
               _hasPendingAction
                   ? null
@@ -541,6 +570,114 @@ class _ConversationScreenState
   }
 
   // ============================================================
+  // PARTICIPANT AVATAR
+  // ============================================================
+
+  Widget _buildParticipantAvatar(
+      Conversation conversation, {
+        required double size,
+      }) {
+    final User? participant =
+    _findParticipant(
+      conversation,
+    );
+
+    final String? path =
+    participant
+        ?.profileImagePath
+        ?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child:
+        hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder: (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              participant?.initials ??
+                  conversation.initials,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          participant?.initials ??
+              conversation.initials,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      String initials, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        initials,
+        style:
+        TextStyle(
+          fontSize:
+          size >= 42
+              ? 11
+              : 10,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ============================================================
   // CONTEXT BAR
   // ============================================================
 
@@ -549,17 +686,21 @@ class _ConversationScreenState
       String offered,
       ) {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.symmetric(
         horizontal: 16,
         vertical: 12,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
         _contextBackground,
-        border: Border(
-          bottom: BorderSide(
+        border:
+        Border(
+          bottom:
+          BorderSide(
             color:
             _contextBorder,
           ),
@@ -585,7 +726,8 @@ class _ConversationScreenState
               children: [
                 Text(
                   'Skill swap discussion',
-                  style: TextStyle(
+                  style:
+                  TextStyle(
                     fontSize: 11,
                     color:
                     _mutedColor,
@@ -601,7 +743,8 @@ class _ConversationScreenState
                   maxLines: 1,
                   overflow:
                   TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style:
+                  TextStyle(
                     fontSize: 12,
                     fontWeight:
                     FontWeight.w700,
@@ -638,8 +781,7 @@ class _ConversationScreenState
       ),
       itemCount:
       conversation.messages.length,
-      itemBuilder:
-          (
+      itemBuilder: (
           BuildContext context,
           int index,
           ) {
@@ -755,7 +897,8 @@ class _ConversationScreenState
                   children: [
                     Text(
                       message.text,
-                      style: TextStyle(
+                      style:
+                      TextStyle(
                         fontSize: 14,
                         height: 1.4,
                         color:
@@ -777,7 +920,8 @@ class _ConversationScreenState
                           _formatMessageTime(
                             message.sentAt,
                           ),
-                          style: TextStyle(
+                          style:
+                          TextStyle(
                             fontSize: 10.5,
                             fontWeight:
                             FontWeight.w500,
@@ -842,7 +986,8 @@ class _ConversationScreenState
               _formatDateSeparator(
                 date,
               ),
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 10.5,
                 fontWeight:
                 FontWeight.w600,
@@ -892,7 +1037,8 @@ class _ConversationScreenState
 
             Text(
               'Start the conversation',
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 16,
                 fontWeight:
                 FontWeight.w800,
@@ -909,7 +1055,8 @@ class _ConversationScreenState
               'Introduce yourself, ask about the skill, and discuss what you can offer in exchange.',
               textAlign:
               TextAlign.center,
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 12,
                 height: 1.5,
                 color:
@@ -935,11 +1082,14 @@ class _ConversationScreenState
         12,
         10,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
         _surfaceColor,
-        border: Border(
-          top: BorderSide(
+        border:
+        Border(
+          top:
+          BorderSide(
             color:
             _borderColor,
           ),
@@ -960,14 +1110,13 @@ class _ConversationScreenState
               maxLength:
               _maxMessageLength,
               maxLengthEnforcement:
-              MaxLengthEnforcement
-                  .enforced,
+              MaxLengthEnforcement.enforced,
               textCapitalization:
-              TextCapitalization
-                  .sentences,
+              TextCapitalization.sentences,
               textInputAction:
               TextInputAction.newline,
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize: 14,
                 color:
                 _textColor,
@@ -994,10 +1143,8 @@ class _ConversationScreenState
                 _surfaceVariantColor,
                 contentPadding:
                 const EdgeInsets.symmetric(
-                  horizontal:
-                  14,
-                  vertical:
-                  11,
+                  horizontal: 14,
+                  vertical: 11,
                 ),
                 border:
                 OutlineInputBorder(
@@ -1028,8 +1175,7 @@ class _ConversationScreenState
                   ),
                   borderSide:
                   const BorderSide(
-                    color:
-                    primary,
+                    color: primary,
                   ),
                 ),
               ),
@@ -1055,6 +1201,8 @@ class _ConversationScreenState
               BoxShape.circle,
             ),
             child: IconButton(
+              tooltip:
+              'Send message',
               onPressed:
               _hasPendingAction
                   ? null
@@ -1072,8 +1220,7 @@ class _ConversationScreenState
                 ),
               )
                   : const Icon(
-                Icons
-                    .send_rounded,
+                Icons.send_rounded,
                 color:
                 Colors.white,
                 size: 19,
@@ -1131,8 +1278,7 @@ class _ConversationScreenState
 
       setState(() {});
 
-      WidgetsBinding.instance
-          .addPostFrameCallback(
+      WidgetsBinding.instance.addPostFrameCallback(
             (_) {
           if (!mounted) {
             return;
@@ -1191,8 +1337,7 @@ class _ConversationScreenState
       _surfaceColor,
       showDragHandle:
       true,
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return SafeArea(
@@ -1241,7 +1386,8 @@ class _ConversationScreenState
       return;
     }
 
-    if (action == 'delete') {
+    if (action ==
+        'delete') {
       await _confirmDeleteConversation(
         conversation,
       );
@@ -1265,25 +1411,28 @@ class _ConversationScreenState
       context,
       barrierDismissible:
       false,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
           backgroundColor:
           _surfaceColor,
-          title: Text(
+          title:
+          Text(
             'Delete conversation?',
-            style: TextStyle(
+            style:
+            TextStyle(
               fontWeight:
               FontWeight.w800,
               color:
               _textColor,
             ),
           ),
-          content: Text(
+          content:
+          Text(
             'This will permanently delete your conversation with ${conversation.userName} and all saved messages in this thread.',
-            style: TextStyle(
+            style:
+            TextStyle(
               color:
               _mutedColor,
             ),
@@ -1296,9 +1445,11 @@ class _ConversationScreenState
                   false,
                 );
               },
-              child: Text(
+              child:
+              Text(
                 'CANCEL',
-                style: TextStyle(
+                style:
+                TextStyle(
                   color:
                   _mutedColor,
                 ),
@@ -1413,8 +1564,7 @@ class _ConversationScreenState
         target,
         duration:
         const Duration(
-          milliseconds:
-          220,
+          milliseconds: 220,
         ),
         curve:
         Curves.easeOut,
@@ -1435,6 +1585,10 @@ class _ConversationScreenState
   void _showSnackBar(
       String message,
       ) {
+    if (!mounted) {
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
     )

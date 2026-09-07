@@ -17,7 +17,7 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState
     extends State<ExploreScreen> {
   final ExploreRepository _repository =
-  ExploreRepository();
+      ExploreRepository.instance;
 
   final TextEditingController _searchController =
   TextEditingController();
@@ -76,6 +76,10 @@ class _ExploreScreenState
         0xFFD2E5E2,
       );
 
+  bool get _hasActiveFilters =>
+      _searchQuery.trim().isNotEmpty ||
+          _selectedCategory != 'All';
+
   List<Skill> get _filteredSkills {
     final String query =
     _searchQuery.trim().toLowerCase();
@@ -133,8 +137,7 @@ class _ExploreScreenState
           children: [
             _buildTopBar(),
             Expanded(
-              child:
-              SingleChildScrollView(
+              child: SingleChildScrollView(
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
@@ -149,13 +152,17 @@ class _ExploreScreenState
                   CrossAxisAlignment.start,
                   children: [
                     _buildTubiIntro(),
+
                     const SizedBox(
                       height: 18,
                     ),
+
                     _buildSearchBar(),
+
                     const SizedBox(
                       height: 22,
                     ),
+
                     Text(
                       'Browse Categories',
                       style:
@@ -165,20 +172,25 @@ class _ExploreScreenState
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height: 12,
                     ),
+
                     _buildCategories(),
+
                     const SizedBox(
                       height: 26,
                     ),
+
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Skills For You',
                             style:
-                            AppTextStyles.cardTitle
+                            AppTextStyles
+                                .cardTitle
                                 .copyWith(
                               color:
                               _textColor,
@@ -188,7 +200,8 @@ class _ExploreScreenState
                         Text(
                           '${skills.length} skills',
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _mutedColor,
@@ -196,9 +209,11 @@ class _ExploreScreenState
                         ),
                       ],
                     ),
+
                     const SizedBox(
                       height: 12,
                     ),
+
                     if (skills.isEmpty)
                       _buildNoResults()
                     else
@@ -254,6 +269,8 @@ class _ExploreScreenState
       child: Row(
         children: [
           IconButton(
+            tooltip:
+            'Back',
             onPressed: () {
               Navigator.pop(
                 context,
@@ -268,6 +285,7 @@ class _ExploreScreenState
               _primaryColor,
             ),
           ),
+
           Expanded(
             child: Center(
               child: Text(
@@ -281,15 +299,10 @@ class _ExploreScreenState
               ),
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon:
-            Icon(
-              Icons.favorite_border_rounded,
-              size: 20,
-              color:
-              _primaryColor,
-            ),
+
+          const SizedBox(
+            width: 48,
+            height: 48,
           ),
         ],
       ),
@@ -394,6 +407,8 @@ class _ExploreScreenState
       child: TextField(
         controller:
         _searchController,
+        textInputAction:
+        TextInputAction.search,
         onChanged: (
             String value,
             ) {
@@ -428,6 +443,8 @@ class _ExploreScreenState
           suffixIcon:
           _searchQuery.isNotEmpty
               ? IconButton(
+            tooltip:
+            'Clear search',
             onPressed: () {
               _searchController
                   .clear();
@@ -437,19 +454,15 @@ class _ExploreScreenState
                 '';
               });
             },
-            icon: Icon(
+            icon:
+            Icon(
               Icons.close_rounded,
               color:
               _mutedColor,
               size: 18,
             ),
           )
-              : Icon(
-            Icons.tune_rounded,
-            color:
-            _primaryColor,
-            size: 19,
-          ),
+              : null,
           border:
           InputBorder.none,
           enabledBorder:
@@ -478,8 +491,7 @@ class _ExploreScreenState
         const BouncingScrollPhysics(),
         itemCount:
         _categories.length,
-        separatorBuilder:
-            (
+        separatorBuilder: (
             BuildContext context,
             int index,
             ) {
@@ -487,8 +499,7 @@ class _ExploreScreenState
             width: 8,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
@@ -660,9 +671,11 @@ class _ExploreScreenState
                 size: 28,
               ),
             ),
+
             const SizedBox(
               width: 13,
             ),
+
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -677,9 +690,11 @@ class _ExploreScreenState
                       _textColor,
                     ),
                   ),
+
                   const SizedBox(
                     height: 4,
                   ),
+
                   Text(
                     skill.category,
                     style:
@@ -689,9 +704,11 @@ class _ExploreScreenState
                       _mutedColor,
                     ),
                   ),
+
                   const SizedBox(
                     height: 8,
                   ),
+
                   Row(
                     children: [
                       Container(
@@ -712,7 +729,8 @@ class _ExploreScreenState
                         child: Text(
                           skill.level,
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _primaryColor,
@@ -721,23 +739,29 @@ class _ExploreScreenState
                           ),
                         ),
                       ),
+
                       const SizedBox(
                         width: 9,
                       ),
+
                       Icon(
-                        Icons.people_outline_rounded,
+                        Icons
+                            .people_outline_rounded,
                         size: 13,
                         color:
                         _mutedColor,
                       ),
+
                       const SizedBox(
                         width: 4,
                       ),
+
                       Expanded(
                         child: Text(
                           '$providerCount provider${providerCount == 1 ? '' : 's'}',
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _mutedColor,
@@ -749,8 +773,10 @@ class _ExploreScreenState
                 ],
               ),
             ),
+
             Icon(
-              Icons.arrow_forward_ios_rounded,
+              Icons
+                  .arrow_forward_ios_rounded,
               size: 14,
               color:
               _mutedColor,
@@ -766,6 +792,23 @@ class _ExploreScreenState
   // ============================================================
 
   Widget _buildNoResults() {
+    final String message;
+
+    if (_searchQuery.trim().isNotEmpty &&
+        _selectedCategory != 'All') {
+      message =
+      'No ${_selectedCategory.toLowerCase()} skills matched "$_searchQuery".';
+    } else if (_searchQuery.trim().isNotEmpty) {
+      message =
+      'We couldn\'t find anything for "$_searchQuery".';
+    } else if (_selectedCategory != 'All') {
+      message =
+      'No skills are available in $_selectedCategory right now.';
+    } else {
+      message =
+      'No skills are available right now.';
+    }
+
     return Container(
       width:
       double.infinity,
@@ -781,9 +824,11 @@ class _ExploreScreenState
             width: 90,
             height: 90,
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Text(
             'No skills found',
             style:
@@ -793,11 +838,13 @@ class _ExploreScreenState
               _textColor,
             ),
           ),
+
           const SizedBox(
             height: 5,
           ),
+
           Text(
-            'We couldn\'t find anything for "$_searchQuery".',
+            message,
             textAlign:
             TextAlign.center,
             style:
@@ -807,6 +854,39 @@ class _ExploreScreenState
               _mutedColor,
             ),
           ),
+
+          if (_hasActiveFilters) ...[
+            const SizedBox(
+              height: 14,
+            ),
+            TextButton.icon(
+              onPressed: () {
+                _searchController.clear();
+
+                setState(() {
+                  _searchQuery = '';
+                  _selectedCategory =
+                  'All';
+                });
+              },
+              icon:
+              const Icon(
+                Icons.refresh_rounded,
+                size: 18,
+              ),
+              label:
+              const Text(
+                'SHOW ALL SKILLS',
+                style:
+                AppTextStyles.button,
+              ),
+              style:
+              TextButton.styleFrom(
+                foregroundColor:
+                _primaryColor,
+              ),
+            ),
+          ],
         ],
       ),
     );

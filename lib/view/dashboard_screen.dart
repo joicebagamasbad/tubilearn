@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -21,8 +22,8 @@ class DashboardScreen extends StatefulWidget {
       _DashboardScreenState();
 }
 
-class _DashboardScreenState
-    extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   final ExploreRepository _repository =
       ExploreRepository.instance;
 
@@ -38,30 +39,9 @@ class _DashboardScreenState
   final GlobalKey _matchSectionKey =
   GlobalKey();
 
-  int _selectedNav = 0;
+  Timer? _sessionBoundaryTimer;
 
-  final List<Map<String, dynamic>> skills = [
-    {
-      'title': 'Graphic Design',
-      'icon': Icons.design_services_outlined,
-    },
-    {
-      'title': 'Photography',
-      'icon': Icons.camera_alt_outlined,
-    },
-    {
-      'title': 'Video Editing',
-      'icon': Icons.movie_creation_outlined,
-    },
-    {
-      'title': 'Illustration',
-      'icon': Icons.brush_outlined,
-    },
-    {
-      'title': 'UI/UX Design',
-      'icon': Icons.dashboard_customize_outlined,
-    },
-  ];
+  int _selectedNav = 0;
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -132,12 +112,138 @@ class _DashboardScreenState
     }
   }
 
+  List<Skill> get _featuredSkills {
+    return _repository.skills
+        .take(
+      5,
+    )
+        .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addObserver(
+      this,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback(
+          (_) {
+        if (!mounted) {
+          return;
+        }
+
+        _scheduleUpcomingSessionRefresh();
+      },
+    );
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(
+      this,
+    );
+
+    _sessionBoundaryTimer?.cancel();
+
     _scrollController.dispose();
 
     super.dispose();
   }
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    if (state ==
+        AppLifecycleState.resumed) {
+      _refreshDashboardData();
+    }
+  }
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  Future<void> _refreshDashboardData() async {
+    try {
+      await _repository.refresh();
+    } catch (_) {
+      // Keep the currently loaded local data if refresh fails.
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+
+    _scheduleUpcomingSessionRefresh();
+  }
+
+  void _scheduleUpcomingSessionRefresh() {
+    _sessionBoundaryTimer?.cancel();
+    _sessionBoundaryTimer = null;
+
+    final SwapRequest? upcomingSession =
+    _findUpcomingSession();
+
+    if (upcomingSession == null) {
+      return;
+    }
+
+    final Duration remaining =
+    upcomingSession.proposedAt.difference(
+      DateTime.now(),
+    );
+
+    if (remaining <=
+        Duration.zero) {
+      if (mounted) {
+        setState(() {});
+      }
+
+      return;
+    }
+
+    _sessionBoundaryTimer = Timer(
+      remaining +
+          const Duration(
+            seconds: 1,
+          ),
+          () {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {});
+
+        _scheduleUpcomingSessionRefresh();
+      },
+    );
+  }
+
+  Future<void> _openRouteAndRefresh(
+      String routeName, {
+        Object? arguments,
+      }) async {
+    await Navigator.pushNamed(
+      context,
+      routeName,
+      arguments: arguments,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _refreshDashboardData();
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -195,9 +301,8 @@ class _DashboardScreenState
                             '✦ Your Smart Match',
                             action:
                             'See all',
-                            onAction: () {
-                              Navigator.pushNamed(
-                                context,
+                            onAction: () async {
+                              await _openRouteAndRefresh(
                                 '/smart-matches',
                               );
                             },
@@ -220,12 +325,11 @@ class _DashboardScreenState
 
                     _buildSectionHeader(
                       title:
-                      'Popular Skills',
+                      'Featured Skills',
                       action:
                       'Explore',
-                      onAction: () {
-                        Navigator.pushNamed(
-                          context,
+                      onAction: () async {
+                        await _openRouteAndRefresh(
                           '/explore',
                         );
                       },
@@ -235,7 +339,7 @@ class _DashboardScreenState
                       height: 14,
                     ),
 
-                    _buildPopularSkills(),
+                    _buildFeaturedSkills(),
 
                     const SizedBox(
                       height: 28,
@@ -246,9 +350,8 @@ class _DashboardScreenState
                       'Upcoming Session',
                       action:
                       'Requests',
-                      onAction: () {
-                        Navigator.pushNamed(
-                          context,
+                      onAction: () async {
+                        await _openRouteAndRefresh(
                           '/swap-requests',
                         );
                       },
@@ -298,7 +401,8 @@ class _DashboardScreenState
         size,
         height:
         size,
-        child: hasImage
+        child:
+        hasImage
             ? Image.file(
           File(
             path,
@@ -309,8 +413,7 @@ class _DashboardScreenState
           size,
           fit:
           BoxFit.cover,
-          errorBuilder:
-              (
+          errorBuilder: (
               BuildContext context,
               Object error,
               StackTrace? stackTrace,
@@ -350,7 +453,8 @@ class _DashboardScreenState
       Alignment.center,
       child: Text(
         initials,
-        style: TextStyle(
+        style:
+        TextStyle(
           fontSize:
           size >= 48
               ? 12
@@ -420,8 +524,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height:
-                4,
+                height: 4,
               ),
 
               Text(
@@ -458,17 +561,16 @@ class _DashboardScreenState
           ),
           child: IconButton(
             tooltip:
-            'Swap activity',
+            'Swap requests',
             padding:
             EdgeInsets.zero,
-            onPressed: () {
-              Navigator.pushNamed(
-                context,
+            onPressed: () async {
+              await _openRouteAndRefresh(
                 '/swap-requests',
               );
             },
             icon: Icon(
-              Icons.notifications_none_rounded,
+              Icons.swap_horiz_rounded,
               size:
               21,
               color:
@@ -478,8 +580,7 @@ class _DashboardScreenState
         ),
 
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
 
         InkWell(
@@ -507,11 +608,7 @@ class _DashboardScreenState
       return;
     }
 
-    try {
-      await _repository.refresh();
-    } catch (_) {
-      // Existing cached profile remains usable if refresh fails.
-    }
+    await _refreshDashboardData();
 
     if (!mounted) {
       return;
@@ -533,9 +630,8 @@ class _DashboardScreenState
       BorderRadius.circular(
         14,
       ),
-      onTap: () {
-        Navigator.pushNamed(
-          context,
+      onTap: () async {
+        await _openRouteAndRefresh(
           '/explore',
         );
       },
@@ -559,8 +655,7 @@ class _DashboardScreenState
         child: Row(
           children: [
             const SizedBox(
-              width:
-              14,
+              width: 14,
             ),
 
             Icon(
@@ -572,8 +667,7 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              width:
-              10,
+              width: 10,
             ),
 
             Expanded(
@@ -597,8 +691,7 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              width:
-              14,
+              width: 14,
             ),
           ],
         ),
@@ -732,8 +825,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width:
-                12,
+                width: 12,
               ),
 
               Expanded(
@@ -743,6 +835,10 @@ class _DashboardScreenState
                   children: [
                     Text(
                       match.user.name,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
                       AppTextStyles.cardTitle
                           .copyWith(
@@ -752,8 +848,7 @@ class _DashboardScreenState
                     ),
 
                     const SizedBox(
-                      height:
-                      3,
+                      height: 3,
                     ),
 
                     Text(
@@ -776,8 +871,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width:
-                8,
+                width: 8,
               ),
 
               Container(
@@ -813,8 +907,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height:
-            12,
+            height: 12,
           ),
 
           Row(
@@ -830,8 +923,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
 
               Expanded(
@@ -850,8 +942,7 @@ class _DashboardScreenState
 
           if (match.reasons.isNotEmpty) ...[
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
 
             Text(
@@ -867,8 +958,7 @@ class _DashboardScreenState
             ),
 
             const SizedBox(
-              height:
-              8,
+              height: 8,
             ),
 
             Wrap(
@@ -894,8 +984,7 @@ class _DashboardScreenState
           ],
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           SizedBox(
@@ -904,9 +993,8 @@ class _DashboardScreenState
             height:
             44,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
+              onPressed: () async {
+                await _openRouteAndRefresh(
                   '/user-profile',
                   arguments:
                   match.user,
@@ -958,7 +1046,8 @@ class _DashboardScreenState
         MainAxisSize.min,
         children: [
           Icon(
-            Icons.check_circle_outline_rounded,
+            Icons
+                .check_circle_outline_rounded,
             size:
             13,
             color:
@@ -966,8 +1055,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width:
-            5,
+            width: 5,
           ),
 
           Text(
@@ -1023,8 +1111,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height:
-            8,
+            height: 8,
           ),
 
           Text(
@@ -1040,8 +1127,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height:
-            6,
+            height: 6,
           ),
 
           Text(
@@ -1057,8 +1143,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           SizedBox(
@@ -1067,9 +1152,8 @@ class _DashboardScreenState
             height:
             42,
             child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
+              onPressed: () async {
+                await _openRouteAndRefresh(
                   '/my-skills',
                 );
               },
@@ -1093,10 +1177,64 @@ class _DashboardScreenState
   }
 
   // ============================================================
-  // POPULAR SKILLS
+  // FEATURED SKILLS
   // ============================================================
 
-  Widget _buildPopularSkills() {
+  Widget _buildFeaturedSkills() {
+    final List<Skill> skills =
+        _featuredSkills;
+
+    if (skills.isEmpty) {
+      return Container(
+        width:
+        double.infinity,
+        padding:
+        const EdgeInsets.all(
+          16,
+        ),
+        decoration:
+        BoxDecoration(
+          color:
+          _surfaceColor,
+          borderRadius:
+          BorderRadius.circular(
+            16,
+          ),
+          border:
+          Border.all(
+            color:
+            _borderColor,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons
+                  .school_outlined,
+              color:
+              _primaryColor,
+            ),
+
+            const SizedBox(
+              width: 10,
+            ),
+
+            Expanded(
+              child: Text(
+                'No skills are available right now.',
+                style:
+                AppTextStyles.secondary
+                    .copyWith(
+                  color:
+                  _mutedColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       height:
       138,
@@ -1107,35 +1245,31 @@ class _DashboardScreenState
         const BouncingScrollPhysics(),
         itemCount:
         skills.length,
-        separatorBuilder:
-            (
+        separatorBuilder: (
             _,
             _,
             ) {
           return const SizedBox(
-            width:
-            12,
+            width: 12,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
-          final Map<String, dynamic> skill =
+          final Skill skill =
           skills[index];
-
-          final String title =
-          skill['title'] as String;
 
           return InkWell(
             borderRadius:
             BorderRadius.circular(
               17,
             ),
-            onTap: () {
-              _openPopularSkill(
-                title,
+            onTap: () async {
+              await _openRouteAndRefresh(
+                '/skill-details',
+                arguments:
+                skill,
               );
             },
             child: Container(
@@ -1183,8 +1317,7 @@ class _DashboardScreenState
                       ),
                     ),
                     child: Icon(
-                      skill['icon']
-                      as IconData,
+                      skill.icon,
                       color:
                       _primaryColor,
                       size:
@@ -1193,12 +1326,11 @@ class _DashboardScreenState
                   ),
 
                   const SizedBox(
-                    height:
-                    11,
+                    height: 11,
                   ),
 
                   Text(
-                    title,
+                    skill.title,
                     maxLines:
                     1,
                     overflow:
@@ -1220,42 +1352,6 @@ class _DashboardScreenState
           );
         },
       ),
-    );
-  }
-
-  void _openPopularSkill(
-      String title,
-      ) {
-    Skill? matchedSkill;
-
-    for (final Skill skill
-    in _repository.skills) {
-      if (skill.title
-          .trim()
-          .toLowerCase() ==
-          title
-              .trim()
-              .toLowerCase()) {
-        matchedSkill =
-            skill;
-        break;
-      }
-    }
-
-    if (matchedSkill != null) {
-      Navigator.pushNamed(
-        context,
-        '/skill-details',
-        arguments:
-        matchedSkill,
-      );
-
-      return;
-    }
-
-    Navigator.pushNamed(
-      context,
-      '/explore',
     );
   }
 
@@ -1281,6 +1377,7 @@ class _DashboardScreenState
           ) {
         return request.status ==
             SwapRequestStatus.scheduled &&
+            request.hasStableIdentity &&
             request.involvesUser(
               currentUser.id,
             ) &&
@@ -1325,11 +1422,17 @@ class _DashboardScreenState
 
     final String displayName =
         otherUser?.name ??
-            request.providerName;
+            _fallbackOtherUserName(
+              request,
+              currentUser,
+            );
 
     final String initials =
         otherUser?.initials ??
-            request.providerInitials;
+            _fallbackOtherUserInitials(
+              request,
+              currentUser,
+            );
 
     final String skillText =
         '${request.skillToLearn} ↔ ${request.skillToOffer}';
@@ -1366,8 +1469,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width:
-            12,
+            width: 12,
           ),
 
           Expanded(
@@ -1390,8 +1492,7 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  3,
+                  height: 3,
                 ),
 
                 Text(
@@ -1411,12 +1512,15 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  3,
+                  height: 3,
                 ),
 
                 Text(
                   '${_formatSessionDate(request.proposedAt)} • ${request.mode}',
+                  maxLines:
+                  2,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
                   AppTextStyles.caption
                       .copyWith(
@@ -1429,8 +1533,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
 
           SizedBox(
@@ -1514,7 +1617,8 @@ class _DashboardScreenState
               ),
             ),
             child: Icon(
-              Icons.event_available_outlined,
+              Icons
+                  .event_available_outlined,
               color:
               _primaryColor,
               size:
@@ -1523,8 +1627,7 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width:
-            12,
+            width: 12,
           ),
 
           Expanded(
@@ -1543,8 +1646,7 @@ class _DashboardScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  4,
+                  height: 4,
                 ),
 
                 Text(
@@ -1563,17 +1665,15 @@ class _DashboardScreenState
           ),
 
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
 
           SizedBox(
             height:
             38,
             child: OutlinedButton(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
+              onPressed: () async {
+                await _openRouteAndRefresh(
                   '/swap-requests',
                 );
               },
@@ -1638,6 +1738,36 @@ class _DashboardScreenState
     );
   }
 
+  String _fallbackOtherUserName(
+      SwapRequest request,
+      User? currentUser,
+      ) {
+    if (currentUser != null &&
+        request.isRequester(
+          currentUser.id,
+        ) &&
+        request.providerName.trim().isNotEmpty) {
+      return request.providerName.trim();
+    }
+
+    return 'Swap partner';
+  }
+
+  String _fallbackOtherUserInitials(
+      SwapRequest request,
+      User? currentUser,
+      ) {
+    if (currentUser != null &&
+        request.isRequester(
+          currentUser.id,
+        ) &&
+        request.providerInitials.trim().isNotEmpty) {
+      return request.providerInitials.trim();
+    }
+
+    return '?';
+  }
+
   void _showSessionDetails(
       SwapRequest request,
       String displayName,
@@ -1653,8 +1783,7 @@ class _DashboardScreenState
     showDialog<void>(
       context:
       context,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
@@ -1689,8 +1818,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
 
               Expanded(
@@ -1724,8 +1852,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height:
-                14,
+                height: 14,
               ),
 
               _buildSessionDetailRow(
@@ -1741,8 +1868,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height:
-                14,
+                height: 14,
               ),
 
               _buildSessionDetailRow(
@@ -1758,8 +1884,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height:
-                14,
+                height: 14,
               ),
 
               _buildSessionDetailRow(
@@ -1791,13 +1916,12 @@ class _DashboardScreenState
             ),
 
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(
                   dialogContext,
                 ).pop();
 
-                Navigator.pushNamed(
-                  context,
+                await _openRouteAndRefresh(
                   '/swap-requests',
                 );
               },
@@ -1832,8 +1956,7 @@ class _DashboardScreenState
         ),
 
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
 
         Expanded(
@@ -1854,8 +1977,7 @@ class _DashboardScreenState
               ),
 
               const SizedBox(
-                height:
-                2,
+                height: 2,
               ),
 
               Text(
@@ -2095,14 +2217,9 @@ class _DashboardScreenState
                   }
 
                   if (index == 1) {
-                    await Navigator.pushNamed(
-                      context,
+                    await _openRouteAndRefresh(
                       '/explore',
                     );
-
-                    if (mounted) {
-                      setState(() {});
-                    }
 
                     return;
                   }
@@ -2113,14 +2230,9 @@ class _DashboardScreenState
                   }
 
                   if (index == 3) {
-                    await Navigator.pushNamed(
-                      context,
+                    await _openRouteAndRefresh(
                       '/chat',
                     );
-
-                    if (mounted) {
-                      setState(() {});
-                    }
 
                     return;
                   }
@@ -2170,8 +2282,7 @@ class _DashboardScreenState
                     ),
 
                     const SizedBox(
-                      height:
-                      3,
+                      height: 3,
                     ),
 
                     Text(

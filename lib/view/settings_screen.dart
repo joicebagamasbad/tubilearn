@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../model/repositories/app_settings_repository.dart';
 import '../services/app_settings_service.dart';
-import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -26,17 +25,56 @@ class _SettingsScreenState
 
   String? _errorMessage;
 
+  bool get _isDarkMode =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _primaryColor =>
+      Theme.of(context).colorScheme.primary;
+
+  Color get _surfaceColor =>
+      Theme.of(context).colorScheme.surface;
+
+  Color get _textColor =>
+      Theme.of(context).colorScheme.onSurface;
+
+  Color get _mutedColor =>
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
+
+  Color get _borderColor =>
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
+
+  Color get _softPrimaryColor =>
+      _isDarkMode
+          ? _primaryColor.withValues(
+        alpha: 0.14,
+      )
+          : _primaryColor.withValues(
+        alpha: 0.07,
+      );
+
   @override
   void initState() {
     super.initState();
+
     _loadSettings();
   }
 
+  // ============================================================
+  // LOAD
+  // ============================================================
+
   Future<void> _loadSettings() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       await _settingsService.initialize();
@@ -47,6 +85,7 @@ class _SettingsScreenState
 
       setState(() {
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (_) {
       if (!mounted) {
@@ -60,6 +99,10 @@ class _SettingsScreenState
       });
     }
   }
+
+  // ============================================================
+  // NOTIFICATION PREFERENCE
+  // ============================================================
 
   Future<void> _toggleNotifications(
       bool enabled,
@@ -85,6 +128,12 @@ class _SettingsScreenState
       setState(() {
         _isSavingNotifications = false;
       });
+
+      _showMessage(
+        enabled
+            ? 'Notification preference saved as On.'
+            : 'Notification preference saved as Off.',
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -94,11 +143,23 @@ class _SettingsScreenState
         _isSavingNotifications = false;
       });
 
-      _showError(
+      _showMessage(
         'Could not save notification preference.',
       );
     }
   }
+
+  String _notificationSubtitle() {
+    if (_settingsService.notificationsEnabled) {
+      return 'Preferred on • real alerts are not active yet';
+    }
+
+    return 'Preferred off • saved locally';
+  }
+
+  // ============================================================
+  // LANGUAGE
+  // ============================================================
 
   Future<void> _showLanguagePicker() async {
     if (_isSavingLanguage) {
@@ -112,6 +173,7 @@ class _SettingsScreenState
     await showModalBottomSheet<
         AppLanguagePreference>(
       context: context,
+      backgroundColor: _surfaceColor,
       showDragHandle: true,
       builder: (
           BuildContext sheetContext,
@@ -131,36 +193,37 @@ class _SettingsScreenState
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: <Widget>[
-                const Text(
-                  'App Language',
+                Text(
+                  'Language preference',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight:
-                    FontWeight.w700,
+                    fontWeight: FontWeight.w800,
+                    color: _textColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 8,
                 ),
-                const Text(
-                  'Choose the language preference TubiLearn should use.',
+
+                Text(
+                  'Choose the language you want TubiLearn to use when localization is connected.',
                   style: TextStyle(
                     fontSize: 14,
-                    color:
-                    AppTheme.mutedText,
+                    height: 1.4,
+                    color: _mutedColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 16,
                 ),
+
                 RadioGroup<
                     AppLanguagePreference>(
-                  groupValue:
-                  current,
-                  onChanged:
-                      (
-                      AppLanguagePreference?
-                      value,
+                  groupValue: current,
+                  onChanged: (
+                      AppLanguagePreference? value,
                       ) {
                     if (value == null) {
                       return;
@@ -172,35 +235,44 @@ class _SettingsScreenState
                       value,
                     );
                   },
-                  child: const Column(
+                  child: Column(
                     children: <Widget>[
                       RadioListTile<
                           AppLanguagePreference>(
                         contentPadding:
                         EdgeInsets.zero,
-                        title:
-                        Text(
+                        title: Text(
                           'English',
+                          style: TextStyle(
+                            color: _textColor,
+                          ),
                         ),
-                        subtitle:
-                        Text(
-                          'Use English throughout the app.',
+                        subtitle: Text(
+                          'Save English as your preferred app language.',
+                          style: TextStyle(
+                            color: _mutedColor,
+                          ),
                         ),
                         value:
                         AppLanguagePreference
                             .english,
                       ),
+
                       RadioListTile<
                           AppLanguagePreference>(
                         contentPadding:
                         EdgeInsets.zero,
-                        title:
-                        Text(
+                        title: Text(
                           'Filipino',
+                          style: TextStyle(
+                            color: _textColor,
+                          ),
                         ),
-                        subtitle:
-                        Text(
+                        subtitle: Text(
                           'Save Filipino as your preferred app language.',
+                          style: TextStyle(
+                            color: _mutedColor,
+                          ),
                         ),
                         value:
                         AppLanguagePreference
@@ -209,40 +281,15 @@ class _SettingsScreenState
                     ],
                   ),
                 ),
+
                 const SizedBox(
                   height: 8,
                 ),
-                Container(
-                  width:
-                  double.infinity,
-                  padding:
-                  const EdgeInsets.all(
-                    12,
-                  ),
-                  decoration:
-                  BoxDecoration(
-                    color:
-                    AppTheme.primary
-                        .withValues(
-                      alpha: 0.06,
-                    ),
-                    borderRadius:
-                    BorderRadius.circular(
-                      12,
-                    ),
-                  ),
-                  child:
-                  const Text(
-                    'Language preference is saved locally. Full app text translation will be connected in a later localization phase.',
-                    style:
-                    TextStyle(
-                      fontSize: 13,
-                      color:
-                      AppTheme
-                          .mutedText,
-                      height: 1.4,
-                    ),
-                  ),
+
+                _buildDevelopmentNotice(
+                  icon: Icons.translate_rounded,
+                  text:
+                  'This setting is saved locally. Full English/Filipino text translation is part of the later localization phase.',
                 ),
               ],
             ),
@@ -262,8 +309,7 @@ class _SettingsScreenState
     });
 
     try {
-      await _settingsService
-          .setLanguage(
+      await _settingsService.setLanguage(
         selected,
       );
 
@@ -274,6 +320,10 @@ class _SettingsScreenState
       setState(() {
         _isSavingLanguage = false;
       });
+
+      _showMessage(
+        'Language preference saved.',
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -283,11 +333,15 @@ class _SettingsScreenState
         _isSavingLanguage = false;
       });
 
-      _showError(
+      _showMessage(
         'Could not save language preference.',
       );
     }
   }
+
+  // ============================================================
+  // THEME
+  // ============================================================
 
   Future<void> _showThemePicker() async {
     if (_isSavingTheme) {
@@ -301,6 +355,7 @@ class _SettingsScreenState
     await showModalBottomSheet<
         AppThemePreference>(
       context: context,
+      backgroundColor: _surfaceColor,
       showDragHandle: true,
       builder: (
           BuildContext sheetContext,
@@ -320,36 +375,35 @@ class _SettingsScreenState
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: <Widget>[
-                const Text(
+                Text(
                   'Appearance',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight:
-                    FontWeight.w700,
+                    fontWeight: FontWeight.w800,
+                    color: _textColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 8,
                 ),
-                const Text(
+
+                Text(
                   'Choose how TubiLearn should look on this device.',
                   style: TextStyle(
                     fontSize: 14,
-                    color:
-                    AppTheme.mutedText,
+                    color: _mutedColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 16,
                 ),
-                RadioGroup<
-                    AppThemePreference>(
-                  groupValue:
-                  current,
-                  onChanged:
-                      (
-                      AppThemePreference?
-                      value,
+
+                RadioGroup<AppThemePreference>(
+                  groupValue: current,
+                  onChanged: (
+                      AppThemePreference? value,
                       ) {
                     if (value == null) {
                       return;
@@ -361,51 +415,65 @@ class _SettingsScreenState
                       value,
                     );
                   },
-                  child: const Column(
+                  child: Column(
                     children: <Widget>[
                       RadioListTile<
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
-                        title:
-                        Text(
+                        title: Text(
                           'System',
+                          style: TextStyle(
+                            color: _textColor,
+                          ),
                         ),
-                        subtitle:
-                        Text(
-                          'Follow your phone appearance.',
+                        subtitle: Text(
+                          'Follow your device appearance.',
+                          style: TextStyle(
+                            color: _mutedColor,
+                          ),
                         ),
                         value:
                         AppThemePreference
                             .system,
                       ),
+
                       RadioListTile<
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
-                        title:
-                        Text(
+                        title: Text(
                           'Light',
+                          style: TextStyle(
+                            color: _textColor,
+                          ),
                         ),
-                        subtitle:
-                        Text(
+                        subtitle: Text(
                           'Always use light mode.',
+                          style: TextStyle(
+                            color: _mutedColor,
+                          ),
                         ),
                         value:
                         AppThemePreference
                             .light,
                       ),
+
                       RadioListTile<
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
-                        title:
-                        Text(
+                        title: Text(
                           'Dark',
+                          style: TextStyle(
+                            color: _textColor,
+                          ),
                         ),
-                        subtitle:
-                        Text(
+                        subtitle: Text(
                           'Always use dark mode.',
+                          style: TextStyle(
+                            color: _mutedColor,
+                          ),
                         ),
                         value:
                         AppThemePreference
@@ -443,6 +511,10 @@ class _SettingsScreenState
       setState(() {
         _isSavingTheme = false;
       });
+
+      _showMessage(
+        'Appearance updated.',
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -452,11 +524,15 @@ class _SettingsScreenState
         _isSavingTheme = false;
       });
 
-      _showError(
+      _showMessage(
         'Could not save appearance preference.',
       );
     }
   }
+
+  // ============================================================
+  // ABOUT
+  // ============================================================
 
   void _showAboutDialog() {
     showDialog<void>(
@@ -465,25 +541,29 @@ class _SettingsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor: _surfaceColor,
+          title: Text(
             'About TubiLearn',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
+          content: Text(
             'TubiLearn is a skill exchange platform designed to help people teach what they know and learn new skills from others.',
+            style: TextStyle(
+              color: _mutedColor,
+              height: 1.45,
+            ),
           ),
-          actions:
-          <Widget>[
+          actions: <Widget>[
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop();
               },
-              child:
-              const Text(
+              child: const Text(
                 'CLOSE',
               ),
             ),
@@ -500,25 +580,29 @@ class _SettingsScreenState
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          title:
-          const Text(
+          backgroundColor: _surfaceColor,
+          title: Text(
             'Privacy',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          content:
-          const Text(
-            'This version of TubiLearn currently stores prototype data locally on this device. A full privacy policy and secure backend data handling will be added before production release.',
+          content: Text(
+            'This local version of TubiLearn stores prototype data on this device. A full privacy policy and secure backend data handling will be required before production release.',
+            style: TextStyle(
+              color: _mutedColor,
+              height: 1.45,
+            ),
           ),
-          actions:
-          <Widget>[
+          actions: <Widget>[
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop();
               },
-              child:
-              const Text(
+              child: const Text(
                 'CLOSE',
               ),
             ),
@@ -528,55 +612,9 @@ class _SettingsScreenState
     );
   }
 
-  void _showAccountSecurityInfo() {
-    showDialog<void>(
-      context: context,
-      builder: (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          title:
-          const Text(
-            'Password & Security',
-          ),
-          content:
-          const Text(
-            'TubiLearn is still using a local prototype session. Real password changes, secure login sessions, logout, account recovery, and account deletion will be connected during the authentication and backend phase.',
-          ),
-          actions:
-          <Widget>[
-            TextButton(
-              onPressed:
-                  () {
-                Navigator.of(
-                  dialogContext,
-                ).pop();
-              },
-              child:
-              const Text(
-                'GOT IT',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showError(
-      String message,
-      ) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
-      SnackBar(
-        content:
-        Text(
-          message,
-        ),
-      ),
-    );
-  }
+  // ============================================================
+  // LABELS
+  // ============================================================
 
   String _languageLabel() {
     switch (_settingsService.language) {
@@ -601,72 +639,109 @@ class _SettingsScreenState
     }
   }
 
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
+  void _showMessage(
+      String message,
+      ) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
       BuildContext context,
       ) {
     return Scaffold(
       backgroundColor:
-      Theme.of(
-        context,
-      ).scaffoldBackgroundColor,
-      appBar:
-      AppBar(
-        title:
-        const Text(
+      Theme.of(context)
+          .scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
+        surfaceTintColor:
+        Colors.transparent,
+        elevation: 0,
+        title: Text(
           'Settings',
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
-      body:
-      _buildBody(),
+      body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child:
-        CircularProgressIndicator(),
+      return Center(
+        child: CircularProgressIndicator(
+          color: _primaryColor,
+        ),
       );
     }
 
     if (_errorMessage != null) {
       return Center(
-        child:
-        Padding(
+        child: Padding(
           padding:
           const EdgeInsets.all(
             24,
           ),
-          child:
-          Column(
+          child: Column(
             mainAxisSize:
             MainAxisSize.min,
-            children:
-            <Widget>[
-              const Icon(
-                Icons
-                    .error_outline_rounded,
+            children: <Widget>[
+              Icon(
+                Icons.error_outline_rounded,
                 size: 48,
-                color:
-                AppTheme.mutedText,
+                color: _mutedColor,
               ),
+
               const SizedBox(
                 height: 12,
               ),
+
               Text(
                 _errorMessage!,
                 textAlign:
                 TextAlign.center,
+                style: TextStyle(
+                  color: _textColor,
+                ),
               ),
+
               const SizedBox(
                 height: 16,
               ),
+
               ElevatedButton(
-                onPressed:
-                _loadSettings,
-                child:
-                const Text(
+                onPressed: _loadSettings,
+                child: const Text(
                   'RETRY',
                 ),
               ),
@@ -677,13 +752,14 @@ class _SettingsScreenState
     }
 
     return AnimatedBuilder(
-      animation:
-      _settingsService,
+      animation: _settingsService,
       builder: (
           BuildContext context,
           Widget? child,
           ) {
         return ListView(
+          physics:
+          const BouncingScrollPhysics(),
           padding:
           const EdgeInsets.fromLTRB(
             16,
@@ -691,39 +767,41 @@ class _SettingsScreenState
             16,
             32,
           ),
-          children:
-          <Widget>[
+          children: <Widget>[
             _sectionTitle(
               'APP PREFERENCES',
             ),
+
             const SizedBox(
               height: 8,
             ),
+
             _settingsCard(
-              children:
-              <Widget>[
+              children: <Widget>[
                 SwitchListTile(
                   contentPadding:
-                  const EdgeInsets
-                      .symmetric(
+                  const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 4,
+                    vertical: 6,
                   ),
-                  secondary:
-                  const Icon(
+                  secondary: Icon(
                     Icons
                         .notifications_outlined,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
-                    'Notifications',
+                  title: Text(
+                    'Notification preference',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  subtitle:
-                  Text(
-                    _settingsService
-                        .notificationsEnabled
-                        ? 'Enabled'
-                        : 'Disabled',
+                  subtitle: Text(
+                    _notificationSubtitle(),
+                    style: TextStyle(
+                      color: _mutedColor,
+                    ),
                   ),
                   value:
                   _settingsService
@@ -733,74 +811,94 @@ class _SettingsScreenState
                       ? null
                       : _toggleNotifications,
                 ),
+
                 const Divider(
                   height: 1,
                 ),
+
                 ListTile(
-                  leading:
-                  const Icon(
-                    Icons
-                        .language_rounded,
+                  leading: Icon(
+                    Icons.language_rounded,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
-                    'Language',
+                  title: Text(
+                    'Language preference',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  subtitle:
-                  Text(
-                    _languageLabel(),
+                  subtitle: Text(
+                    '${_languageLabel()} • translation not active yet',
+                    style: TextStyle(
+                      color: _mutedColor,
+                    ),
                   ),
                   trailing:
                   _isSavingLanguage
-                      ? const SizedBox(
+                      ? SizedBox(
                     width: 20,
                     height: 20,
                     child:
                     CircularProgressIndicator(
-                      strokeWidth:
-                      2,
+                      strokeWidth: 2,
+                      color:
+                      _primaryColor,
                     ),
                   )
-                      : const Icon(
+                      : Icon(
                     Icons
                         .chevron_right_rounded,
+                    color:
+                    _mutedColor,
                   ),
                   onTap:
                   _isSavingLanguage
                       ? null
                       : _showLanguagePicker,
                 ),
+
                 const Divider(
                   height: 1,
                 ),
+
                 ListTile(
-                  leading:
-                  const Icon(
-                    Icons
-                        .palette_outlined,
+                  leading: Icon(
+                    Icons.palette_outlined,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
+                  title: Text(
                     'Appearance',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  subtitle:
-                  Text(
+                  subtitle: Text(
                     _themeLabel(),
+                    style: TextStyle(
+                      color: _mutedColor,
+                    ),
                   ),
                   trailing:
                   _isSavingTheme
-                      ? const SizedBox(
+                      ? SizedBox(
                     width: 20,
                     height: 20,
                     child:
                     CircularProgressIndicator(
-                      strokeWidth:
-                      2,
+                      strokeWidth: 2,
+                      color:
+                      _primaryColor,
                     ),
                   )
-                      : const Icon(
+                      : Icon(
                     Icons
                         .chevron_right_rounded,
+                    color:
+                    _mutedColor,
                   ),
                   onTap:
                   _isSavingTheme
@@ -809,175 +907,130 @@ class _SettingsScreenState
                 ),
               ],
             ),
+
             const SizedBox(
               height: 24,
             ),
+
             _sectionTitle(
-              'ACCOUNT',
+              'LOCAL APP STATUS',
             ),
+
             const SizedBox(
               height: 8,
             ),
+
             _settingsCard(
-              children:
-              <Widget>[
-                const ListTile(
-                  leading:
-                  Icon(
-                    Icons
-                        .person_outline_rounded,
-                  ),
-                  title:
-                  Text(
-                    'Account Status',
-                  ),
-                  subtitle:
-                  Text(
-                    'Local prototype session',
-                  ),
-                ),
-                const Divider(
-                  height: 1,
-                ),
+              children: <Widget>[
                 ListTile(
-                  leading:
-                  const Icon(
-                    Icons
-                        .lock_outline_rounded,
+                  leading: Icon(
+                    Icons.smartphone_rounded,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
-                    'Password & Security',
+                  title: Text(
+                    'Local prototype session',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  subtitle:
-                  const Text(
-                    'Authentication phase required',
+                  subtitle: Text(
+                    'Account authentication and cloud sync are not connected yet.',
+                    style: TextStyle(
+                      color: _mutedColor,
+                    ),
                   ),
-                  trailing:
-                  const Icon(
-                    Icons
-                        .chevron_right_rounded,
-                  ),
-                  onTap:
-                  _showAccountSecurityInfo,
                 ),
               ],
             ),
+
             const SizedBox(
               height: 24,
             ),
+
             _sectionTitle(
               'ABOUT',
             ),
+
             const SizedBox(
               height: 8,
             ),
+
             _settingsCard(
-              children:
-              <Widget>[
+              children: <Widget>[
                 ListTile(
-                  leading:
-                  const Icon(
-                    Icons
-                        .info_outline_rounded,
+                  leading: Icon(
+                    Icons.info_outline_rounded,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
+                  title: Text(
                     'About TubiLearn',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  trailing:
-                  const Icon(
-                    Icons
-                        .chevron_right_rounded,
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: _mutedColor,
                   ),
-                  onTap:
-                  _showAboutDialog,
+                  onTap: _showAboutDialog,
                 ),
+
                 const Divider(
                   height: 1,
                 ),
+
                 ListTile(
-                  leading:
-                  const Icon(
+                  leading: Icon(
                     Icons
                         .privacy_tip_outlined,
+                    color: _primaryColor,
                   ),
-                  title:
-                  const Text(
+                  title: Text(
                     'Privacy',
+                    style: TextStyle(
+                      fontWeight:
+                      FontWeight.w700,
+                      color: _textColor,
+                    ),
                   ),
-                  subtitle:
-                  const Text(
+                  subtitle: Text(
                     'Prototype data is stored locally',
+                    style: TextStyle(
+                      color: _mutedColor,
+                    ),
                   ),
-                  trailing:
-                  const Icon(
-                    Icons
-                        .chevron_right_rounded,
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: _mutedColor,
                   ),
-                  onTap:
-                  _showPrivacyDialog,
+                  onTap: _showPrivacyDialog,
                 ),
               ],
             ),
+
             const SizedBox(
               height: 20,
             ),
-            Container(
-              padding:
-              const EdgeInsets.all(
-                16,
-              ),
-              decoration:
-              BoxDecoration(
-                color:
-                AppTheme.primary
-                    .withValues(
-                  alpha: 0.06,
-                ),
-                borderRadius:
-                BorderRadius.circular(
-                  16,
-                ),
-              ),
-              child:
-              const Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children:
-                <Widget>[
-                  Icon(
-                    Icons
-                        .construction_rounded,
-                    size: 20,
-                    color:
-                    AppTheme.primary,
-                  ),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  Expanded(
-                    child:
-                    Text(
-                      'TubiLearn is still under active development. Real authentication, cloud sync, account security, and production notifications will be added in later phases.',
-                      style:
-                      TextStyle(
-                        fontSize: 13,
-                        height: 1.45,
-                        color:
-                        AppTheme
-                            .mutedText,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+
+            _buildDevelopmentNotice(
+              icon:
+              Icons.construction_rounded,
+              text:
+              'Real authentication, account security, cloud sync, realtime chat, push notifications, and remote profile photos belong to the production/backend phase.',
             ),
           ],
         );
       },
     );
   }
+
+  // ============================================================
+  // COMMON WIDGETS
+  // ============================================================
 
   Widget _sectionTitle(
       String title,
@@ -987,17 +1040,13 @@ class _SettingsScreenState
       const EdgeInsets.symmetric(
         horizontal: 4,
       ),
-      child:
-      Text(
+      child: Text(
         title,
-        style:
-        const TextStyle(
+        style: TextStyle(
           fontSize: 12,
-          fontWeight:
-          FontWeight.w700,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color:
-          AppTheme.mutedText,
+          color: _mutedColor,
         ),
       ),
     );
@@ -1007,26 +1056,73 @@ class _SettingsScreenState
     required List<Widget> children,
   }) {
     return Container(
-      decoration:
-      BoxDecoration(
-        color:
-        Theme.of(
-          context,
-        ).cardColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
-          color:
-          AppTheme.border,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
-      child:
-      Column(
-        children:
-        children,
+      child: Column(
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildDevelopmentNotice({
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: _softPrimaryColor,
+        borderRadius:
+        BorderRadius.circular(
+          14,
+        ),
+        border: Border.all(
+          color:
+          _primaryColor.withValues(
+            alpha:
+            _isDarkMode
+                ? 0.24
+                : 0.12,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            icon,
+            size: 20,
+            color: _primaryColor,
+          ),
+
+          const SizedBox(
+            width: 10,
+          ),
+
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: _mutedColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

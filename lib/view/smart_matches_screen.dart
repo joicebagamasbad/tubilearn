@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
@@ -25,12 +27,15 @@ class _SmartMatchesScreenState
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
-  bool _isLoading =
-  true;
+  bool _isLoading = true;
+  bool _isRefreshing = false;
 
   String? _errorMessage;
-
   String? _openingSwapUserId;
+  String? _currentUserId;
+
+  bool _hasOfferedSkills = false;
+  bool _hasWantedSkills = false;
 
   List<SkillMatch> _matches =
   <SkillMatch>[];
@@ -66,8 +71,7 @@ class _SmartMatchesScreenState
   Color get _softPrimaryColor =>
       _isDarkMode
           ? _primaryColor.withValues(
-        alpha:
-        0.16,
+        alpha: 0.16,
       )
           : const Color(
         0xFFE4F0EF,
@@ -81,8 +85,7 @@ class _SmartMatchesScreenState
           : Colors.white;
 
   bool get _hasPendingAction =>
-      _openingSwapUserId !=
-          null;
+      _openingSwapUserId != null;
 
   @override
   void initState() {
@@ -91,14 +94,23 @@ class _SmartMatchesScreenState
     _loadMatches();
   }
 
-  Future<void> _loadMatches() async {
-    if (mounted) {
-      setState(() {
-        _isLoading =
-        true;
+  // ============================================================
+  // LOAD / REFRESH
+  // ============================================================
 
-        _errorMessage =
-        null;
+  Future<void> _loadMatches({
+    bool showLoading = true,
+  }) async {
+    if (_isRefreshing) {
+      return;
+    }
+
+    _isRefreshing = true;
+
+    if (mounted && showLoading) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
       });
     }
 
@@ -108,18 +120,48 @@ class _SmartMatchesScreenState
       final String currentUserId =
       _currentUserService.requireUserId();
 
-      final List<SkillMatch> matches =
+      final List<SkillMatch> rawMatches =
       _repository.getSmartMatchesForUser(
         currentUserId,
       );
+
+      final List<SkillMatch> safeMatches =
+      _sanitizeMatches(
+        rawMatches,
+        currentUserId:
+        currentUserId,
+      );
+
+      final bool hasOfferedSkills =
+          _repository
+              .getOfferedSkillsForUser(
+            currentUserId,
+          )
+              .isNotEmpty;
+
+      final bool hasWantedSkills =
+          _repository
+              .getWantedSkillsForUser(
+            currentUserId,
+          )
+              .isNotEmpty;
 
       if (!mounted) {
         return;
       }
 
       setState(() {
+        _currentUserId =
+            currentUserId;
+
         _matches =
-            matches;
+            safeMatches;
+
+        _hasOfferedSkills =
+            hasOfferedSkills;
+
+        _hasWantedSkills =
+            hasWantedSkills;
 
         _isLoading =
         false;
@@ -127,20 +169,125 @@ class _SmartMatchesScreenState
         _errorMessage =
         null;
       });
+    } on CurrentUserServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      if (!showLoading &&
+          _matches.isNotEmpty) {
+        _showMessage(
+          error.message,
+        );
+
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            error.message;
+      });
+    } on ExploreRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      if (!showLoading &&
+          _matches.isNotEmpty) {
+        _showMessage(
+          error.message,
+        );
+
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            error.message;
+      });
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _isLoading =
-        false;
+      if (!showLoading &&
+          _matches.isNotEmpty) {
+        _showMessage(
+          'Smart matches could not be refreshed.',
+        );
 
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
         _errorMessage =
         'Smart matches could not be loaded. Please try again.';
       });
+    } finally {
+      _isRefreshing = false;
     }
   }
+
+  Future<void> _refreshMatches() async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    await _loadMatches(
+      showLoading:
+      false,
+    );
+  }
+
+  List<SkillMatch> _sanitizeMatches(
+      List<SkillMatch> matches, {
+        required String currentUserId,
+      }) {
+    final String cleanCurrentUserId =
+    currentUserId.trim();
+
+    final Set<String> seenUserIds =
+    <String>{};
+
+    final List<SkillMatch> result =
+    <SkillMatch>[];
+
+    for (final SkillMatch match
+    in matches) {
+      final String candidateUserId =
+      match.user.id.trim();
+
+      if (candidateUserId.isEmpty) {
+        continue;
+      }
+
+      if (candidateUserId ==
+          cleanCurrentUserId) {
+        continue;
+      }
+
+      if (!seenUserIds.add(
+        candidateUserId,
+      )) {
+        continue;
+      }
+
+      result.add(
+        match,
+      );
+    }
+
+    return List<SkillMatch>.unmodifiable(
+      result,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -153,7 +300,8 @@ class _SmartMatchesScreenState
         backgroundColor:
         Theme.of(context)
             .scaffoldBackgroundColor,
-        appBar: AppBar(
+        appBar:
+        AppBar(
           backgroundColor:
           Theme.of(context)
               .scaffoldBackgroundColor,
@@ -161,7 +309,10 @@ class _SmartMatchesScreenState
           Colors.transparent,
           elevation:
           0,
-          leading: IconButton(
+          leading:
+          IconButton(
+            tooltip:
+            'Back',
             onPressed:
             _hasPendingAction
                 ? null
@@ -170,8 +321,10 @@ class _SmartMatchesScreenState
                 context,
               );
             },
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
+            icon:
+            Icon(
+              Icons
+                  .arrow_back_ios_new_rounded,
               size:
               20,
               color:
@@ -180,7 +333,8 @@ class _SmartMatchesScreenState
                   : _textColor,
             ),
           ),
-          title: Text(
+          title:
+          Text(
             'Smart Matches',
             style:
             AppTextStyles.sectionTitle
@@ -190,7 +344,8 @@ class _SmartMatchesScreenState
             ),
           ),
         ),
-        body: SafeArea(
+        body:
+        SafeArea(
           child:
           _buildBody(),
         ),
@@ -213,10 +368,9 @@ class _SmartMatchesScreenState
 
     return RefreshIndicator(
       onRefresh:
-      _hasPendingAction
-          ? () async {}
-          : _loadMatches,
-      child: ListView.separated(
+      _refreshMatches,
+      child:
+      ListView.separated(
         physics:
         const AlwaysScrollableScrollPhysics(),
         padding:
@@ -229,13 +383,11 @@ class _SmartMatchesScreenState
         itemCount:
         _matches.length +
             1,
-        separatorBuilder:
-            (
+        separatorBuilder: (
             _,
-            index,
+            int index,
             ) {
-          if (index ==
-              0) {
+          if (index == 0) {
             return const SizedBox(
               height:
               16,
@@ -247,18 +399,17 @@ class _SmartMatchesScreenState
             12,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
-          if (index ==
-              0) {
+          if (index == 0) {
             return _buildHeaderCard();
           }
 
           return _buildMatchCard(
-            _matches[index - 1],
+            _matches[
+            index - 1],
             rank:
             index,
           );
@@ -266,6 +417,10 @@ class _SmartMatchesScreenState
       ),
     );
   }
+
+  // ============================================================
+  // HEADER
+  // ============================================================
 
   Widget _buildHeaderCard() {
     return Container(
@@ -289,10 +444,12 @@ class _SmartMatchesScreenState
           _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -312,7 +469,7 @@ class _SmartMatchesScreenState
                 ),
 
                 Text(
-                  'Ranked using skill compatibility, availability, mode, language, location, and trust signals.',
+                  'Ranked using your skill relationships, availability, mode, language, location, and local trust signals.',
                   style:
                   AppTextStyles.bodyMuted
                       .copyWith(
@@ -342,6 +499,115 @@ class _SmartMatchesScreenState
       ),
     );
   }
+
+  // ============================================================
+  // AVATAR
+  // ============================================================
+
+  Widget _buildUserAvatar(
+      User user, {
+        required double size,
+      }) {
+    final String? path =
+    user.profileImagePath?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child:
+      SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child:
+        hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder: (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              initials:
+              user.initials,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          initials:
+          user.initials,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar({
+    required String initials,
+    required double size,
+  }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child:
+      Text(
+        initials.trim().isEmpty
+            ? '?'
+            : initials,
+        style:
+        TextStyle(
+          fontSize:
+          size >= 48
+              ? 12
+              : 11,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ============================================================
+  // MATCH CARD
+  // ============================================================
 
   Widget _buildMatchCard(
       SkillMatch match, {
@@ -379,38 +645,17 @@ class _SmartMatchesScreenState
           _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width:
+              _buildUserAvatar(
+                user,
+                size:
                 48,
-                height:
-                48,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  AppTheme.accent,
-                  shape:
-                  BoxShape.circle,
-                ),
-                alignment:
-                Alignment.center,
-                child: Text(
-                  user.initials,
-                  style:
-                  const TextStyle(
-                    fontSize:
-                    12,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    Colors.white,
-                  ),
-                ),
               ),
 
               const SizedBox(
@@ -419,14 +664,16 @@ class _SmartMatchesScreenState
               ),
 
               Expanded(
-                child: Column(
+                child:
+                Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
+                          child:
+                          Text(
                             user.name,
                             maxLines:
                             1,
@@ -468,7 +715,8 @@ class _SmartMatchesScreenState
                     Row(
                       children: [
                         Icon(
-                          Icons.location_on_outlined,
+                          Icons
+                              .location_on_outlined,
                           size:
                           13,
                           color:
@@ -481,7 +729,8 @@ class _SmartMatchesScreenState
                         ),
 
                         Expanded(
-                          child: Text(
+                          child:
+                          Text(
                             user.city,
                             maxLines:
                             1,
@@ -523,7 +772,8 @@ class _SmartMatchesScreenState
                     20,
                   ),
                 ),
-                child: Text(
+                child:
+                Text(
                   '${match.score}%',
                   style:
                   AppTextStyles.caption
@@ -537,6 +787,62 @@ class _SmartMatchesScreenState
               ),
             ],
           ),
+
+          if (match.isTwoWayMatch) ...[
+            const SizedBox(
+              height:
+              12,
+            ),
+
+            Container(
+              padding:
+              const EdgeInsets.symmetric(
+                horizontal:
+                10,
+                vertical:
+                6,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _softPrimaryColor,
+                borderRadius:
+                BorderRadius.circular(
+                  20,
+                ),
+              ),
+              child:
+              Row(
+                mainAxisSize:
+                MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons
+                        .swap_horiz_rounded,
+                    size:
+                    14,
+                    color:
+                    _primaryColor,
+                  ),
+                  const SizedBox(
+                    width:
+                    5,
+                  ),
+                  Text(
+                    'Two-way match',
+                    style:
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _primaryColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(
             height:
@@ -564,7 +870,8 @@ class _SmartMatchesScreenState
                 _borderColor,
               ),
             ),
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -654,7 +961,8 @@ class _SmartMatchesScreenState
               CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.info_outline_rounded,
+                  Icons
+                      .info_outline_rounded,
                   size:
                   15,
                   color:
@@ -667,7 +975,8 @@ class _SmartMatchesScreenState
                 ),
 
                 Expanded(
-                  child: Text(
+                  child:
+                  Text(
                     'This person wants a skill you offer, but they do not currently offer one of your learning interests.',
                     style:
                     AppTextStyles.caption
@@ -695,16 +1004,14 @@ class _SmartMatchesScreenState
                   _hasPendingAction
                       ? null
                       : () {
-                    Navigator.pushNamed(
-                      context,
-                      '/user-profile',
-                      arguments:
+                    _openUserProfile(
                       user,
                     );
                   },
                   icon:
                   const Icon(
-                    Icons.person_outline_rounded,
+                    Icons
+                        .person_outline_rounded,
                     size:
                     18,
                   ),
@@ -761,7 +1068,8 @@ class _SmartMatchesScreenState
                     ),
                   )
                       : const Icon(
-                    Icons.swap_horiz_rounded,
+                    Icons
+                        .swap_horiz_rounded,
                     size:
                     18,
                   ),
@@ -781,6 +1089,34 @@ class _SmartMatchesScreenState
   }
 
   // ============================================================
+  // PROFILE
+  // ============================================================
+
+  Future<void> _openUserProfile(
+      User user,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      '/user-profile',
+      arguments:
+      user,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadMatches(
+      showLoading:
+      false,
+    );
+  }
+
+  // ============================================================
   // DIRECT SWAP REQUEST
   // ============================================================
 
@@ -794,8 +1130,7 @@ class _SmartMatchesScreenState
     final skillToLearn =
         match.skillToLearn;
 
-    if (skillToLearn ==
-        null) {
+    if (skillToLearn == null) {
       _showMessage(
         '${match.user.name} does not currently offer one of your learning interests.',
       );
@@ -803,9 +1138,27 @@ class _SmartMatchesScreenState
       return;
     }
 
+    final String candidateUserId =
+    match.user.id.trim();
+
+    final String currentUserId =
+        _currentUserId?.trim() ??
+            '';
+
+    if (candidateUserId.isEmpty ||
+        currentUserId.isEmpty ||
+        candidateUserId ==
+            currentUserId) {
+      _showMessage(
+        'This match is no longer available.',
+      );
+
+      return;
+    }
+
     setState(() {
       _openingSwapUserId =
-          match.user.id;
+          candidateUserId;
     });
 
     try {
@@ -813,13 +1166,12 @@ class _SmartMatchesScreenState
       await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder:
-              (
+          builder: (
               BuildContext routeContext,
               ) =>
               CreateSwapRequestScreen(
                 providerUserId:
-                match.user.id,
+                candidateUserId,
                 skillToLearnId:
                 skillToLearn.id,
                 skillToOfferId:
@@ -846,6 +1198,11 @@ class _SmartMatchesScreenState
           'Your request to ${match.user.name} is now Pending.',
         );
       }
+
+      await _loadMatches(
+        showLoading:
+        false,
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -896,12 +1253,14 @@ class _SmartMatchesScreenState
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         mainAxisSize:
         MainAxisSize.min,
         children: [
           Icon(
-            Icons.check_circle_outline_rounded,
+            Icons
+                .check_circle_outline_rounded,
             size:
             13,
             color:
@@ -937,7 +1296,8 @@ class _SmartMatchesScreenState
 
   Widget _buildLoadingState() {
     return Center(
-      child: Column(
+      child:
+      Column(
         mainAxisSize:
         MainAxisSize.min,
         children: [
@@ -980,17 +1340,20 @@ class _SmartMatchesScreenState
 
   Widget _buildErrorState() {
     return Center(
-      child: Padding(
+      child:
+      Padding(
         padding:
         const EdgeInsets.all(
           28,
         ),
-        child: Column(
+        child:
+        Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline_rounded,
+              Icons
+                  .error_outline_rounded,
               size:
               44,
               color:
@@ -1035,10 +1398,20 @@ class _SmartMatchesScreenState
               18,
             ),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed:
-              _loadMatches,
-              child:
+              _isRefreshing
+                  ? null
+                  : () {
+                _loadMatches();
+              },
+              icon:
+              const Icon(
+                Icons.refresh_rounded,
+                size:
+                18,
+              ),
+              label:
               const Text(
                 'TRY AGAIN',
               ),
@@ -1054,84 +1427,123 @@ class _SmartMatchesScreenState
   // ============================================================
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
+    return RefreshIndicator(
+      onRefresh:
+      _refreshMatches,
+      child:
+      ListView(
+        physics:
+        const AlwaysScrollableScrollPhysics(),
         padding:
-        const EdgeInsets.all(
+        const EdgeInsets.fromLTRB(
+          28,
+          70,
+          28,
           28,
         ),
-        child: Column(
-          mainAxisSize:
-          MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/images/mascot/tubi_thinking.png',
-              width:
-              100,
-              height:
-              100,
-              fit:
-              BoxFit.contain,
-            ),
+        children: [
+          Image.asset(
+            'assets/images/mascot/tubi_thinking.png',
+            width:
+            100,
+            height:
+            100,
+            fit:
+            BoxFit.contain,
+          ),
 
-            const SizedBox(
-              height:
-              14,
-            ),
+          const SizedBox(
+            height:
+            14,
+          ),
 
-            Text(
-              'No smart matches yet',
-              textAlign:
-              TextAlign.center,
-              style:
-              AppTextStyles.cardTitle
-                  .copyWith(
-                color:
-                _textColor,
-              ),
+          Text(
+            'No smart matches yet',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor,
             ),
+          ),
 
-            const SizedBox(
-              height:
-              7,
-            ),
+          const SizedBox(
+            height:
+            7,
+          ),
 
-            Text(
-              'Add or update your offered skills and learning interests to find compatible people.',
-              textAlign:
-              TextAlign.center,
-              style:
-              AppTextStyles.bodyMuted
-                  .copyWith(
-                color:
-                _mutedColor,
-              ),
+          Text(
+            _emptyStateMessage(),
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor,
             ),
+          ),
 
-            const SizedBox(
-              height:
-              18,
-            ),
+          const SizedBox(
+            height:
+            18,
+          ),
 
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/my-skills',
-                );
-              },
-              icon:
-              const Icon(
-                Icons.add_rounded,
-              ),
-              label:
-              const Text(
-                'UPDATE MY SKILLS',
-              ),
+          OutlinedButton.icon(
+            onPressed:
+            _hasPendingAction
+                ? null
+                : _openMySkills,
+            icon:
+            const Icon(
+              Icons.add_rounded,
             ),
-          ],
-        ),
+            label:
+            const Text(
+              'UPDATE MY SKILLS',
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  String _emptyStateMessage() {
+    if (!_hasOfferedSkills &&
+        !_hasWantedSkills) {
+      return 'Add skills you can teach and skills you want to learn so TubiLearn can start comparing compatible people.';
+    }
+
+    if (!_hasOfferedSkills) {
+      return 'You already have learning interests. Add at least one skill you can teach to unlock stronger skill exchanges.';
+    }
+
+    if (!_hasWantedSkills) {
+      return 'You already have skills to offer. Add at least one skill you want to learn to find people who can teach you.';
+    }
+
+    return 'Your skill profile is ready, but no compatible people are available right now. Try adding more skills or refresh again later.';
+  }
+
+  Future<void> _openMySkills() async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      '/my-skills',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadMatches(
+      showLoading:
+      false,
     );
   }
 

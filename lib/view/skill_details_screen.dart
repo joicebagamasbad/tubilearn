@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
@@ -16,7 +18,7 @@ class SkillDetailsScreen extends StatelessWidget {
   });
 
   static final ExploreRepository _repository =
-  ExploreRepository();
+      ExploreRepository.instance;
 
   Color _primaryColor(
       BuildContext context,
@@ -120,15 +122,19 @@ class SkillDetailsScreen extends StatelessWidget {
                     _buildSkillHeader(
                       context,
                     ),
+
                     const SizedBox(
                       height: 20,
                     ),
+
                     _buildQuickInfo(
                       context,
                     ),
+
                     const SizedBox(
                       height: 24,
                     ),
+
                     Text(
                       'About this skill',
                       style:
@@ -140,9 +146,11 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height: 8,
                     ),
+
                     Text(
                       skill.description,
                       style:
@@ -154,9 +162,11 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height: 24,
                     ),
+
                     Text(
                       'What you can learn',
                       style:
@@ -168,9 +178,11 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height: 10,
                     ),
+
                     ...skill.learnings.map(
                           (
                           String item,
@@ -182,7 +194,8 @@ class SkillDetailsScreen extends StatelessWidget {
                             ),
                             child: Row(
                               crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                              CrossAxisAlignment
+                                  .start,
                               children: [
                                 Container(
                                   margin:
@@ -225,7 +238,8 @@ class SkillDetailsScreen extends StatelessWidget {
                                   child: Text(
                                     item,
                                     style:
-                                    AppTextStyles.secondary
+                                    AppTextStyles
+                                        .secondary
                                         .copyWith(
                                       color:
                                       _textColor(
@@ -238,22 +252,27 @@ class SkillDetailsScreen extends StatelessWidget {
                             ),
                           ),
                     ),
+
                     const SizedBox(
                       height: 20,
                     ),
+
                     _buildPrerequisiteCard(
                       context,
                     ),
+
                     const SizedBox(
                       height: 28,
                     ),
+
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'People offering this skill',
                             style:
-                            AppTextStyles.cardTitle
+                            AppTextStyles
+                                .cardTitle
                                 .copyWith(
                               color:
                               _textColor(
@@ -265,7 +284,8 @@ class SkillDetailsScreen extends StatelessWidget {
                         Text(
                           '${providers.length} available',
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _mutedColor(
@@ -275,9 +295,11 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+
                     const SizedBox(
                       height: 6,
                     ),
+
                     Text(
                       'Choose someone based on availability, experience, and what they want to learn in exchange.',
                       style:
@@ -289,9 +311,11 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height: 14,
                     ),
+
                     if (providers.isEmpty)
                       _buildNoProviders(
                         context,
@@ -356,6 +380,8 @@ class SkillDetailsScreen extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
+            tooltip:
+            'Back',
             onPressed: () {
               Navigator.pop(
                 context,
@@ -371,6 +397,7 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ),
           ),
+
           Expanded(
             child: Center(
               child: Text(
@@ -386,16 +413,10 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(
-              Icons.favorite_border_rounded,
-              size: 20,
-              color:
-              _primaryColor(
-                context,
-              ),
-            ),
+
+          const SizedBox(
+            width: 48,
+            height: 48,
           ),
         ],
       ),
@@ -410,7 +431,8 @@ class SkillDetailsScreen extends StatelessWidget {
       BuildContext context,
       ) {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.fromLTRB(
         16,
@@ -468,9 +490,11 @@ class SkillDetailsScreen extends StatelessWidget {
               size: 30,
             ),
           ),
+
           const SizedBox(
             width: 13,
           ),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -487,9 +511,11 @@ class SkillDetailsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 const SizedBox(
                   height: 4,
                 ),
+
                 Text(
                   skill.category,
                   style:
@@ -501,9 +527,11 @@ class SkillDetailsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 const SizedBox(
                   height: 8,
                 ),
+
                 Container(
                   padding:
                   const EdgeInsets.symmetric(
@@ -545,6 +573,7 @@ class SkillDetailsScreen extends StatelessWidget {
               ],
             ),
           ),
+
           Image.asset(
             'assets/images/mascot/tubi_explaining.png',
             width: 70,
@@ -699,7 +728,8 @@ class SkillDetailsScreen extends StatelessWidget {
       BuildContext context,
       ) {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         14,
@@ -816,7 +846,8 @@ class SkillDetailsScreen extends StatelessWidget {
         : wantedSkillTitles.first;
 
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         14,
@@ -843,33 +874,16 @@ class SkillDetailsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  AppTheme.accent,
-                  shape:
-                  BoxShape.circle,
-                ),
-                alignment:
-                Alignment.center,
-                child: Text(
-                  provider.initials,
-                  style:
-                  const TextStyle(
-                    fontSize: 12,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    Colors.white,
-                  ),
-                ),
+              _buildProviderAvatar(
+                provider,
+                size:
+                48,
               ),
+
               const SizedBox(
                 width: 11,
               ),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -877,6 +891,9 @@ class SkillDetailsScreen extends StatelessWidget {
                   children: [
                     Text(
                       provider.name,
+                      maxLines: 1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
                       AppTextStyles.cardTitle
                           .copyWith(
@@ -891,6 +908,9 @@ class SkillDetailsScreen extends StatelessWidget {
                     ),
                     Text(
                       '${provider.city} • ${offeredRelationship?.level ?? skill.level}',
+                      maxLines: 1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
                       AppTextStyles.caption
                           .copyWith(
@@ -903,7 +923,14 @@ class SkillDetailsScreen extends StatelessWidget {
                   ],
                 ),
               ),
+
+              const SizedBox(
+                width: 8,
+              ),
+
               Row(
+                mainAxisSize:
+                MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.star_rounded,
@@ -934,9 +961,11 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Row(
             children: [
               Icon(
@@ -965,9 +994,11 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(
             height: 7,
           ),
+
           Row(
             children: [
               Icon(
@@ -984,6 +1015,9 @@ class SkillDetailsScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Wants to learn: $wantsToLearn',
+                  maxLines: 2,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style:
                   AppTextStyles.secondary
                       .copyWith(
@@ -996,9 +1030,11 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(
             height: 14,
           ),
+
           Row(
             children: [
               Expanded(
@@ -1021,9 +1057,11 @@ class SkillDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(
                 width: 9,
               ),
+
               Expanded(
                 child: SizedBox(
                   height: 40,
@@ -1049,6 +1087,101 @@ class SkillDetailsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildProviderAvatar(
+      User provider, {
+        required double size,
+      }) {
+    final String? path =
+    provider.profileImagePath?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child:
+        hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder: (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              provider,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          provider,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      User provider, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      AppTheme.accent,
+      alignment:
+      Alignment.center,
+      child: Text(
+        provider.initials,
+        style:
+        TextStyle(
+          fontSize:
+          size >= 48
+              ? 12
+              : 11,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          Colors.white,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
   }
 
   // ============================================================
@@ -1104,8 +1237,7 @@ class SkillDetailsScreen extends StatelessWidget {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder:
-            (
+        builder: (
             BuildContext routeContext,
             ) =>
             CreateSwapRequestScreen(
@@ -1129,19 +1261,22 @@ class SkillDetailsScreen extends StatelessWidget {
       return;
     }
 
-    if (requestCreated == true) {
+    if (requestCreated ==
+        true) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(
-        SnackBar(
-          content:
-          Text(
-            'Your request to ${provider.name} is now Pending.',
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content:
+            Text(
+              'Your request to ${provider.name} is now Pending.',
+            ),
+            behavior:
+            SnackBarBehavior.floating,
           ),
-          behavior:
-          SnackBarBehavior.floating,
-        ),
-      );
+        );
     }
   }
 
@@ -1153,7 +1288,8 @@ class SkillDetailsScreen extends StatelessWidget {
       BuildContext context,
       ) {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         18,
@@ -1176,18 +1312,48 @@ class SkillDetailsScreen extends StatelessWidget {
           ),
         ),
       ),
-      child: Text(
-        'No providers are currently available for this skill.',
-        textAlign:
-        TextAlign.center,
-        style:
-        AppTextStyles.bodyMuted
-            .copyWith(
-          color:
-          _mutedColor(
-            context,
+      child: Column(
+        children: [
+          Icon(
+            Icons
+                .person_search_outlined,
+            size: 28,
+            color:
+            _mutedColor(
+              context,
+            ),
           ),
-        ),
+          const SizedBox(
+            height: 8,
+          ),
+          Text(
+            'No providers available',
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor(
+                context,
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 5,
+          ),
+          Text(
+            'No one is currently offering this skill.',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.bodyMuted
+                .copyWith(
+              color:
+              _mutedColor(
+                context,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
@@ -106,6 +108,10 @@ class _SwapRequestsScreenState
     _loadRequests();
   }
 
+  // ============================================================
+  // LOAD
+  // ============================================================
+
   Future<void> _loadRequests() async {
     if (mounted) {
       setState(() {
@@ -115,6 +121,8 @@ class _SwapRequestsScreenState
     }
 
     try {
+      await _exploreRepository.initialize();
+
       await _swapService.initialize();
 
       await _loadReviewStatuses();
@@ -192,6 +200,10 @@ class _SwapRequestsScreenState
       );
   }
 
+  // ============================================================
+  // FILTERED REQUESTS
+  // ============================================================
+
   List<SwapRequest> get _filteredRequests {
     final List<SwapRequest> requests =
     _swapService.requests
@@ -255,6 +267,10 @@ class _SwapRequestsScreenState
     ).toList();
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
       BuildContext context,
@@ -275,6 +291,8 @@ class _SwapRequestsScreenState
           elevation:
           0,
           leading: IconButton(
+            tooltip:
+            'Back',
             onPressed:
             _hasPendingAction
                 ? null
@@ -284,7 +302,8 @@ class _SwapRequestsScreenState
               );
             },
             icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons
+                  .arrow_back_ios_new_rounded,
               size:
               20,
               color:
@@ -295,7 +314,8 @@ class _SwapRequestsScreenState
           ),
           title: Text(
             'My Swap Requests',
-            style: TextStyle(
+            style:
+            TextStyle(
               fontSize:
               19,
               fontWeight:
@@ -367,7 +387,8 @@ class _SwapRequestsScreenState
                     children: [
                       Text(
                         'Manage your swaps',
-                        style: TextStyle(
+                        style:
+                        TextStyle(
                           fontSize:
                           17,
                           fontWeight:
@@ -382,7 +403,8 @@ class _SwapRequestsScreenState
                       ),
                       Text(
                         'Track incoming and outgoing skill requests.',
-                        style: TextStyle(
+                        style:
+                        TextStyle(
                           fontSize:
                           12.5,
                           height:
@@ -425,8 +447,7 @@ class _SwapRequestsScreenState
             Axis.horizontal,
             itemCount:
             _filters.length,
-            separatorBuilder:
-                (
+            separatorBuilder: (
                 _,
                 _,
                 ) =>
@@ -434,8 +455,7 @@ class _SwapRequestsScreenState
               width:
               8,
             ),
-            itemBuilder:
-                (
+            itemBuilder: (
                 BuildContext context,
                 int index,
                 ) {
@@ -447,7 +467,8 @@ class _SwapRequestsScreenState
                       _selectedFilter;
 
               return ChoiceChip(
-                label: Text(
+                label:
+                Text(
                   filter,
                 ),
                 selected:
@@ -522,8 +543,7 @@ class _SwapRequestsScreenState
             ),
             itemCount:
             requests.length,
-            separatorBuilder:
-                (
+            separatorBuilder: (
                 _,
                 _,
                 ) =>
@@ -531,8 +551,7 @@ class _SwapRequestsScreenState
               height:
               12,
             ),
-            itemBuilder:
-                (
+            itemBuilder: (
                 BuildContext context,
                 int index,
                 ) {
@@ -545,6 +564,10 @@ class _SwapRequestsScreenState
       ],
     );
   }
+
+  // ============================================================
+  // STATES
+  // ============================================================
 
   Widget _buildLoadingState() {
     return Center(
@@ -571,7 +594,8 @@ class _SwapRequestsScreenState
           ),
           Text(
             'Loading swap requests...',
-            style: TextStyle(
+            style:
+            TextStyle(
               fontSize:
               12.5,
               color:
@@ -595,7 +619,8 @@ class _SwapRequestsScreenState
           MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline_rounded,
+              Icons
+                  .error_outline_rounded,
               size:
               42,
               color:
@@ -607,7 +632,8 @@ class _SwapRequestsScreenState
             ),
             Text(
               'Could not load requests',
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize:
                 17,
                 fontWeight:
@@ -625,7 +651,8 @@ class _SwapRequestsScreenState
                   'Something went wrong.',
               textAlign:
               TextAlign.center,
-              style: TextStyle(
+              style:
+              TextStyle(
                 fontSize:
                 12.5,
                 height:
@@ -652,6 +679,10 @@ class _SwapRequestsScreenState
     );
   }
 
+  // ============================================================
+  // REQUEST CARD
+  // ============================================================
+
   Widget _buildRequestCard(
       SwapRequest request,
       ) {
@@ -673,39 +704,29 @@ class _SwapRequestsScreenState
       request.id,
     );
 
-    User? requesterUser;
-
-    final String? requesterUserId =
-        request.requesterUserId;
-
-    if (isIncoming &&
-        requesterUserId != null &&
-        requesterUserId
-            .trim()
-            .isNotEmpty) {
-      requesterUser =
-          _exploreRepository.findUserById(
-            requesterUserId,
-          );
-    }
+    final User? otherUser =
+    _findOtherParticipant(
+      request,
+      direction,
+    );
 
     final String displayInitials =
-    isIncoming
-        ? requesterUser?.initials ??
-        '?'
-        : request.providerInitials;
+        otherUser?.initials ??
+            (isIncoming
+                ? '?'
+                : request.providerInitials);
 
     final String displayName =
-    isIncoming
-        ? requesterUser?.name ??
-        'Incoming skill request'
-        : request.providerName;
+        otherUser?.name ??
+            (isIncoming
+                ? 'Incoming skill request'
+                : request.providerName);
 
     final String displayCity =
-    isIncoming
-        ? requesterUser?.city ??
-        'Sender profile unavailable'
-        : request.providerCity;
+        otherUser?.city ??
+            (isIncoming
+                ? 'Sender profile unavailable'
+                : request.providerCity);
 
     return Container(
       padding:
@@ -770,23 +791,13 @@ class _SwapRequestsScreenState
 
           Row(
             children: [
-              CircleAvatar(
-                radius:
-                23,
-                backgroundColor:
-                _softPrimaryColor,
-                child: Text(
-                  displayInitials,
-                  style:
-                  TextStyle(
-                    fontSize:
-                    14,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    _primaryColor,
-                  ),
-                ),
+              _buildUserAvatar(
+                user:
+                otherUser,
+                initials:
+                displayInitials,
+                size:
+                46,
               ),
 
               const SizedBox(
@@ -801,6 +812,10 @@ class _SwapRequestsScreenState
                   children: [
                     Text(
                       displayName,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
                       TextStyle(
                         fontSize:
@@ -817,6 +832,10 @@ class _SwapRequestsScreenState
                     ),
                     Text(
                       displayCity,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style:
                       TextStyle(
                         fontSize:
@@ -908,8 +927,7 @@ class _SwapRequestsScreenState
             request.mode,
           ),
 
-          if (request.meetingDetails !=
-              null &&
+          if (request.meetingDetails != null &&
               request.meetingDetails!
                   .trim()
                   .isNotEmpty) ...[
@@ -956,6 +974,64 @@ class _SwapRequestsScreenState
                   color:
                   _primaryColor,
                 ),
+              ),
+            ),
+          ],
+
+          if (request.status ==
+              SwapRequestStatus.scheduled &&
+              DateTime.now().isBefore(
+                request.proposedAt,
+              )) ...[
+            const SizedBox(
+              height:
+              10,
+            ),
+            Container(
+              width:
+              double.infinity,
+              padding:
+              const EdgeInsets.all(
+                10,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _softPrimaryColor,
+                borderRadius:
+                BorderRadius.circular(
+                  10,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons
+                        .schedule_rounded,
+                    size:
+                    17,
+                    color:
+                    _primaryColor,
+                  ),
+                  const SizedBox(
+                    width:
+                    7,
+                  ),
+                  Expanded(
+                    child: Text(
+                      'This session is still upcoming.',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        11.5,
+                        fontWeight:
+                        FontWeight.w600,
+                        color:
+                        _primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1079,6 +1155,139 @@ class _SwapRequestsScreenState
     );
   }
 
+  // ============================================================
+  // OTHER PARTICIPANT
+  // ============================================================
+
+  User? _findOtherParticipant(
+      SwapRequest request,
+      SwapRequestDirection direction,
+      ) {
+    String? userId;
+
+    if (direction ==
+        SwapRequestDirection.incoming) {
+      userId =
+          request.requesterUserId;
+    } else if (direction ==
+        SwapRequestDirection.outgoing) {
+      userId =
+          request.providerUserId;
+    }
+
+    final String cleanUserId =
+        userId?.trim() ??
+            '';
+
+    if (cleanUserId.isEmpty) {
+      return null;
+    }
+
+    return _exploreRepository.findUserById(
+      cleanUserId,
+    );
+  }
+
+  Widget _buildUserAvatar({
+    required User? user,
+    required String initials,
+    required double size,
+  }) {
+    final String? path =
+    user
+        ?.profileImagePath
+        ?.trim();
+
+    final bool hasImage =
+        path != null &&
+            path.isNotEmpty &&
+            _profileImageExists(
+              path,
+            );
+
+    return ClipOval(
+      child: SizedBox(
+        width:
+        size,
+        height:
+        size,
+        child:
+        hasImage
+            ? Image.file(
+          File(
+            path,
+          ),
+          width:
+          size,
+          height:
+          size,
+          fit:
+          BoxFit.cover,
+          errorBuilder: (
+              BuildContext context,
+              Object error,
+              StackTrace? stackTrace,
+              ) {
+            return _buildInitialAvatar(
+              initials,
+              size:
+              size,
+            );
+          },
+        )
+            : _buildInitialAvatar(
+          initials,
+          size:
+          size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInitialAvatar(
+      String initials, {
+        required double size,
+      }) {
+    return Container(
+      width:
+      size,
+      height:
+      size,
+      color:
+      _softPrimaryColor,
+      alignment:
+      Alignment.center,
+      child: Text(
+        initials,
+        style:
+        TextStyle(
+          fontSize:
+          14,
+          fontWeight:
+          FontWeight.w800,
+          color:
+          _primaryColor,
+        ),
+      ),
+    );
+  }
+
+  bool _profileImageExists(
+      String path,
+      ) {
+    try {
+      return File(
+        path,
+      ).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ============================================================
+  // ACTION AVAILABILITY
+  // ============================================================
+
   bool _hasAvailableAction(
       SwapRequest request,
       ) {
@@ -1134,6 +1343,10 @@ class _SwapRequestsScreenState
           _currentUserId,
         );
   }
+
+  // ============================================================
+  // ACTION BUTTONS
+  // ============================================================
 
   Widget _buildActions({
     required SwapRequest request,
@@ -1211,7 +1424,8 @@ class _SwapRequestsScreenState
               },
               icon:
               const Icon(
-                Icons.edit_calendar_outlined,
+                Icons
+                    .edit_calendar_outlined,
                 size:
                 18,
               ),
@@ -1240,7 +1454,8 @@ class _SwapRequestsScreenState
               },
               icon:
               const Icon(
-                Icons.event_available_outlined,
+                Icons
+                    .event_available_outlined,
                 size:
                 18,
               ),
@@ -1270,6 +1485,11 @@ class _SwapRequestsScreenState
 
     if (request.status ==
         SwapRequestStatus.scheduled) {
+      final bool sessionTimeReached =
+      !DateTime.now().isBefore(
+        request.proposedAt,
+      );
+
       return Column(
         children: [
           SizedBox(
@@ -1297,17 +1517,20 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
+
           const SizedBox(
             height:
             9,
           ),
+
           SizedBox(
             width:
             double.infinity,
             child:
             ElevatedButton(
               onPressed:
-              blocked
+              blocked ||
+                  !sessionTimeReached
                   ? null
                   : () {
                 _confirmComplete(
@@ -1315,11 +1538,14 @@ class _SwapRequestsScreenState
                 );
               },
               child:
-              const Text(
-                'MARK AS COMPLETED',
+              Text(
+                sessionTimeReached
+                    ? 'MARK AS COMPLETED'
+                    : 'SESSION UPCOMING',
               ),
             ),
           ),
+
           if (isOutgoing &&
               request.canCancel(
                 _currentUserId,
@@ -1360,7 +1586,8 @@ class _SwapRequestsScreenState
                 },
                 icon:
                 const Icon(
-                  Icons.star_outline_rounded,
+                  Icons
+                      .star_outline_rounded,
                   size:
                   19,
                 ),
@@ -1370,6 +1597,7 @@ class _SwapRequestsScreenState
                 ),
               ),
             ),
+
           if (_canReview(
             request,
           ) &&
@@ -1380,6 +1608,7 @@ class _SwapRequestsScreenState
               height:
               9,
             ),
+
           if (_canRemoveFromHistory(
             request,
           ))
@@ -1507,13 +1736,11 @@ class _SwapRequestsScreenState
       context,
       barrierDismissible:
       false,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return StatefulBuilder(
-          builder:
-              (
+          builder: (
               BuildContext context,
               StateSetter setDialogState,
               ) {
@@ -1568,8 +1795,7 @@ class _SwapRequestsScreenState
                               index + 1;
 
                           return IconButton(
-                            onPressed:
-                                () {
+                            onPressed: () {
                               setDialogState(() {
                                 selectedRating =
                                     starValue;
@@ -1580,7 +1806,8 @@ class _SwapRequestsScreenState
                               starValue <=
                                   selectedRating
                                   ? Icons.star_rounded
-                                  : Icons.star_outline_rounded,
+                                  : Icons
+                                  .star_outline_rounded,
                               size:
                               34,
                               color:
@@ -1654,8 +1881,7 @@ class _SwapRequestsScreenState
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      () {
+                  onPressed: () {
                     Navigator.pop(
                       dialogContext,
                       false,
@@ -1731,8 +1957,7 @@ class _SwapRequestsScreenState
 
       setState(() {
         _reviewedRequests[
-        requestId
-        ] = true;
+        requestId] = true;
       });
 
       _showMessage(
@@ -1810,13 +2035,11 @@ class _SwapRequestsScreenState
       context,
       barrierDismissible:
       false,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return StatefulBuilder(
-          builder:
-              (
+          builder: (
               BuildContext context,
               StateSetter setDialogState,
               ) {
@@ -1826,7 +2049,8 @@ class _SwapRequestsScreenState
               title:
               Text(
                 request.status ==
-                    SwapRequestStatus.scheduled
+                    SwapRequestStatus
+                        .scheduled
                     ? 'Reschedule session'
                     : 'Edit schedule',
                 style:
@@ -1846,7 +2070,8 @@ class _SwapRequestsScreenState
                   CrossAxisAlignment.start,
                   children: [
                     if (request.status ==
-                        SwapRequestStatus.scheduled) ...[
+                        SwapRequestStatus
+                            .scheduled) ...[
                       Container(
                         width:
                         double.infinity,
@@ -1882,6 +2107,7 @@ class _SwapRequestsScreenState
                         16,
                       ),
                     ],
+
                     Text(
                       'Date',
                       style:
@@ -1894,10 +2120,12 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       7,
                     ),
+
                     SizedBox(
                       width:
                       double.infinity,
@@ -1942,7 +2170,8 @@ class _SwapRequestsScreenState
                             ),
                           );
 
-                          if (result == null) {
+                          if (result ==
+                              null) {
                             return;
                           }
 
@@ -1953,7 +2182,8 @@ class _SwapRequestsScreenState
                         },
                         icon:
                         const Icon(
-                          Icons.calendar_today_outlined,
+                          Icons
+                              .calendar_today_outlined,
                           size:
                           17,
                         ),
@@ -1965,10 +2195,12 @@ class _SwapRequestsScreenState
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       14,
                     ),
+
                     Text(
                       'Time',
                       style:
@@ -1981,10 +2213,12 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       7,
                     ),
+
                     SizedBox(
                       width:
                       double.infinity,
@@ -2000,7 +2234,8 @@ class _SwapRequestsScreenState
                             selectedTime,
                           );
 
-                          if (result == null) {
+                          if (result ==
+                              null) {
                             return;
                           }
 
@@ -2011,7 +2246,8 @@ class _SwapRequestsScreenState
                         },
                         icon:
                         const Icon(
-                          Icons.schedule_rounded,
+                          Icons
+                              .schedule_rounded,
                           size:
                           18,
                         ),
@@ -2023,10 +2259,12 @@ class _SwapRequestsScreenState
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       14,
                     ),
+
                     Text(
                       'Session mode',
                       style:
@@ -2039,10 +2277,12 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       8,
                     ),
+
                     Row(
                       children: [
                         Expanded(
@@ -2057,8 +2297,7 @@ class _SwapRequestsScreenState
                                 'Online',
                             showCheckmark:
                             false,
-                            onSelected:
-                                (_) {
+                            onSelected: (_) {
                               setDialogState(() {
                                 selectedMode =
                                 'Online';
@@ -2082,8 +2321,7 @@ class _SwapRequestsScreenState
                                 'In-person',
                             showCheckmark:
                             false,
-                            onSelected:
-                                (_) {
+                            onSelected: (_) {
                               setDialogState(() {
                                 selectedMode =
                                 'In-person';
@@ -2093,10 +2331,12 @@ class _SwapRequestsScreenState
                         ),
                       ],
                     ),
+
                     const SizedBox(
                       height:
                       14,
                     ),
+
                     Text(
                       selectedMode ==
                           'Online'
@@ -2112,10 +2352,12 @@ class _SwapRequestsScreenState
                         _textColor,
                       ),
                     ),
+
                     const SizedBox(
                       height:
                       7,
                     ),
+
                     TextField(
                       controller:
                       detailsController,
@@ -2135,8 +2377,7 @@ class _SwapRequestsScreenState
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      () {
+                  onPressed: () {
                     Navigator.pop(
                       dialogContext,
                       false,
@@ -2148,10 +2389,10 @@ class _SwapRequestsScreenState
                   ),
                 ),
                 ElevatedButton(
-                  onPressed:
-                      () {
+                  onPressed: () {
                     final String details =
-                    detailsController.text
+                    detailsController
+                        .text
                         .trim();
 
                     if (details.isEmpty) {
@@ -2215,8 +2456,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.updateSchedule(
             requestId:
             request.id,
@@ -2238,7 +2478,7 @@ class _SwapRequestsScreenState
   }
 
   // ============================================================
-  // BADGES / DETAILS
+  // BADGES
   // ============================================================
 
   Widget _buildDirectionBadge(
@@ -2399,6 +2639,10 @@ class _SwapRequestsScreenState
     );
   }
 
+  // ============================================================
+  // DETAILS
+  // ============================================================
+
   Widget _buildSkillRow({
     required IconData icon,
     required String label,
@@ -2545,8 +2789,7 @@ class _SwapRequestsScreenState
     await showDialog<bool>(
       context:
       context,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
@@ -2560,8 +2803,7 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   false,
@@ -2573,8 +2815,7 @@ class _SwapRequestsScreenState
               ),
             ),
             ElevatedButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -2590,15 +2831,15 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true) {
+    if (confirmed !=
+        true) {
       return;
     }
 
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.acceptRequest(
             requestId:
             request.id,
@@ -2616,8 +2857,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.declineRequest(
             requestId:
             request.id,
@@ -2635,8 +2875,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.cancelRequest(
             requestId:
             request.id,
@@ -2664,8 +2903,7 @@ class _SwapRequestsScreenState
     await showDialog<bool>(
       context:
       context,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
@@ -2681,8 +2919,7 @@ class _SwapRequestsScreenState
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   false,
@@ -2694,8 +2931,7 @@ class _SwapRequestsScreenState
               ),
             ),
             ElevatedButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -2711,15 +2947,15 @@ class _SwapRequestsScreenState
       },
     );
 
-    if (confirmed != true) {
+    if (confirmed !=
+        true) {
       return;
     }
 
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.scheduleRequest(
             requestId:
             request.id,
@@ -2746,8 +2982,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.completeRequest(
             requestId:
             request.id,
@@ -2763,8 +2998,7 @@ class _SwapRequestsScreenState
     }
 
     _reviewedRequests[
-    request.id
-    ] = false;
+    request.id] = false;
   }
 
   Future<void> _confirmRemoveFromHistory(
@@ -2773,8 +3007,7 @@ class _SwapRequestsScreenState
     await _performAction(
       requestId:
       request.id,
-      action:
-          () =>
+      action: () =>
           _swapService.deleteRequest(
             requestId:
             request.id,
@@ -2794,9 +3027,10 @@ class _SwapRequestsScreenState
     final String cleanRequestId =
     requestId.trim();
 
-    if (_processingRequestIds.contains(
-      cleanRequestId,
-    )) {
+    if (cleanRequestId.isEmpty ||
+        _processingRequestIds.contains(
+          cleanRequestId,
+        )) {
       return;
     }
 
