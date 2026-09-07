@@ -1192,13 +1192,19 @@ class _SmartMatchesScreenState
         return;
       }
 
-      if (requestCreated ==
-          true) {
+      // Unlock the screen immediately after coming back
+      // from CreateSwapRequestScreen.
+      setState(() {
+        _openingSwapUserId = null;
+      });
+
+      if (requestCreated == true) {
         _showMessage(
           'Your request to ${match.user.name} is now Pending.',
         );
       }
 
+      // Refresh only after the UI has been unlocked.
       await _loadMatches(
         showLoading:
         false,
@@ -1208,14 +1214,20 @@ class _SmartMatchesScreenState
         return;
       }
 
+      if (_openingSwapUserId != null) {
+        setState(() {
+          _openingSwapUserId = null;
+        });
+      }
+
       _showMessage(
         'Swap request screen could not be opened. Please try again.',
       );
     } finally {
-      if (mounted) {
+      if (mounted &&
+          _openingSwapUserId != null) {
         setState(() {
-          _openingSwapUserId =
-          null;
+          _openingSwapUserId = null;
         });
       }
     }
