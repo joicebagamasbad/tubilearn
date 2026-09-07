@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../model/repositories/my_skills_repository.dart';
 import '../services/current_user_service.dart';
+import '../theme/app_theme.dart';
 
 class AddSkillScreen extends StatefulWidget {
   const AddSkillScreen({
@@ -29,11 +30,15 @@ class _AddSkillScreenState
 
   String? _selectedCategory;
 
-  String _experienceLevel = 'Intermediate';
+  String _experienceLevel =
+      'Intermediate';
 
-  String _availability = 'Weekends';
+  String _availability =
+      'Weekends';
 
   bool _saving = false;
+  bool _isExitDialogOpen = false;
+  bool _allowPop = false;
 
   final List<String> _categories = [
     'Design & Creative',
@@ -90,6 +95,20 @@ class _AddSkillScreenState
       )
           : Colors.white;
 
+  bool get _hasDraft {
+    return _skillNameController.text
+        .trim()
+        .isNotEmpty ||
+        _descriptionController.text
+            .trim()
+            .isNotEmpty ||
+        _selectedCategory != null ||
+        _experienceLevel !=
+            'Intermediate' ||
+        _availability !=
+            'Weekends';
+  }
+
   @override
   void dispose() {
     _skillNameController.dispose();
@@ -98,104 +117,289 @@ class _AddSkillScreenState
     super.dispose();
   }
 
-  @override
-  Widget build(
-      BuildContext context,
+  // ============================================================
+  // BACK / DRAFT PROTECTION
+  // ============================================================
+
+  void _handlePopAttempt(
+      bool didPop,
       ) {
-    return Scaffold(
-      backgroundColor:
-      Theme.of(context)
-          .scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  16,
-                  20,
-                  30,
+    if (didPop ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    _confirmDiscardDraft();
+  }
+
+  Future<void> _confirmDiscardDraft() async {
+    if (!mounted ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    if (!_hasDraft) {
+      setState(() {
+        _allowPop = true;
+      });
+
+      Navigator.pop(
+        context,
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _isExitDialogOpen = true;
+
+    final bool? discard =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
+            'Discard offered skill?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content: Text(
+            'You have an unfinished offered skill. '
+                'Leaving now will discard the details you entered.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: Text(
+                'KEEP EDITING',
+                style: TextStyle(
+                  color:
+                  _primaryColor,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildIntro(),
-                    const SizedBox(
-                      height: 22,
-                    ),
-                    _buildLabel(
-                      'Skill Name',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildSkillNameField(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Category',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildCategoryDropdown(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Description',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildDescriptionField(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Experience Level',
-                    ),
-                    const SizedBox(
-                      height: 10,
-                    ),
-                    _buildExperienceSelector(),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    _buildLabel(
-                      'Availability',
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    _buildAvailabilitySelector(),
-                    const SizedBox(
-                      height: 28,
-                    ),
-                    _buildAddButton(),
-                  ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                'DISCARD',
+                style: TextStyle(
+                  color:
+                  AppTheme.error,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
               ),
             ),
           ],
+        );
+      },
+    );
+
+    _isExitDialogOpen = false;
+
+    if (!mounted ||
+        discard != true) {
+      return;
+    }
+
+    setState(() {
+      _allowPop = true;
+    });
+
+    Navigator.pop(
+      context,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return PopScope(
+      canPop:
+      !_saving &&
+          (_allowPop || !_hasDraft),
+      onPopInvokedWithResult: (
+          bool didPop,
+          Object? result,
+          ) {
+        _handlePopAttempt(
+          didPop,
+        );
+      },
+      child: Scaffold(
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              Expanded(
+                child:
+                SingleChildScrollView(
+                  physics:
+                  const BouncingScrollPhysics(),
+                  padding:
+                  const EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    30,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      _buildIntro(),
+
+                      const SizedBox(
+                        height:
+                        22,
+                      ),
+
+                      _buildLabel(
+                        'Skill Name',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildSkillNameField(),
+
+                      const SizedBox(
+                        height:
+                        20,
+                      ),
+
+                      _buildLabel(
+                        'Category',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildCategoryDropdown(),
+
+                      const SizedBox(
+                        height:
+                        20,
+                      ),
+
+                      _buildLabel(
+                        'Description',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildDescriptionField(),
+
+                      const SizedBox(
+                        height:
+                        20,
+                      ),
+
+                      _buildLabel(
+                        'Experience Level',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        10,
+                      ),
+
+                      _buildExperienceSelector(),
+
+                      const SizedBox(
+                        height:
+                        20,
+                      ),
+
+                      _buildLabel(
+                        'Availability',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildAvailabilitySelector(),
+
+                      const SizedBox(
+                        height:
+                        28,
+                      ),
+
+                      _buildAddButton(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  // ============================================================
+  // TOP BAR
+  // ============================================================
+
   Widget _buildTopBar() {
     return Container(
-      height: 60,
+      height:
+      60,
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 10,
+        horizontal:
+        10,
       ),
       decoration:
       BoxDecoration(
@@ -210,35 +414,39 @@ class _AddSkillScreenState
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           IconButton(
+            tooltip:
+            'Back',
             onPressed:
             _saving
                 ? null
-                : () {
-              Navigator.pop(
-                context,
-              );
-            },
+                : _confirmDiscardDraft,
             icon:
             Icon(
               Icons
                   .arrow_back_ios_new_rounded,
-              size: 18,
+              size:
+              18,
               color:
               _saving
                   ? _mutedColor
                   : _primaryColor,
             ),
           ),
+
           Expanded(
-            child: Center(
-              child: Text(
+            child:
+            Center(
+              child:
+              Text(
                 'Add Skill',
                 style:
                 TextStyle(
-                  fontSize: 15,
+                  fontSize:
+                  15,
                   fontWeight:
                   FontWeight.w800,
                   color:
@@ -247,13 +455,19 @@ class _AddSkillScreenState
               ),
             ),
           ),
+
           const SizedBox(
-            width: 48,
+            width:
+            48,
           ),
         ],
       ),
     );
   }
+
+  // ============================================================
+  // INTRO
+  // ============================================================
 
   Widget _buildIntro() {
     return Row(
@@ -261,25 +475,34 @@ class _AddSkillScreenState
       CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Text(
+          child:
+          Text(
             'Share what you can teach with the community.',
             style:
             TextStyle(
-              fontSize: 11,
-              height: 1.4,
+              fontSize:
+              11,
+              height:
+              1.4,
               color:
               _mutedColor,
             ),
           ),
         ),
+
         const SizedBox(
-          width: 10,
+          width:
+          10,
         ),
+
         Image.asset(
           'assets/images/mascot/tubi_explaining.png',
-          width: 66,
-          height: 66,
-          fit: BoxFit.contain,
+          width:
+          66,
+          height:
+          66,
+          fit:
+          BoxFit.contain,
         ),
       ],
     );
@@ -292,7 +515,8 @@ class _AddSkillScreenState
       text,
       style:
       TextStyle(
-        fontSize: 12,
+        fontSize:
+        12,
         fontWeight:
         FontWeight.w700,
         color:
@@ -300,6 +524,10 @@ class _AddSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // SKILL NAME
+  // ============================================================
 
   Widget _buildSkillNameField() {
     return TextField(
@@ -309,12 +537,24 @@ class _AddSkillScreenState
       !_saving,
       maxLength:
       80,
+      textCapitalization:
+      TextCapitalization.words,
       style:
       TextStyle(
-        fontSize: 12,
+        fontSize:
+        12,
         color:
         _textColor,
       ),
+      onChanged: (
+          String value,
+          ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {});
+      },
       decoration:
       InputDecoration(
         hintText:
@@ -323,14 +563,16 @@ class _AddSkillScreenState
         '',
         hintStyle:
         TextStyle(
-          fontSize: 11,
+          fontSize:
+          11,
           color:
           _mutedColor,
         ),
         prefixIcon:
         Icon(
           Icons.lightbulb_outline_rounded,
-          size: 19,
+          size:
+          19,
           color:
           _primaryColor,
         ),
@@ -340,8 +582,10 @@ class _AddSkillScreenState
         _surfaceColor,
         contentPadding:
         const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
+          horizontal:
+          14,
+          vertical:
+          14,
         ),
         border:
         OutlineInputBorder(
@@ -395,6 +639,10 @@ class _AddSkillScreenState
     );
   }
 
+  // ============================================================
+  // CATEGORY
+  // ============================================================
+
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
       initialValue:
@@ -408,7 +656,8 @@ class _AddSkillScreenState
         'Select category',
         style:
         TextStyle(
-          fontSize: 11,
+          fontSize:
+          11,
           color:
           _mutedColor,
         ),
@@ -424,7 +673,8 @@ class _AddSkillScreenState
         prefixIcon:
         Icon(
           Icons.grid_view_rounded,
-          size: 18,
+          size:
+          18,
           color:
           _primaryColor,
         ),
@@ -434,8 +684,10 @@ class _AddSkillScreenState
         _surfaceColor,
         contentPadding:
         const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
+          horizontal:
+          14,
+          vertical:
+          14,
         ),
         border:
         OutlineInputBorder(
@@ -501,7 +753,8 @@ class _AddSkillScreenState
               TextOverflow.ellipsis,
               style:
               TextStyle(
-                fontSize: 11,
+                fontSize:
+                11,
                 color:
                 _textColor,
               ),
@@ -523,6 +776,10 @@ class _AddSkillScreenState
     );
   }
 
+  // ============================================================
+  // DESCRIPTION
+  // ============================================================
+
   Widget _buildDescriptionField() {
     return Stack(
       children: [
@@ -535,9 +792,12 @@ class _AddSkillScreenState
           5,
           maxLength:
           200,
+          textCapitalization:
+          TextCapitalization.sentences,
           style:
           TextStyle(
-            fontSize: 12,
+            fontSize:
+            12,
             color:
             _textColor,
           ),
@@ -547,7 +807,8 @@ class _AddSkillScreenState
             'Tell others what they can learn from you...',
             hintStyle:
             TextStyle(
-              fontSize: 11,
+              fontSize:
+              11,
               color:
               _mutedColor,
             ),
@@ -613,19 +874,25 @@ class _AddSkillScreenState
               ),
             ),
           ),
-          onChanged: (_) {
+          onChanged: (
+              String value,
+              ) {
             setState(() {});
           },
         ),
+
         Positioned(
-          right: 12,
-          bottom: 10,
+          right:
+          12,
+          bottom:
+          10,
           child:
           Text(
             '${_descriptionController.text.length}/200',
             style:
             TextStyle(
-              fontSize: 9,
+              fontSize:
+              9,
               color:
               _mutedColor,
             ),
@@ -634,6 +901,10 @@ class _AddSkillScreenState
       ],
     );
   }
+
+  // ============================================================
+  // EXPERIENCE
+  // ============================================================
 
   Widget _buildExperienceSelector() {
     final List<String> levels = [
@@ -653,16 +924,20 @@ class _AddSkillScreenState
                   level;
 
           return Expanded(
-            child: Padding(
+            child:
+            Padding(
               padding:
               EdgeInsets.only(
                 right:
-                level == 'Advanced'
+                level ==
+                    'Advanced'
                     ? 0
                     : 8,
               ),
-              child: SizedBox(
-                height: 42,
+              child:
+              SizedBox(
+                height:
+                42,
                 child:
                 OutlinedButton(
                   onPressed:
@@ -706,7 +981,8 @@ class _AddSkillScreenState
                     level,
                     style:
                     TextStyle(
-                      fontSize: 9,
+                      fontSize:
+                      9,
                       fontWeight:
                       isSelected
                           ? FontWeight.w700
@@ -722,6 +998,10 @@ class _AddSkillScreenState
     );
   }
 
+  // ============================================================
+  // AVAILABILITY
+  // ============================================================
+
   Widget _buildAvailabilitySelector() {
     return InkWell(
       borderRadius:
@@ -734,10 +1014,12 @@ class _AddSkillScreenState
           : _showAvailabilitySheet,
       child:
       Container(
-        height: 48,
+        height:
+        48,
         padding:
         const EdgeInsets.symmetric(
-          horizontal: 14,
+          horizontal:
+          14,
         ),
         decoration:
         BoxDecoration(
@@ -758,28 +1040,35 @@ class _AddSkillScreenState
           children: [
             Icon(
               Icons.calendar_month_outlined,
-              size: 19,
+              size:
+              19,
               color:
               _primaryColor,
             ),
+
             const SizedBox(
-              width: 10,
+              width:
+              10,
             ),
+
             Expanded(
               child:
               Text(
                 _availability,
                 style:
                 TextStyle(
-                  fontSize: 11,
+                  fontSize:
+                  11,
                   color:
                   _textColor,
                 ),
               ),
             ),
+
             Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 14,
+              size:
+              14,
               color:
               _mutedColor,
             ),
@@ -789,14 +1078,18 @@ class _AddSkillScreenState
     );
   }
 
-  void _showAvailabilitySheet() {
-    showModalBottomSheet(
+  Future<void> _showAvailabilitySheet() async {
+    if (_saving) {
+      return;
+    }
+
+    final String? selected =
+    await showModalBottomSheet<String>(
       context:
       context,
       backgroundColor:
       Colors.transparent,
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return Container(
@@ -825,8 +1118,10 @@ class _AddSkillScreenState
             MainAxisSize.min,
             children: [
               Container(
-                width: 40,
-                height: 4,
+                width:
+                40,
+                height:
+                4,
                 decoration:
                 BoxDecoration(
                   color:
@@ -837,9 +1132,12 @@ class _AddSkillScreenState
                   ),
                 ),
               ),
+
               const SizedBox(
-                height: 18,
+                height:
+                18,
               ),
+
               Align(
                 alignment:
                 Alignment.centerLeft,
@@ -848,7 +1146,8 @@ class _AddSkillScreenState
                   'Choose Availability',
                   style:
                   TextStyle(
-                    fontSize: 15,
+                    fontSize:
+                    15,
                     fontWeight:
                     FontWeight.w800,
                     color:
@@ -856,9 +1155,12 @@ class _AddSkillScreenState
                   ),
                 ),
               ),
+
               const SizedBox(
-                height: 10,
+                height:
+                10,
               ),
+
               ..._availabilityOptions.map(
                     (
                     String option,
@@ -875,7 +1177,8 @@ class _AddSkillScreenState
                       option,
                       style:
                       TextStyle(
-                        fontSize: 12,
+                        fontSize:
+                        12,
                         fontWeight:
                         selected
                             ? FontWeight.w700
@@ -893,13 +1196,9 @@ class _AddSkillScreenState
                     )
                         : null,
                     onTap: () {
-                      setState(() {
-                        _availability =
-                            option;
-                      });
-
                       Navigator.pop(
                         sheetContext,
+                        option,
                       );
                     },
                   );
@@ -910,7 +1209,21 @@ class _AddSkillScreenState
         );
       },
     );
+
+    if (!mounted ||
+        selected == null) {
+      return;
+    }
+
+    setState(() {
+      _availability =
+          selected;
+    });
   }
+
+  // ============================================================
+  // ADD BUTTON
+  // ============================================================
 
   Widget _buildAddButton() {
     return SizedBox(
@@ -952,11 +1265,14 @@ class _AddSkillScreenState
         child:
         _saving
             ? SizedBox(
-          width: 20,
-          height: 20,
+          width:
+          20,
+          height:
+          20,
           child:
           CircularProgressIndicator(
-            strokeWidth: 2,
+            strokeWidth:
+            2,
             color:
             _primaryForeground,
           ),
@@ -965,7 +1281,8 @@ class _AddSkillScreenState
           'ADD SKILL',
           style:
           TextStyle(
-            fontSize: 11,
+            fontSize:
+            11,
             fontWeight:
             FontWeight.w800,
             letterSpacing:
@@ -976,7 +1293,15 @@ class _AddSkillScreenState
     );
   }
 
+  // ============================================================
+  // SAVE
+  // ============================================================
+
   Future<void> _saveSkill() async {
+    if (_saving) {
+      return;
+    }
+
     final String title =
     _skillNameController.text.trim();
 
@@ -990,7 +1315,18 @@ class _AddSkillScreenState
       return;
     }
 
-    if (_selectedCategory == null) {
+    if (title.length > 80) {
+      _showMessage(
+        'Skill name must be 80 characters or less.',
+      );
+      return;
+    }
+
+    final String? selectedCategory =
+        _selectedCategory;
+
+    if (selectedCategory == null ||
+        selectedCategory.trim().isEmpty) {
       _showMessage(
         'Please select a category.',
       );
@@ -1004,8 +1340,20 @@ class _AddSkillScreenState
       return;
     }
 
+    if (description.length > 200) {
+      _showMessage(
+        'Description must be 200 characters or less.',
+      );
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
     setState(() {
-      _saving = true;
+      _saving =
+      true;
     });
 
     try {
@@ -1015,7 +1363,7 @@ class _AddSkillScreenState
         title:
         title,
         category:
-        _selectedCategory!,
+        selectedCategory,
         description:
         description,
         level:
@@ -1028,48 +1376,94 @@ class _AddSkillScreenState
         return;
       }
 
+      setState(() {
+        _allowPop =
+        true;
+      });
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(
-        const SnackBar(
-          content:
-          Text(
-            'Skill added successfully!',
+      )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content:
+            Text(
+              'Skill added successfully!',
+            ),
           ),
-        ),
-      );
+        );
 
       Navigator.pop(
         context,
         true,
       );
-    } catch (error) {
+    } on CurrentUserServiceException catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _saving = false;
+        _saving =
+        false;
       });
 
       _showMessage(
-        error.toString(),
+        error.message,
+      );
+    } on MySkillsRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _saving =
+        false;
+      });
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _saving =
+        false;
+      });
+
+      _showMessage(
+        'Could not add the skill. Please try again.',
       );
     }
   }
 
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
   void _showMessage(
       String message,
       ) {
+    if (!mounted) {
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(
-      SnackBar(
-        content:
-        Text(
-          message,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
   }
 }

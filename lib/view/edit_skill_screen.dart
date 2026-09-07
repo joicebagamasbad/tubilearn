@@ -35,7 +35,15 @@ class _EditSkillScreenState
   late String _availability;
   late bool _canEditMetadata;
 
+  late final String _originalSkillName;
+  late final String _originalDescription;
+  late final String _originalCategory;
+  late final String _originalExperienceLevel;
+  late final String _originalAvailability;
+
   bool _saving = false;
+  bool _allowPop = false;
+  bool _isExitDialogOpen = false;
 
   final List<String> _categories = [
     'Design & Creative',
@@ -117,6 +125,26 @@ class _EditSkillScreenState
       )
           : Colors.white;
 
+  bool get _hasUnsavedChanges {
+    final bool metadataChanged =
+        _canEditMetadata &&
+            (_skillNameController.text.trim() !=
+                _originalSkillName ||
+                _descriptionController.text.trim() !=
+                    _originalDescription ||
+                _category !=
+                    _originalCategory);
+
+    final bool teachingSettingsChanged =
+        _experienceLevel !=
+            _originalExperienceLevel ||
+            _availability !=
+                _originalAvailability;
+
+    return metadataChanged ||
+        teachingSettingsChanged;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +182,21 @@ class _EditSkillScreenState
           _currentUser.userId,
         );
 
+    _originalSkillName =
+        skill.title.trim();
+
+    _originalDescription =
+        skill.description.trim();
+
+    _originalCategory =
+        skill.category;
+
+    _originalExperienceLevel =
+        userSkill.level;
+
+    _originalAvailability =
+        userSkill.availability;
+
     if (!_categories.contains(
       _category,
     )) {
@@ -181,126 +224,298 @@ class _EditSkillScreenState
     super.dispose();
   }
 
-  @override
-  Widget build(
-      BuildContext context,
+  // ============================================================
+  // UNSAVED CHANGES
+  // ============================================================
+
+  void _handlePopAttempt(
+      bool didPop,
       ) {
-    return Scaffold(
-      backgroundColor:
-      Theme.of(context)
-          .scaffoldBackgroundColor,
-      body:
-      SafeArea(
-        child:
-        Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
+    if (didPop ||
+        _saving ||
+        _allowPop ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    _confirmDiscardChanges();
+  }
+
+  Future<void> _confirmDiscardChanges() async {
+    if (!mounted ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _allowPop = true;
+      });
+
+      Navigator.pop(
+        context,
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _isExitDialogOpen = true;
+
+    final bool? discard =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Text(
+            'Discard changes?',
+            style:
+            TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content:
+          Text(
+            'You changed this offered skill but have not saved it yet. '
+                'Leaving now will discard those edits.',
+            style:
+            TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
               child:
-              SingleChildScrollView(
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  18,
-                  20,
-                  30,
+              Text(
+                'KEEP EDITING',
+                style:
+                TextStyle(
+                  color:
+                  _primaryColor,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
-                child:
-                Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildIntro(),
-
-                    if (!_canEditMetadata)
-                      _buildSharedSkillNotice(),
-
-                    const SizedBox(
-                      height: 20,
-                    ),
-
-                    _buildLabel(
-                      'Skill Name',
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    _buildSkillNameField(),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _buildLabel(
-                      'Category',
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    _buildCategoryField(),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _buildLabel(
-                      'Description',
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    _buildDescriptionField(),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _buildLabel(
-                      'Your Experience Level',
-                    ),
-
-                    const SizedBox(
-                      height: 10,
-                    ),
-
-                    _buildExperienceLevel(),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _buildLabel(
-                      'Your Availability',
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    _buildAvailabilityField(),
-
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    _buildUpdateButton(),
-                  ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'DISCARD',
+                style:
+                TextStyle(
+                  color:
+                  Colors.redAccent,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
               ),
             ),
           ],
+        );
+      },
+    );
+
+    _isExitDialogOpen = false;
+
+    if (!mounted ||
+        discard != true) {
+      return;
+    }
+
+    setState(() {
+      _allowPop =
+      true;
+    });
+
+    Navigator.pop(
+      context,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return PopScope(
+      canPop:
+      !_saving &&
+          (_allowPop ||
+              !_hasUnsavedChanges),
+      onPopInvokedWithResult: (
+          bool didPop,
+          Object? result,
+          ) {
+        _handlePopAttempt(
+          didPop,
+        );
+      },
+      child:
+      Scaffold(
+        backgroundColor:
+        Theme.of(context)
+            .scaffoldBackgroundColor,
+        body:
+        SafeArea(
+          child:
+          Column(
+            children: [
+              _buildTopBar(),
+              Expanded(
+                child:
+                SingleChildScrollView(
+                  physics:
+                  const BouncingScrollPhysics(),
+                  padding:
+                  const EdgeInsets.fromLTRB(
+                    20,
+                    18,
+                    20,
+                    30,
+                  ),
+                  child:
+                  Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      _buildIntro(),
+
+                      if (!_canEditMetadata)
+                        _buildSharedSkillNotice(),
+
+                      const SizedBox(
+                        height:
+                        20,
+                      ),
+
+                      _buildLabel(
+                        'Skill Name',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildSkillNameField(),
+
+                      const SizedBox(
+                        height:
+                        18,
+                      ),
+
+                      _buildLabel(
+                        'Category',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildCategoryField(),
+
+                      const SizedBox(
+                        height:
+                        18,
+                      ),
+
+                      _buildLabel(
+                        'Description',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildDescriptionField(),
+
+                      const SizedBox(
+                        height:
+                        18,
+                      ),
+
+                      _buildLabel(
+                        'Your Experience Level',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        10,
+                      ),
+
+                      _buildExperienceLevel(),
+
+                      const SizedBox(
+                        height:
+                        18,
+                      ),
+
+                      _buildLabel(
+                        'Your Availability',
+                      ),
+
+                      const SizedBox(
+                        height:
+                        8,
+                      ),
+
+                      _buildAvailabilityField(),
+
+                      const SizedBox(
+                        height:
+                        24,
+                      ),
+
+                      _buildUpdateButton(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  // ============================================================
+  // TOP BAR
+  // ============================================================
 
   Widget _buildTopBar() {
     return Container(
@@ -328,14 +543,12 @@ class _EditSkillScreenState
       Row(
         children: [
           IconButton(
+            tooltip:
+            'Back',
             onPressed:
             _saving
                 ? null
-                : () {
-              Navigator.pop(
-                context,
-              );
-            },
+                : _confirmDiscardChanges,
             icon:
             Icon(
               Icons.arrow_back_ios_new_rounded,
@@ -347,6 +560,7 @@ class _EditSkillScreenState
                   : _primaryColor,
             ),
           ),
+
           Expanded(
             child:
             Center(
@@ -365,6 +579,7 @@ class _EditSkillScreenState
               ),
             ),
           ),
+
           const SizedBox(
             width:
             48,
@@ -373,6 +588,10 @@ class _EditSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // INTRO
+  // ============================================================
 
   Widget _buildIntro() {
     return Row(
@@ -397,10 +616,12 @@ class _EditSkillScreenState
                   _textColor,
                 ),
               ),
+
               const SizedBox(
                 height:
                 4,
               ),
+
               Text(
                 'Keep your teaching details accurate and up to date.',
                 style:
@@ -416,10 +637,12 @@ class _EditSkillScreenState
             ],
           ),
         ),
+
         const SizedBox(
           width:
           10,
         ),
+
         Image.asset(
           'assets/images/mascot/tubi_planning.png',
           width:
@@ -432,6 +655,10 @@ class _EditSkillScreenState
       ],
     );
   }
+
+  // ============================================================
+  // SHARED SKILL NOTICE
+  // ============================================================
 
   Widget _buildSharedSkillNotice() {
     return Container(
@@ -472,14 +699,17 @@ class _EditSkillScreenState
             color:
             _primaryColor,
           ),
+
           const SizedBox(
             width:
             9,
           ),
+
           Expanded(
             child:
             Text(
-              'This is a shared TubiLearn skill. Its name, category, and description are shared with other users, so you can only update your level and availability.',
+              'This is a shared TubiLearn skill. Its name, category, and description '
+                  'are shared with other users, so you can only update your level and availability.',
               style:
               TextStyle(
                 fontSize:
@@ -495,6 +725,10 @@ class _EditSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // LABEL
+  // ============================================================
 
   Widget _buildLabel(
       String text,
@@ -513,6 +747,10 @@ class _EditSkillScreenState
     );
   }
 
+  // ============================================================
+  // SKILL NAME
+  // ============================================================
+
   Widget _buildSkillNameField() {
     return TextField(
       controller:
@@ -522,6 +760,8 @@ class _EditSkillScreenState
           _saving,
       maxLength:
       80,
+      textCapitalization:
+      TextCapitalization.words,
       style:
       TextStyle(
         fontSize:
@@ -531,6 +771,14 @@ class _EditSkillScreenState
         color:
         _textColor,
       ),
+      onChanged:
+      _canEditMetadata
+          ? (
+          String value,
+          ) {
+        setState(() {});
+      }
+          : null,
       decoration:
       InputDecoration(
         counterText:
@@ -605,6 +853,10 @@ class _EditSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // CATEGORY
+  // ============================================================
 
   Widget _buildCategoryField() {
     return DropdownButtonFormField<String>(
@@ -728,6 +980,10 @@ class _EditSkillScreenState
     );
   }
 
+  // ============================================================
+  // DESCRIPTION
+  // ============================================================
+
   Widget _buildDescriptionField() {
     return Stack(
       children: [
@@ -741,6 +997,8 @@ class _EditSkillScreenState
           5,
           maxLength:
           200,
+          textCapitalization:
+          TextCapitalization.sentences,
           style:
           TextStyle(
             fontSize:
@@ -750,9 +1008,14 @@ class _EditSkillScreenState
             color:
             _textColor,
           ),
-          onChanged: (_) {
+          onChanged:
+          _canEditMetadata
+              ? (
+              String value,
+              ) {
             setState(() {});
-          },
+          }
+              : null,
           decoration:
           InputDecoration(
             counterText:
@@ -808,6 +1071,7 @@ class _EditSkillScreenState
             ),
           ),
         ),
+
         Positioned(
           right:
           12,
@@ -828,6 +1092,10 @@ class _EditSkillScreenState
       ],
     );
   }
+
+  // ============================================================
+  // EXPERIENCE
+  // ============================================================
 
   Widget _buildExperienceLevel() {
     final List<String> levels = [
@@ -936,6 +1204,10 @@ class _EditSkillScreenState
     );
   }
 
+  // ============================================================
+  // AVAILABILITY
+  // ============================================================
+
   Widget _buildAvailabilityField() {
     return InkWell(
       borderRadius:
@@ -979,10 +1251,12 @@ class _EditSkillScreenState
               color:
               _primaryColor,
             ),
+
             const SizedBox(
               width:
               12,
             ),
+
             Expanded(
               child:
               Text(
@@ -998,6 +1272,7 @@ class _EditSkillScreenState
                 ),
               ),
             ),
+
             Icon(
               Icons.chevron_right_rounded,
               size:
@@ -1011,14 +1286,14 @@ class _EditSkillScreenState
     );
   }
 
-  void _showAvailabilitySheet() {
-    showModalBottomSheet(
+  Future<void> _showAvailabilitySheet() async {
+    final String? selected =
+    await showModalBottomSheet<String>(
       context:
       context,
       backgroundColor:
       Colors.transparent,
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return Container(
@@ -1061,10 +1336,12 @@ class _EditSkillScreenState
                   ),
                 ),
               ),
+
               const SizedBox(
                 height:
                 18,
               ),
+
               Align(
                 alignment:
                 Alignment.centerLeft,
@@ -1082,10 +1359,12 @@ class _EditSkillScreenState
                   ),
                 ),
               ),
+
               const SizedBox(
                 height:
                 12,
               ),
+
               ..._availabilityOptions.map(
                     (
                     String option,
@@ -1121,13 +1400,9 @@ class _EditSkillScreenState
                     )
                         : null,
                     onTap: () {
-                      setState(() {
-                        _availability =
-                            option;
-                      });
-
                       Navigator.pop(
                         sheetContext,
+                        option,
                       );
                     },
                   );
@@ -1138,7 +1413,21 @@ class _EditSkillScreenState
         );
       },
     );
+
+    if (!mounted ||
+        selected == null) {
+      return;
+    }
+
+    setState(() {
+      _availability =
+          selected;
+    });
   }
+
+  // ============================================================
+  // UPDATE BUTTON
+  // ============================================================
 
   Widget _buildUpdateButton() {
     return SizedBox(
@@ -1206,7 +1495,15 @@ class _EditSkillScreenState
     );
   }
 
+  // ============================================================
+  // UPDATE
+  // ============================================================
+
   Future<void> _updateSkill() async {
+    if (_saving) {
+      return;
+    }
+
     final String title =
     _skillNameController.text.trim();
 
@@ -1221,6 +1518,25 @@ class _EditSkillScreenState
       return;
     }
 
+    if (title.length >
+        80) {
+      _showMessage(
+        'Skill name must be 80 characters or less.',
+      );
+
+      return;
+    }
+
+    if (_category
+        .trim()
+        .isEmpty) {
+      _showMessage(
+        'Category is required.',
+      );
+
+      return;
+    }
+
     if (description.isEmpty) {
       _showMessage(
         'Description is required.',
@@ -1228,6 +1544,19 @@ class _EditSkillScreenState
 
       return;
     }
+
+    if (description.length >
+        200) {
+      _showMessage(
+        'Description must be 200 characters or less.',
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
 
     setState(() {
       _saving =
@@ -1259,6 +1588,11 @@ class _EditSkillScreenState
         return;
       }
 
+      setState(() {
+        _allowPop =
+        true;
+      });
+
       _showMessage(
         'Skill updated successfully!',
       );
@@ -1267,7 +1601,7 @@ class _EditSkillScreenState
         context,
         true,
       );
-    } catch (error) {
+    } on CurrentUserServiceException catch (error) {
       if (!mounted) {
         return;
       }
@@ -1278,23 +1612,61 @@ class _EditSkillScreenState
       });
 
       _showMessage(
-        error.toString(),
+        error.message,
+      );
+    } on MySkillsRepositoryException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _saving =
+        false;
+      });
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _saving =
+        false;
+      });
+
+      _showMessage(
+        'Could not update the skill. Please try again.',
       );
     }
   }
 
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
   void _showMessage(
       String message,
       ) {
+    if (!mounted) {
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(
-      SnackBar(
-        content:
-        Text(
-          message,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
   }
 }

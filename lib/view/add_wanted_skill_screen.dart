@@ -35,6 +35,8 @@ class _AddWantedSkillScreenState
   String _availability = 'Flexible';
 
   bool _saving = false;
+  bool _isExitDialogOpen = false;
+  bool _allowPop = false;
 
   static const List<String> _categories = <String>[
     'Design & Creative',
@@ -92,6 +94,18 @@ class _AddWantedSkillScreenState
       )
           : Colors.white;
 
+  bool get _hasDraft {
+    return _skillNameController.text
+        .trim()
+        .isNotEmpty ||
+        _descriptionController.text
+            .trim()
+            .isNotEmpty ||
+        _selectedCategory != null ||
+        _level != 'Beginner' ||
+        _availability != 'Flexible';
+  }
+
   @override
   void dispose() {
     _skillNameController.dispose();
@@ -100,13 +114,153 @@ class _AddWantedSkillScreenState
     super.dispose();
   }
 
+  // ============================================================
+  // BACK / DRAFT PROTECTION
+  // ============================================================
+
+  void _handlePopAttempt(
+      bool didPop,
+      ) {
+    if (didPop ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    _confirmDiscardDraft();
+  }
+
+  Future<void> _confirmDiscardDraft() async {
+    if (!mounted ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    if (!_hasDraft) {
+      setState(() {
+        _allowPop = true;
+      });
+
+      Navigator.pop(
+        context,
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _isExitDialogOpen = true;
+
+    final bool? discard =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
+            'Discard learning interest?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content: Text(
+            'You have an unfinished learning interest. '
+                'Leaving now will discard the details you entered.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: Text(
+                'KEEP EDITING',
+                style:
+                AppTextStyles.button.copyWith(
+                  color:
+                  _primaryColor,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                'DISCARD',
+                style: TextStyle(
+                  color:
+                  AppTheme.error,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    _isExitDialogOpen = false;
+
+    if (!mounted ||
+        discard != true) {
+      return;
+    }
+
+    setState(() {
+      _allowPop = true;
+    });
+
+    Navigator.pop(
+      context,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
       BuildContext context,
       ) {
     return PopScope(
       canPop:
-      !_saving,
+      !_saving &&
+          (_allowPop || !_hasDraft),
+      onPopInvokedWithResult: (
+          bool didPop,
+          Object? result,
+          ) {
+        _handlePopAttempt(
+          didPop,
+        );
+      },
       child:
       Scaffold(
         backgroundColor:
@@ -249,6 +403,10 @@ class _AddWantedSkillScreenState
     );
   }
 
+  // ============================================================
+  // INTRO
+  // ============================================================
+
   Widget _buildIntro() {
     return Container(
       width:
@@ -340,6 +498,10 @@ class _AddWantedSkillScreenState
     );
   }
 
+  // ============================================================
+  // SKILL NAME
+  // ============================================================
+
   Widget _buildSkillNameField() {
     return TextField(
       controller:
@@ -355,6 +517,15 @@ class _AddWantedSkillScreenState
         color:
         _textColor,
       ),
+      onChanged: (
+          String value,
+          ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {});
+      },
       decoration:
       InputDecoration(
         hintText:
@@ -429,6 +600,10 @@ class _AddWantedSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // CATEGORY
+  // ============================================================
 
   Widget _buildCategoryField() {
     return DropdownButtonFormField<String>(
@@ -545,6 +720,10 @@ class _AddWantedSkillScreenState
     );
   }
 
+  // ============================================================
+  // DESCRIPTION
+  // ============================================================
+
   Widget _buildDescriptionField() {
     return Stack(
       children: [
@@ -637,7 +816,9 @@ class _AddWantedSkillScreenState
               ),
             ),
           ),
-          onChanged: (_) {
+          onChanged: (
+              String value,
+              ) {
             setState(() {});
           },
         ),
@@ -660,6 +841,10 @@ class _AddWantedSkillScreenState
       ],
     );
   }
+
+  // ============================================================
+  // LEVEL
+  // ============================================================
 
   Widget _buildLevelSelector() {
     const List<String> levels =
@@ -685,7 +870,8 @@ class _AddWantedSkillScreenState
               padding:
               EdgeInsets.only(
                 right:
-                level == levels.last
+                level ==
+                    levels.last
                     ? 0
                     : 8,
               ),
@@ -752,6 +938,10 @@ class _AddWantedSkillScreenState
       ).toList(),
     );
   }
+
+  // ============================================================
+  // AVAILABILITY
+  // ============================================================
 
   Widget _buildAvailabilitySelector() {
     return InkWell(
@@ -841,8 +1031,7 @@ class _AddWantedSkillScreenState
           ),
         ),
       ),
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return SafeArea(
@@ -949,6 +1138,10 @@ class _AddWantedSkillScreenState
     });
   }
 
+  // ============================================================
+  // SAVE BUTTON
+  // ============================================================
+
   Widget _buildSaveButton() {
     return SizedBox(
       width:
@@ -1012,6 +1205,10 @@ class _AddWantedSkillScreenState
       ),
     );
   }
+
+  // ============================================================
+  // SAVE
+  // ============================================================
 
   Future<void> _save() async {
     if (_saving) {
@@ -1095,6 +1292,11 @@ class _AddWantedSkillScreenState
         return;
       }
 
+      setState(() {
+        _allowPop =
+        true;
+      });
+
       Navigator.pop(
         context,
         true,
@@ -1132,6 +1334,10 @@ class _AddWantedSkillScreenState
       }
     }
   }
+
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
 
   void _showMessage(
       String message,

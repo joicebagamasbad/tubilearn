@@ -32,7 +32,15 @@ class _EditWantedSkillScreenState
   late String _level;
   late String _availability;
 
+  late final String _originalSkillName;
+  late final String _originalDescription;
+  late final String _originalCategory;
+  late final String _originalLevel;
+  late final String _originalAvailability;
+
   bool _saving = false;
+  bool _allowPop = false;
+  bool _isExitDialogOpen = false;
 
   bool get _canEditMetadata {
     try {
@@ -49,7 +57,8 @@ class _EditWantedSkillScreenState
   }
 
   bool get _isDarkMode =>
-      Theme.of(context).brightness == Brightness.dark;
+      Theme.of(context).brightness ==
+          Brightness.dark;
 
   Color get _surfaceColor =>
       Theme.of(context).colorScheme.surface;
@@ -101,6 +110,26 @@ class _EditWantedSkillScreenState
     'Flexible',
   ];
 
+  bool get _hasUnsavedChanges {
+    final bool metadataChanged =
+        _canEditMetadata &&
+            (_skillNameController.text.trim() !=
+                _originalSkillName ||
+                _descriptionController.text.trim() !=
+                    _originalDescription ||
+                _selectedCategory !=
+                    _originalCategory);
+
+    final bool personalSettingsChanged =
+        _level !=
+            _originalLevel ||
+            _availability !=
+                _originalAvailability;
+
+    return metadataChanged ||
+        personalSettingsChanged;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -113,12 +142,14 @@ class _EditWantedSkillScreenState
 
     _skillNameController =
         TextEditingController(
-          text: skill.title,
+          text:
+          skill.title,
         );
 
     _descriptionController =
         TextEditingController(
-          text: skill.description,
+          text:
+          skill.description,
         );
 
     _selectedCategory =
@@ -128,6 +159,21 @@ class _EditWantedSkillScreenState
         userSkill.level;
 
     _availability =
+        userSkill.availability;
+
+    _originalSkillName =
+        skill.title.trim();
+
+    _originalDescription =
+        skill.description.trim();
+
+    _originalCategory =
+        skill.category;
+
+    _originalLevel =
+        userSkill.level;
+
+    _originalAvailability =
         userSkill.availability;
   }
 
@@ -140,6 +186,142 @@ class _EditWantedSkillScreenState
   }
 
   // ============================================================
+  // UNSAVED CHANGES
+  // ============================================================
+
+  void _handlePopAttempt(
+      bool didPop,
+      ) {
+    if (didPop ||
+        _saving ||
+        _allowPop ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    _confirmDiscardChanges();
+  }
+
+  Future<void> _confirmDiscardChanges() async {
+    if (!mounted ||
+        _saving ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _allowPop = true;
+      });
+
+      Navigator.pop(
+        context,
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _isExitDialogOpen = true;
+
+    final bool? discard =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Text(
+            'Discard changes?',
+            style:
+            TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content:
+          Text(
+            'You changed this learning interest but have not saved it yet. '
+                'Leaving now will discard those edits.',
+            style:
+            TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              Text(
+                'KEEP EDITING',
+                style:
+                AppTextStyles.button.copyWith(
+                  color:
+                  AppTheme.primary,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child:
+              const Text(
+                'DISCARD',
+                style:
+                TextStyle(
+                  color:
+                  AppTheme.error,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    _isExitDialogOpen = false;
+
+    if (!mounted ||
+        discard != true) {
+      return;
+    }
+
+    setState(() {
+      _allowPop =
+      true;
+    });
+
+    Navigator.pop(
+      context,
+    );
+  }
+
+  // ============================================================
   // BUILD
   // ============================================================
 
@@ -148,29 +330,48 @@ class _EditWantedSkillScreenState
       BuildContext context,
       ) {
     return PopScope(
-      canPop: !_saving,
-      child: Scaffold(
+      canPop:
+      !_saving &&
+          (_allowPop ||
+              !_hasUnsavedChanges),
+      onPopInvokedWithResult: (
+          bool didPop,
+          Object? result,
+          ) {
+        _handlePopAttempt(
+          didPop,
+        );
+      },
+      child:
+      Scaffold(
         backgroundColor:
         Theme.of(context)
             .scaffoldBackgroundColor,
-        appBar: AppBar(
+        appBar:
+        AppBar(
           backgroundColor:
           Theme.of(context)
               .scaffoldBackgroundColor,
           surfaceTintColor:
           Colors.transparent,
-          elevation: 0,
-          title: Text(
+          elevation:
+          0,
+          title:
+          Text(
             'Edit Learning Interest',
-            style: TextStyle(
-              fontSize: 18,
+            style:
+            TextStyle(
+              fontSize:
+              18,
               fontWeight:
               FontWeight.w800,
-              color: _textColor,
+              color:
+              _textColor,
             ),
           ),
         ),
-        body: SafeArea(
+        body:
+        SafeArea(
           child:
           SingleChildScrollView(
             physics:
@@ -182,21 +383,24 @@ class _EditWantedSkillScreenState
               20,
               32,
             ),
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
                 _buildIntro(),
 
                 const SizedBox(
-                  height: 24,
+                  height:
+                  24,
                 ),
 
                 if (!_canEditMetadata) ...[
                   _buildSharedSkillNotice(),
 
                   const SizedBox(
-                    height: 20,
+                    height:
+                    20,
                   ),
                 ],
 
@@ -205,13 +409,15 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 8,
+                  height:
+                  8,
                 ),
 
                 _buildSkillNameField(),
 
                 const SizedBox(
-                  height: 20,
+                  height:
+                  20,
                 ),
 
                 _buildLabel(
@@ -219,13 +425,15 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 8,
+                  height:
+                  8,
                 ),
 
                 _buildCategoryField(),
 
                 const SizedBox(
-                  height: 20,
+                  height:
+                  20,
                 ),
 
                 _buildLabel(
@@ -233,13 +441,15 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 8,
+                  height:
+                  8,
                 ),
 
                 _buildDescriptionField(),
 
                 const SizedBox(
-                  height: 20,
+                  height:
+                  20,
                 ),
 
                 _buildLabel(
@@ -247,13 +457,15 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 10,
+                  height:
+                  10,
                 ),
 
                 _buildLevelSelector(),
 
                 const SizedBox(
-                  height: 20,
+                  height:
+                  20,
                 ),
 
                 _buildLabel(
@@ -261,13 +473,15 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 8,
+                  height:
+                  8,
                 ),
 
                 _buildAvailabilitySelector(),
 
                 const SizedBox(
-                  height: 28,
+                  height:
+                  28,
                 ),
 
                 _buildSaveButton(),
@@ -285,25 +499,32 @@ class _EditWantedSkillScreenState
 
   Widget _buildIntro() {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
-      decoration: BoxDecoration(
-        color: _surfaceColor,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border: Border.all(
-          color: _borderColor,
+        border:
+        Border.all(
+          color:
+          _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -318,7 +539,8 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 5,
+                  height:
+                  5,
                 ),
 
                 Text(
@@ -335,14 +557,18 @@ class _EditWantedSkillScreenState
           ),
 
           const SizedBox(
-            width: 12,
+            width:
+            12,
           ),
 
           Image.asset(
             'assets/images/mascot/tubi_planning.png',
-            width: 68,
-            height: 68,
-            fit: BoxFit.contain,
+            width:
+            68,
+            height:
+            68,
+            fit:
+            BoxFit.contain,
           ),
         ],
       ),
@@ -355,15 +581,16 @@ class _EditWantedSkillScreenState
 
   Widget _buildSharedSkillNotice() {
     return Container(
-      width: double.infinity,
+      width:
+      double.infinity,
       padding:
       const EdgeInsets.all(
         13,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color:
-        AppTheme.primary
-            .withValues(
+        AppTheme.primary.withValues(
           alpha:
           _isDarkMode
               ? 0.14
@@ -373,10 +600,10 @@ class _EditWantedSkillScreenState
         BorderRadius.circular(
           13,
         ),
-        border: Border.all(
+        border:
+        Border.all(
           color:
-          AppTheme.primary
-              .withValues(
+          AppTheme.primary.withValues(
             alpha:
             _isDarkMode
                 ? 0.28
@@ -384,29 +611,36 @@ class _EditWantedSkillScreenState
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           const Icon(
-            Icons
-                .info_outline_rounded,
-            size: 18,
+            Icons.info_outline_rounded,
+            size:
+            18,
             color:
             AppTheme.primary,
           ),
 
           const SizedBox(
-            width: 9,
+            width:
+            9,
           ),
 
           Expanded(
-            child: Text(
-              'This is a shared skill from the TubiLearn catalog. You can update your current level and availability, but the skill name, category, and description stay unchanged.',
+            child:
+            Text(
+              'This is a shared skill from the TubiLearn catalog. '
+                  'You can update your current level and availability, but the '
+                  'skill name, category, and description stay unchanged.',
               style:
               TextStyle(
-                fontSize: 12,
-                height: 1.4,
+                fontSize:
+                12,
+                height:
+                1.4,
                 color:
                 _mutedColor,
               ),
@@ -426,11 +660,14 @@ class _EditWantedSkillScreenState
       ) {
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 12,
+      style:
+      TextStyle(
+        fontSize:
+        12,
         fontWeight:
         FontWeight.w700,
-        color: _textColor,
+        color:
+        _textColor,
       ),
     );
   }
@@ -446,17 +683,29 @@ class _EditWantedSkillScreenState
       enabled:
       !_saving &&
           _canEditMetadata,
-      maxLength: 80,
+      maxLength:
+      80,
       textCapitalization:
       TextCapitalization.words,
-      style: TextStyle(
-        color: _textColor,
+      style:
+      TextStyle(
+        color:
+        _textColor,
       ),
+      onChanged:
+      _canEditMetadata
+          ? (
+          String value,
+          ) {
+        setState(() {});
+      }
+          : null,
       decoration:
       InputDecoration(
         hintText:
         'Skill name',
-        counterText: '',
+        counterText:
+        '',
         hintStyle:
         TextStyle(
           color:
@@ -464,12 +713,12 @@ class _EditWantedSkillScreenState
         ),
         prefixIcon:
         const Icon(
-          Icons
-              .lightbulb_outline_rounded,
+          Icons.lightbulb_outline_rounded,
           color:
           AppTheme.primary,
         ),
-        filled: true,
+        filled:
+        true,
         fillColor:
         _canEditMetadata
             ? _surfaceColor
@@ -477,8 +726,7 @@ class _EditWantedSkillScreenState
         border:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -490,8 +738,7 @@ class _EditWantedSkillScreenState
         enabledBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -503,8 +750,7 @@ class _EditWantedSkillScreenState
         disabledBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -516,16 +762,15 @@ class _EditWantedSkillScreenState
         focusedBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
           const BorderSide(
             color:
-            AppTheme
-                .primary,
-            width: 1.3,
+            AppTheme.primary,
+            width:
+            1.3,
           ),
         ),
       ),
@@ -553,19 +798,20 @@ class _EditWantedSkillScreenState
     return DropdownButtonFormField<String>(
       initialValue:
       _selectedCategory,
-      isExpanded: true,
+      isExpanded:
+      true,
       dropdownColor:
       _surfaceColor,
       decoration:
       InputDecoration(
         prefixIcon:
         const Icon(
-          Icons
-              .grid_view_rounded,
+          Icons.grid_view_rounded,
           color:
           AppTheme.primary,
         ),
-        filled: true,
+        filled:
+        true,
         fillColor:
         _canEditMetadata
             ? _surfaceColor
@@ -573,8 +819,7 @@ class _EditWantedSkillScreenState
         border:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -586,8 +831,7 @@ class _EditWantedSkillScreenState
         enabledBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -599,8 +843,7 @@ class _EditWantedSkillScreenState
         disabledBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
@@ -612,15 +855,13 @@ class _EditWantedSkillScreenState
         focusedBorder:
         OutlineInputBorder(
           borderRadius:
-          BorderRadius
-              .circular(
+          BorderRadius.circular(
             13,
           ),
           borderSide:
           const BorderSide(
             color:
-            AppTheme
-                .primary,
+            AppTheme.primary,
           ),
         ),
       ),
@@ -630,16 +871,14 @@ class _EditWantedSkillScreenState
             (
             String category,
             ) =>
-            DropdownMenuItem<
-                String
-            >(
+            DropdownMenuItem<String>(
               value:
               category,
-              child: Text(
+              child:
+              Text(
                 category,
                 overflow:
-                TextOverflow
-                    .ellipsis,
+                TextOverflow.ellipsis,
                 style:
                 TextStyle(
                   color:
@@ -682,32 +921,36 @@ class _EditWantedSkillScreenState
           enabled:
           !_saving &&
               _canEditMetadata,
-          maxLines: 5,
-          maxLength: 200,
+          maxLines:
+          5,
+          maxLength:
+          200,
           textCapitalization:
-          TextCapitalization
-              .sentences,
-          style: TextStyle(
-            color: _textColor,
+          TextCapitalization.sentences,
+          style:
+          TextStyle(
+            color:
+            _textColor,
           ),
           decoration:
           InputDecoration(
             hintText:
             'Describe what you want to learn...',
-            counterText: '',
+            counterText:
+            '',
             hintStyle:
             TextStyle(
               color:
               _mutedColor,
             ),
-            filled: true,
+            filled:
+            true,
             fillColor:
             _canEditMetadata
                 ? _surfaceColor
                 : _lockedFieldColor,
             contentPadding:
-            const EdgeInsets
-                .fromLTRB(
+            const EdgeInsets.fromLTRB(
               14,
               14,
               14,
@@ -716,8 +959,7 @@ class _EditWantedSkillScreenState
             border:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 13,
               ),
               borderSide:
@@ -729,8 +971,7 @@ class _EditWantedSkillScreenState
             enabledBorder:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 13,
               ),
               borderSide:
@@ -742,8 +983,7 @@ class _EditWantedSkillScreenState
             disabledBorder:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 13,
               ),
               borderSide:
@@ -755,15 +995,13 @@ class _EditWantedSkillScreenState
             focusedBorder:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius
-                  .circular(
+              BorderRadius.circular(
                 13,
               ),
               borderSide:
               const BorderSide(
                 color:
-                AppTheme
-                    .primary,
+                AppTheme.primary,
                 width:
                 1.3,
               ),
@@ -771,20 +1009,24 @@ class _EditWantedSkillScreenState
           ),
           onChanged:
           _canEditMetadata
-              ? (_) {
+              ? (
+              String value,
+              ) {
             setState(() {});
           }
               : null,
         ),
 
         Positioned(
-          right: 12,
-          bottom: 10,
-          child: Text(
+          right:
+          12,
+          bottom:
+          10,
+          child:
+          Text(
             '${_descriptionController.text.length}/200',
             style:
-            AppTextStyles.caption
-                .copyWith(
+            AppTextStyles.caption.copyWith(
               color:
               _mutedColor,
             ),
@@ -818,49 +1060,46 @@ class _EditWantedSkillScreenState
                   level;
 
           return Expanded(
-            child: Padding(
+            child:
+            Padding(
               padding:
               EdgeInsets.only(
                 right:
                 level ==
-                    levels
-                        .last
+                    levels.last
                     ? 0
                     : 8,
               ),
-              child: SizedBox(
-                height: 42,
+              child:
+              SizedBox(
+                height:
+                42,
                 child:
                 OutlinedButton(
                   onPressed:
                   _saving
                       ? null
                       : () {
-                    setState(
-                          () {
-                        _level =
-                            level;
-                      },
-                    );
+                    setState(() {
+                      _level =
+                          level;
+                    });
                   },
                   style:
                   OutlinedButton.styleFrom(
                     backgroundColor:
                     selected
-                        ? AppTheme
-                        .primary
+                        ? AppTheme.primary
                         : _surfaceColor,
                     foregroundColor:
                     selected
-                        ? Colors
-                        .white
+                        ? Colors.white
                         : _textColor,
                     side:
                     BorderSide(
                       color:
                       selected
-                          ? AppTheme
-                          .primary
+                          ? AppTheme.primary
                           : _borderColor,
                     ),
                     shape:
@@ -871,10 +1110,10 @@ class _EditWantedSkillScreenState
                       ),
                     ),
                     padding:
-                    EdgeInsets
-                        .zero,
+                    EdgeInsets.zero,
                   ),
-                  child: Text(
+                  child:
+                  Text(
                     level,
                     style:
                     TextStyle(
@@ -882,10 +1121,8 @@ class _EditWantedSkillScreenState
                       9,
                       fontWeight:
                       selected
-                          ? FontWeight
-                          .w700
-                          : FontWeight
-                          .w500,
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -912,11 +1149,14 @@ class _EditWantedSkillScreenState
       _saving
           ? null
           : _showAvailabilitySheet,
-      child: Container(
-        height: 50,
+      child:
+      Container(
+        height:
+        50,
         padding:
         const EdgeInsets.symmetric(
-          horizontal: 14,
+          horizontal:
+          14,
         ),
         decoration:
         BoxDecoration(
@@ -926,27 +1166,31 @@ class _EditWantedSkillScreenState
           BorderRadius.circular(
             13,
           ),
-          border: Border.all(
+          border:
+          Border.all(
             color:
             _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             const Icon(
-              Icons
-                  .calendar_month_outlined,
+              Icons.calendar_month_outlined,
               color:
               AppTheme.primary,
-              size: 20,
+              size:
+              20,
             ),
 
             const SizedBox(
-              width: 10,
+              width:
+              10,
             ),
 
             Expanded(
-              child: Text(
+              child:
+              Text(
                 _availability,
                 style:
                 TextStyle(
@@ -959,8 +1203,7 @@ class _EditWantedSkillScreenState
             ),
 
             Icon(
-              Icons
-                  .keyboard_arrow_down_rounded,
+              Icons.keyboard_arrow_down_rounded,
               color:
               _mutedColor,
             ),
@@ -970,8 +1213,7 @@ class _EditWantedSkillScreenState
     );
   }
 
-  Future<void>
-  _showAvailabilitySheet() async {
+  Future<void> _showAvailabilitySheet() async {
     final List<String> options =
     <String>[
       ..._availabilityOptions,
@@ -986,10 +1228,9 @@ class _EditWantedSkillScreenState
     }
 
     final String? selected =
-    await showModalBottomSheet<
-        String
-    >(
-      context: context,
+    await showModalBottomSheet<String>(
+      context:
+      context,
       backgroundColor:
       _surfaceColor,
       shape:
@@ -1006,33 +1247,35 @@ class _EditWantedSkillScreenState
           BuildContext sheetContext,
           ) {
         return SafeArea(
-          child: Padding(
+          child:
+          Padding(
             padding:
-            const EdgeInsets
-                .fromLTRB(
+            const EdgeInsets.fromLTRB(
               20,
               16,
               20,
               24,
             ),
-            child: Column(
+            child:
+            Column(
               mainAxisSize:
               MainAxisSize.min,
               crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
+              CrossAxisAlignment.start,
               children: [
                 Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
+                  child:
+                  Container(
+                    width:
+                    40,
+                    height:
+                    4,
                     decoration:
                     BoxDecoration(
                       color:
                       _borderColor,
                       borderRadius:
-                      BorderRadius
-                          .circular(
+                      BorderRadius.circular(
                         10,
                       ),
                     ),
@@ -1040,22 +1283,22 @@ class _EditWantedSkillScreenState
                 ),
 
                 const SizedBox(
-                  height: 18,
+                  height:
+                  18,
                 ),
 
                 Text(
                   'Choose availability',
                   style:
-                  AppTextStyles
-                      .cardTitle
-                      .copyWith(
+                  AppTextStyles.cardTitle.copyWith(
                     color:
                     _textColor,
                   ),
                 ),
 
                 const SizedBox(
-                  height: 8,
+                  height:
+                  8,
                 ),
 
                 ...options.map(
@@ -1064,9 +1307,9 @@ class _EditWantedSkillScreenState
                       ) {
                     return ListTile(
                       contentPadding:
-                      EdgeInsets
-                          .zero,
-                      title: Text(
+                      EdgeInsets.zero,
+                      title:
+                      Text(
                         option,
                         style:
                         TextStyle(
@@ -1078,11 +1321,9 @@ class _EditWantedSkillScreenState
                       _availability ==
                           option
                           ? const Icon(
-                        Icons
-                            .check_circle_rounded,
+                        Icons.check_circle_rounded,
                         color:
-                        AppTheme
-                            .primary,
+                        AppTheme.primary,
                       )
                           : null,
                       onTap: () {
@@ -1118,8 +1359,10 @@ class _EditWantedSkillScreenState
 
   Widget _buildSaveButton() {
     return SizedBox(
-      width: double.infinity,
-      height: 48,
+      width:
+      double.infinity,
+      height:
+      48,
       child:
       ElevatedButton.icon(
         onPressed:
@@ -1129,23 +1372,25 @@ class _EditWantedSkillScreenState
         icon:
         _saving
             ? const SizedBox(
-          width: 18,
-          height: 18,
+          width:
+          18,
+          height:
+          18,
           child:
           CircularProgressIndicator(
             strokeWidth:
             2,
             color:
-            Colors
-                .white,
+            Colors.white,
           ),
         )
             : const Icon(
-          Icons
-              .save_outlined,
-          size: 19,
+          Icons.save_outlined,
+          size:
+          19,
         ),
-        label: Text(
+        label:
+        Text(
           _saving
               ? 'SAVING...'
               : 'SAVE CHANGES',
@@ -1162,12 +1407,12 @@ class _EditWantedSkillScreenState
           _surfaceVariantColor,
           disabledForegroundColor:
           _mutedColor,
-          elevation: 0,
+          elevation:
+          0,
           shape:
           RoundedRectangleBorder(
             borderRadius:
-            BorderRadius
-                .circular(
+            BorderRadius.circular(
               13,
             ),
           ),
@@ -1186,12 +1431,10 @@ class _EditWantedSkillScreenState
     }
 
     final String skillName =
-    _skillNameController.text
-        .trim();
+    _skillNameController.text.trim();
 
     final String description =
-    _descriptionController.text
-        .trim();
+    _descriptionController.text.trim();
 
     if (skillName.isEmpty) {
       _showMessage(
@@ -1200,7 +1443,8 @@ class _EditWantedSkillScreenState
       return;
     }
 
-    if (skillName.length > 80) {
+    if (skillName.length >
+        80) {
       _showMessage(
         'Skill name must be 80 characters or less.',
       );
@@ -1223,7 +1467,8 @@ class _EditWantedSkillScreenState
       return;
     }
 
-    if (description.length > 200) {
+    if (description.length >
+        200) {
       _showMessage(
         'Description must be 200 characters or less.',
       );
@@ -1235,28 +1480,30 @@ class _EditWantedSkillScreenState
     ).unfocus();
 
     setState(() {
-      _saving = true;
+      _saving =
+      true;
     });
 
     try {
       final String userId =
-      _currentUserService
-          .requireUserId();
+      _currentUserService.requireUserId();
 
-      await _repository
-          .updateWantedSkill(
-        userId: userId,
+      await _repository.updateWantedSkill(
+        userId:
+        userId,
         userSkillId:
         widget
             .managedWantedSkill
             .userSkill
             .id,
-        title: skillName,
+        title:
+        skillName,
         category:
         _selectedCategory,
         description:
         description,
-        level: _level,
+        level:
+        _level,
         availability:
         _availability,
       );
@@ -1264,6 +1511,11 @@ class _EditWantedSkillScreenState
       if (!mounted) {
         return;
       }
+
+      setState(() {
+        _allowPop =
+        true;
+      });
 
       Navigator.pop(
         context,
@@ -1296,7 +1548,8 @@ class _EditWantedSkillScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _saving = false;
+          _saving =
+          false;
         });
       }
     }
@@ -1319,12 +1572,12 @@ class _EditWantedSkillScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
+          content:
+          Text(
             message,
           ),
           behavior:
-          SnackBarBehavior
-              .floating,
+          SnackBarBehavior.floating,
         ),
       );
   }

@@ -58,8 +58,17 @@ class _EditProfileScreenState
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isUpdatingProfileImage = false;
+  bool _isExitDialogOpen = false;
 
   String? _loadError;
+
+  String _originalName = '';
+  String _originalCity = '';
+  String _originalBio = '';
+  String _originalAvailability = '';
+  String _originalLanguage = '';
+  String _originalPreferredMode = '';
+  String _originalTeachingStyle = '';
 
   Color get _surfaceColor =>
       Theme.of(context).colorScheme.surface;
@@ -89,6 +98,28 @@ class _EditProfileScreenState
       _isSaving ||
           _isUpdatingProfileImage;
 
+  bool get _hasUnsavedChanges {
+    if (_currentUser == null ||
+        _isLoading) {
+      return false;
+    }
+
+    return _nameController.text.trim() !=
+        _originalName ||
+        _cityController.text.trim() !=
+            _originalCity ||
+        _bioController.text.trim() !=
+            _originalBio ||
+        _availabilityController.text.trim() !=
+            _originalAvailability ||
+        _languageController.text.trim() !=
+            _originalLanguage ||
+        _preferredModeController.text.trim() !=
+            _originalPreferredMode ||
+        _teachingStyleController.text.trim() !=
+            _originalTeachingStyle;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -107,6 +138,60 @@ class _EditProfileScreenState
     _teachingStyleController.dispose();
 
     super.dispose();
+  }
+
+  // ============================================================
+  // ORIGINAL FORM SNAPSHOT
+  // ============================================================
+
+  void _captureOriginalValues(
+      User user,
+      ) {
+    _originalName =
+        user.name.trim();
+
+    _originalCity =
+        user.city.trim();
+
+    _originalBio =
+        user.bio.trim();
+
+    _originalAvailability =
+        user.availability.trim();
+
+    _originalLanguage =
+        user.language.trim();
+
+    _originalPreferredMode =
+        user.preferredMode.trim();
+
+    _originalTeachingStyle =
+        user.teachingStyle.trim();
+  }
+
+  void _populateControllers(
+      User user,
+      ) {
+    _nameController.text =
+        user.name;
+
+    _cityController.text =
+        user.city;
+
+    _bioController.text =
+        user.bio;
+
+    _availabilityController.text =
+        user.availability;
+
+    _languageController.text =
+        user.language;
+
+    _preferredModeController.text =
+        user.preferredMode;
+
+    _teachingStyleController.text =
+        user.teachingStyle;
   }
 
   // ============================================================
@@ -138,26 +223,13 @@ class _EditProfileScreenState
       _currentUser =
           user;
 
-      _nameController.text =
-          user.name;
+      _populateControllers(
+        user,
+      );
 
-      _cityController.text =
-          user.city;
-
-      _bioController.text =
-          user.bio;
-
-      _availabilityController.text =
-          user.availability;
-
-      _languageController.text =
-          user.language;
-
-      _preferredModeController.text =
-          user.preferredMode;
-
-      _teachingStyleController.text =
-          user.teachingStyle;
+      _captureOriginalValues(
+        user,
+      );
 
       setState(() {
         _isLoading = false;
@@ -192,6 +264,124 @@ class _EditProfileScreenState
         'Your profile could not be loaded. Please try again.';
       });
     }
+  }
+
+  // ============================================================
+  // UNSAVED CHANGES
+  // ============================================================
+
+  void _handlePopAttempt(
+      bool didPop,
+      ) {
+    if (didPop ||
+        _isBusy ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    _confirmDiscardChanges();
+  }
+
+  Future<void> _confirmDiscardChanges() async {
+    if (!mounted ||
+        _isBusy ||
+        _isExitDialogOpen) {
+      return;
+    }
+
+    if (!_hasUnsavedChanges) {
+      Navigator.pop(
+        context,
+      );
+
+      return;
+    }
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _isExitDialogOpen = true;
+
+    final bool? discard =
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title: Text(
+            'Discard unsaved changes?',
+            style: TextStyle(
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
+            ),
+          ),
+          content: Text(
+            'You changed some profile details but have not saved them yet. '
+                'Leaving now will discard those edits. '
+                'Profile photo changes are saved separately when applied.',
+            style: TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: Text(
+                'KEEP EDITING',
+                style:
+                AppTextStyles.button.copyWith(
+                  color:
+                  _primaryColor,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                'DISCARD',
+                style: TextStyle(
+                  color:
+                  AppTheme.error,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    _isExitDialogOpen = false;
+
+    if (!mounted ||
+        discard != true) {
+      return;
+    }
+
+    Navigator.pop(
+      context,
+    );
   }
 
   // ============================================================
@@ -241,6 +431,14 @@ class _EditProfileScreenState
 
       _currentUser =
           updatedUser;
+
+      _populateControllers(
+        updatedUser,
+      );
+
+      _captureOriginalValues(
+        updatedUser,
+      );
 
       if (!mounted) {
         return;
@@ -298,14 +496,12 @@ class _EditProfileScreenState
 
     final String? action =
     await showModalBottomSheet<String>(
-      context:
-      context,
+      context: context,
       backgroundColor:
       _surfaceColor,
       showDragHandle:
       true,
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return SafeArea(
@@ -461,8 +657,7 @@ class _EditProfileScreenState
     await showDialog<bool>(
       context:
       context,
-      builder:
-          (
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
@@ -657,8 +852,7 @@ class _EditProfileScreenState
               size,
               fit:
               BoxFit.cover,
-              errorBuilder:
-                  (
+              errorBuilder: (
                   BuildContext context,
                   Object error,
                   StackTrace? stackTrace,
@@ -771,7 +965,16 @@ class _EditProfileScreenState
       ) {
     return PopScope(
       canPop:
-      !_isBusy,
+      !_isBusy &&
+          !_hasUnsavedChanges,
+      onPopInvokedWithResult: (
+          bool didPop,
+          Object? result,
+          ) {
+        _handlePopAttempt(
+          didPop,
+        );
+      },
       child: Scaffold(
         backgroundColor:
         Theme.of(context)
@@ -1098,7 +1301,8 @@ class _EditProfileScreenState
           _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           _buildProfileAvatar(
             size:
@@ -1111,7 +1315,8 @@ class _EditProfileScreenState
           ),
 
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -1182,7 +1387,8 @@ class _EditProfileScreenState
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Icon(
             Icons.edit_rounded,
@@ -1198,7 +1404,8 @@ class _EditProfileScreenState
           ),
 
           Expanded(
-            child: Text(
+            child:
+            Text(
               'Tap any field below to edit your information.',
               style:
               AppTextStyles.secondary
@@ -1242,7 +1449,8 @@ class _EditProfileScreenState
           : 1,
       cursorColor:
       _primaryColor,
-      style: TextStyle(
+      style:
+      TextStyle(
         color:
         _textColor,
         fontWeight:
@@ -1376,8 +1584,7 @@ class _EditProfileScreenState
           ),
         ),
       ),
-      validator:
-          (
+      validator: (
           String? value,
           ) {
         final String cleaned =
@@ -1395,13 +1602,15 @@ class _EditProfileScreenState
 
         return null;
       },
-      onChanged:
-      label ==
-          'Name'
-          ? (_) {
+      onChanged: (
+          String value,
+          ) {
+        if (!mounted) {
+          return;
+        }
+
         setState(() {});
-      }
-          : null,
+      },
     );
   }
 
@@ -1411,12 +1620,14 @@ class _EditProfileScreenState
 
   Widget _buildErrorState() {
     return Center(
-      child: Padding(
+      child:
+      Padding(
         padding:
         const EdgeInsets.all(
           24,
         ),
-        child: Column(
+        child:
+        Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [

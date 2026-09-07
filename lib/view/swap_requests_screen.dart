@@ -2854,6 +2854,93 @@ class _SwapRequestsScreenState
   Future<void> _confirmDecline(
       SwapRequest request,
       ) async {
+    if (_processingRequestIds.contains(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Text(
+            'Decline request?',
+            style:
+            TextStyle(
+              fontWeight:
+              FontWeight.w800,
+              color:
+              _textColor,
+            ),
+          ),
+          content:
+          Text(
+            'This will decline the pending swap request. '
+                'The request will move to Declined and can no longer be accepted.',
+            style:
+            TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'KEEP REQUEST',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                AppTheme.error,
+                foregroundColor:
+                Colors.white,
+              ),
+              child:
+              const Text(
+                'DECLINE',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed !=
+        true) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
     await _performAction(
       requestId:
       request.id,
@@ -2872,6 +2959,121 @@ class _SwapRequestsScreenState
   Future<void> _confirmCancel(
       SwapRequest request,
       ) async {
+    if (_processingRequestIds.contains(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool scheduled =
+        request.status ==
+            SwapRequestStatus.scheduled;
+
+    final bool accepted =
+        request.status ==
+            SwapRequestStatus.accepted;
+
+    final String message;
+
+    if (scheduled) {
+      message =
+      'This session is already scheduled for '
+          '${_formatDateTime(request.proposedAt)}. '
+          'Cancelling will end this swap and remove it from your active sessions.';
+    } else if (accepted) {
+      message =
+      'This swap has already been accepted. '
+          'Cancelling will end the request before the schedule is completed.';
+    } else {
+      message =
+      'This will cancel your pending swap request. '
+          'The other participant will no longer be able to accept it.';
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Text(
+            scheduled
+                ? 'Cancel scheduled session?'
+                : 'Cancel request?',
+            style:
+            TextStyle(
+              fontWeight:
+              FontWeight.w800,
+              color:
+              _textColor,
+            ),
+          ),
+          content:
+          Text(
+            message,
+            style:
+            TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'KEEP IT',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                AppTheme.error,
+                foregroundColor:
+                Colors.white,
+              ),
+              child:
+              Text(
+                scheduled
+                    ? 'CANCEL SESSION'
+                    : 'CANCEL REQUEST',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed !=
+        true) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
     await _performAction(
       requestId:
       request.id,
@@ -2883,7 +3085,9 @@ class _SwapRequestsScreenState
             _currentUserId,
           ),
       successMessage:
-      'Swap request cancelled.',
+      scheduled
+          ? 'Scheduled session cancelled.'
+          : 'Swap request cancelled.',
     );
   }
 
@@ -3004,6 +3208,93 @@ class _SwapRequestsScreenState
   Future<void> _confirmRemoveFromHistory(
       SwapRequest request,
       ) async {
+    if (_processingRequestIds.contains(
+      request.id,
+    )) {
+      return;
+    }
+
+    final bool? confirmed =
+    await showDialog<bool>(
+      context:
+      context,
+      barrierDismissible:
+      false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor:
+          _surfaceColor,
+          title:
+          Text(
+            'Remove from history?',
+            style:
+            TextStyle(
+              fontWeight:
+              FontWeight.w800,
+              color:
+              _textColor,
+            ),
+          ),
+          content:
+          Text(
+            'This only removes the terminal swap from your local history view. '
+                'It does not cancel, complete, or change the result of the swap.',
+            style:
+            TextStyle(
+              color:
+              _mutedColor,
+              height:
+              1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'KEEP IN HISTORY',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                AppTheme.error,
+                foregroundColor:
+                Colors.white,
+              ),
+              child:
+              const Text(
+                'REMOVE',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed !=
+        true) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
     await _performAction(
       requestId:
       request.id,
