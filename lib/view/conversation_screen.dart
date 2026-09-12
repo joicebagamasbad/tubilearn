@@ -46,13 +46,13 @@ class _ConversationScreenState
 
   bool _isLoading = true;
   bool _isSending = false;
-  bool _isDeleting = false;
+  bool _isArchiving = false;
 
   String? _loadError;
 
   bool get _hasPendingAction =>
       _isSending ||
-          _isDeleting;
+          _isArchiving;
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -85,16 +85,14 @@ class _ConversationScreenState
 
   Color get _contextBackground =>
       primary.withValues(
-        alpha:
-        _isDarkMode
+        alpha: _isDarkMode
             ? 0.14
             : 0.08,
       );
 
   Color get _contextBorder =>
       primary.withValues(
-        alpha:
-        _isDarkMode
+        alpha: _isDarkMode
             ? 0.28
             : 0.16,
       );
@@ -164,8 +162,7 @@ class _ConversationScreenState
 
       setState(() {
         _isLoading = false;
-        _loadError =
-            error.message;
+        _loadError = error.message;
       });
     } catch (_) {
       if (!mounted) {
@@ -223,8 +220,7 @@ class _ConversationScreenState
             .scaffoldBackgroundColor,
         body: const SafeArea(
           child: Center(
-            child:
-            CircularProgressIndicator(
+            child: CircularProgressIndicator(
               color: primary,
             ),
           ),
@@ -390,7 +386,7 @@ class _ConversationScreenState
 
                       Text(
                         _loadError ??
-                            'This conversation may have been deleted.',
+                            'This conversation may have been archived or is no longer available.',
                         textAlign:
                         TextAlign.center,
                         style:
@@ -527,7 +523,7 @@ class _ConversationScreenState
             ),
           ),
 
-          if (_isDeleting)
+          if (_isArchiving)
             const Padding(
               padding:
               EdgeInsets.only(
@@ -557,8 +553,7 @@ class _ConversationScreenState
               },
               icon:
               Icon(
-                Icons
-                    .more_vert_rounded,
+                Icons.more_vert_rounded,
                 size: 20,
                 color:
                 _mutedColor,
@@ -596,22 +591,17 @@ class _ConversationScreenState
 
     return ClipOval(
       child: SizedBox(
-        width:
-        size,
-        height:
-        size,
+        width: size,
+        height: size,
         child:
         hasImage
             ? Image.file(
           File(
             path,
           ),
-          width:
-          size,
-          height:
-          size,
-          fit:
-          BoxFit.cover,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
           errorBuilder: (
               BuildContext context,
               Object error,
@@ -620,16 +610,14 @@ class _ConversationScreenState
             return _buildInitialAvatar(
               participant?.initials ??
                   conversation.initials,
-              size:
-              size,
+              size: size,
             );
           },
         )
             : _buildInitialAvatar(
           participant?.initials ??
               conversation.initials,
-          size:
-          size,
+          size: size,
         ),
       ),
     );
@@ -640,10 +628,8 @@ class _ConversationScreenState
         required double size,
       }) {
     return Container(
-      width:
-      size,
-      height:
-      size,
+      width: size,
+      height: size,
       color:
       AppTheme.accent,
       alignment:
@@ -709,8 +695,7 @@ class _ConversationScreenState
       child: Row(
         children: [
           const Icon(
-            Icons
-                .swap_horiz_rounded,
+            Icons.swap_horiz_rounded,
             color: primary,
             size: 19,
           ),
@@ -872,15 +857,13 @@ class _ConversationScreenState
                       : [
                     BoxShadow(
                       color:
-                      Colors.black
-                          .withValues(
+                      Colors.black.withValues(
                         alpha:
                         _isDarkMode
                             ? 0.08
                             : 0.02,
                       ),
-                      blurRadius:
-                      8,
+                      blurRadius: 8,
                       offset:
                       const Offset(
                         0,
@@ -912,38 +895,20 @@ class _ConversationScreenState
                       height: 6,
                     ),
 
-                    Row(
-                      mainAxisSize:
-                      MainAxisSize.min,
-                      children: [
-                        Text(
-                          _formatMessageTime(
-                            message.sentAt,
-                          ),
-                          style:
-                          TextStyle(
-                            fontSize: 10.5,
-                            fontWeight:
-                            FontWeight.w500,
-                            color:
-                            isMe
-                                ? Colors.white70
-                                : _mutedColor,
-                          ),
-                        ),
-
-                        if (isMe) ...[
-                          const SizedBox(
-                            width: 4,
-                          ),
-                          const Icon(
-                            Icons.done_rounded,
-                            size: 12,
-                            color:
-                            Colors.white70,
-                          ),
-                        ],
-                      ],
+                    Text(
+                      _formatMessageTime(
+                        message.sentAt,
+                      ),
+                      style:
+                      TextStyle(
+                        fontSize: 10.5,
+                        fontWeight:
+                        FontWeight.w500,
+                        color:
+                        isMe
+                            ? Colors.white70
+                            : _mutedColor,
+                      ),
                     ),
                   ],
                 ),
@@ -1027,8 +992,7 @@ class _ConversationScreenState
               'assets/images/mascot/tubi_typing.png',
               width: 100,
               height: 100,
-              fit:
-              BoxFit.contain,
+              fit: BoxFit.contain,
             ),
 
             const SizedBox(
@@ -1124,8 +1088,8 @@ class _ConversationScreenState
               decoration:
               InputDecoration(
                 hintText:
-                _isDeleting
-                    ? 'Deleting conversation...'
+                _isArchiving
+                    ? 'Archiving conversation...'
                     : _isSending
                     ? 'Sending...'
                     : 'Type a message...',
@@ -1352,25 +1316,34 @@ class _ConversationScreenState
               children: [
                 ListTile(
                   leading:
-                  const Icon(
-                    Icons
-                        .delete_outline_rounded,
+                  Icon(
+                    Icons.archive_outlined,
                     color:
-                    Colors.redAccent,
+                    _mutedColor,
                   ),
                   title:
-                  const Text(
-                    'Delete conversation',
+                  Text(
+                    'Archive conversation',
                     style:
                     TextStyle(
                       color:
-                      Colors.redAccent,
+                      _textColor,
+                    ),
+                  ),
+                  subtitle:
+                  Text(
+                    'Remove it from Messages without deleting the saved thread.',
+                    style:
+                    TextStyle(
+                      color:
+                      _mutedColor,
+                      fontSize: 11,
                     ),
                   ),
                   onTap: () {
                     Navigator.pop(
                       sheetContext,
-                      'delete',
+                      'archive',
                     );
                   },
                 ),
@@ -1386,19 +1359,18 @@ class _ConversationScreenState
       return;
     }
 
-    if (action ==
-        'delete') {
-      await _confirmDeleteConversation(
+    if (action == 'archive') {
+      await _confirmArchiveConversation(
         conversation,
       );
     }
   }
 
   // ============================================================
-  // DELETE
+  // ARCHIVE
   // ============================================================
 
-  Future<void> _confirmDeleteConversation(
+  Future<void> _confirmArchiveConversation(
       Conversation conversation,
       ) async {
     if (_hasPendingAction) {
@@ -1419,7 +1391,7 @@ class _ConversationScreenState
           _surfaceColor,
           title:
           Text(
-            'Delete conversation?',
+            'Archive conversation?',
             style:
             TextStyle(
               fontWeight:
@@ -1430,7 +1402,7 @@ class _ConversationScreenState
           ),
           content:
           Text(
-            'This will permanently delete your conversation with ${conversation.userName} and all saved messages in this thread.',
+            'This will remove your conversation with ${conversation.userName} from Messages. The saved thread and its messages are not permanently deleted and can be restored later.',
             style:
             TextStyle(
               color:
@@ -1456,20 +1428,23 @@ class _ConversationScreenState
               ),
             ),
 
-            TextButton(
+            TextButton.icon(
               onPressed: () {
                 Navigator.pop(
                   dialogContext,
                   true,
                 );
               },
-              child:
+              icon:
+              const Icon(
+                Icons.archive_outlined,
+                size: 18,
+              ),
+              label:
               const Text(
-                'DELETE',
+                'ARCHIVE',
                 style:
                 TextStyle(
-                  color:
-                  Colors.redAccent,
                   fontWeight:
                   FontWeight.w700,
                 ),
@@ -1485,12 +1460,12 @@ class _ConversationScreenState
       return;
     }
 
-    await _deleteConversation(
+    await _archiveConversation(
       conversation,
     );
   }
 
-  Future<void> _deleteConversation(
+  Future<void> _archiveConversation(
       Conversation conversation,
       ) async {
     if (_hasPendingAction) {
@@ -1502,7 +1477,7 @@ class _ConversationScreenState
     ).unfocus();
 
     setState(() {
-      _isDeleting = true;
+      _isArchiving = true;
     });
 
     try {
@@ -1532,12 +1507,12 @@ class _ConversationScreenState
       }
 
       _showSnackBar(
-        'Conversation could not be deleted. Please try again.',
+        'Conversation could not be archived. Please try again.',
       );
     } finally {
       if (mounted) {
         setState(() {
-          _isDeleting = false;
+          _isArchiving = false;
         });
       }
     }
