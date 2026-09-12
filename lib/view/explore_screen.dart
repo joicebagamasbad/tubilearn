@@ -32,16 +32,18 @@ class _ExploreScreenState
 
   bool _isRefreshing = false;
 
-  final List<String> _modeOptions = const [
+  final List<String> _modeOptions =
+  const <String>[
     'Any',
     'Online',
     'In-person',
   ];
 
-  final List<String> _sortOptions = const [
+  final List<String> _sortOptions =
+  const <String>[
     'A-Z',
     'Most Providers',
-    'Highest Rated',
+    'Top Provider Rating',
   ];
 
   bool get _isDarkMode =>
@@ -141,10 +143,10 @@ class _ExploreScreenState
         skill.id,
       );
 
-      for (final User user
+      for (final User provider
       in providers) {
         final String city =
-        user.city.trim();
+        provider.city.trim();
 
         if (city.isNotEmpty) {
           cities.add(
@@ -243,20 +245,12 @@ class _ExploreScreenState
                 );
 
         final bool matchesMode =
-            _selectedMode == 'Any' ||
-                _supportsMode(
-                  skill.mode,
-                  _selectedMode,
-                ) ||
-                providers.any(
-                      (
-                      User provider,
-                      ) =>
-                      _supportsMode(
-                        provider.preferredMode,
-                        _selectedMode,
-                      ),
-                );
+        _matchesModeFilter(
+          skill:
+          skill,
+          providers:
+          providers,
+        );
 
         final bool matchesCity =
             _selectedCity == 'Any' ||
@@ -341,17 +335,46 @@ class _ExploreScreenState
     );
   }
 
-  bool _supportsMode(
-      String rawValue,
+  bool _matchesModeFilter({
+    required Skill skill,
+    required List<User> providers,
+  }) {
+    if (_selectedMode == 'Any') {
+      return true;
+    }
+
+    if (!skill.supportsSessionMode(
+      _selectedMode,
+    )) {
+      return false;
+    }
+
+    if (providers.isEmpty) {
+      return true;
+    }
+
+    return providers.any(
+          (
+          User provider,
+          ) =>
+          _providerSupportsMode(
+            provider,
+            _selectedMode,
+          ),
+    );
+  }
+
+  bool _providerSupportsMode(
+      User provider,
       String selectedMode,
       ) {
     final String value =
-    rawValue
+    provider.preferredMode
         .trim()
         .toLowerCase();
 
     if (value.isEmpty) {
-      return false;
+      return true;
     }
 
     if (value.contains(
@@ -375,10 +398,13 @@ class _ExploreScreenState
       ) ||
           value.contains(
             'in person',
+          ) ||
+          value.contains(
+            'meetup',
           );
     }
 
-    return true;
+    return false;
   }
 
   void _sortSkills(
@@ -395,15 +421,13 @@ class _ExploreScreenState
                 _repository
                     .getProvidersForSkill(
                   first.id,
-                )
-                    .length;
+                ).length;
 
             final int secondCount =
                 _repository
                     .getProvidersForSkill(
                   second.id,
-                )
-                    .length;
+                ).length;
 
             final int providerComparison =
             secondCount.compareTo(
@@ -425,7 +449,7 @@ class _ExploreScreenState
 
         break;
 
-      case 'Highest Rated':
+      case 'Top Provider Rating':
         skills.sort(
               (
               Skill first,
@@ -485,10 +509,6 @@ class _ExploreScreenState
     _repository.getProvidersForSkill(
       skill.id,
     );
-
-    if (providers.isEmpty) {
-      return 0;
-    }
 
     double highest = 0;
 
@@ -608,17 +628,21 @@ class _ExploreScreenState
       backgroundColor:
       Theme.of(context)
           .scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
+      body:
+      SafeArea(
+        child:
+        Column(
           children: [
             _buildTopBar(),
             Expanded(
-              child: RefreshIndicator(
+              child:
+              RefreshIndicator(
                 onRefresh:
                 _refreshExplore,
                 color:
                 _primaryColor,
-                child: SingleChildScrollView(
+                child:
+                SingleChildScrollView(
                   physics:
                   const AlwaysScrollableScrollPhysics(
                     parent:
@@ -631,7 +655,8 @@ class _ExploreScreenState
                     20,
                     30,
                   ),
-                  child: Column(
+                  child:
+                  Column(
                     crossAxisAlignment:
                     CrossAxisAlignment.start,
                     children: [
@@ -676,11 +701,11 @@ class _ExploreScreenState
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
+                            child:
+                            Text(
                               'Skills For You',
                               style:
-                              AppTextStyles
-                                  .cardTitle
+                              AppTextStyles.cardTitle
                                   .copyWith(
                                 color:
                                 _textColor,
@@ -690,8 +715,7 @@ class _ExploreScreenState
                           Text(
                             '${skills.length} skill${skills.length == 1 ? '' : 's'}',
                             style:
-                            AppTextStyles
-                                .caption
+                            AppTextStyles.caption
                                 .copyWith(
                               color:
                               _mutedColor,
@@ -739,7 +763,8 @@ class _ExploreScreenState
 
   Widget _buildTopBar() {
     return Container(
-      height: 62,
+      height:
+      62,
       padding:
       const EdgeInsets.symmetric(
         horizontal: 10,
@@ -757,7 +782,8 @@ class _ExploreScreenState
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           IconButton(
             tooltip:
@@ -769,8 +795,7 @@ class _ExploreScreenState
             },
             icon:
             Icon(
-              Icons
-                  .arrow_back_ios_new_rounded,
+              Icons.arrow_back_ios_new_rounded,
               size: 18,
               color:
               _primaryColor,
@@ -778,8 +803,10 @@ class _ExploreScreenState
           ),
 
           Expanded(
-            child: Center(
-              child: Text(
+            child:
+            Center(
+              child:
+              Text(
                 'Explore',
                 style:
                 AppTextStyles.cardTitle
@@ -805,7 +832,8 @@ class _ExploreScreenState
               height: 18,
               child:
               CircularProgressIndicator(
-                strokeWidth: 2,
+                strokeWidth:
+                2,
                 color:
                 _primaryColor,
               ),
@@ -850,10 +878,12 @@ class _ExploreScreenState
           _softPrimaryBorderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -888,7 +918,8 @@ class _ExploreScreenState
             'assets/images/mascot/tubi_studying.png',
             width: 82,
             height: 82,
-            fit: BoxFit.contain,
+            fit:
+            BoxFit.contain,
           ),
         ],
       ),
@@ -906,11 +937,9 @@ class _ExploreScreenState
           child:
           _buildSearchBar(),
         ),
-
         const SizedBox(
           width: 10,
         ),
-
         _buildFilterButton(),
       ],
     );
@@ -918,7 +947,8 @@ class _ExploreScreenState
 
   Widget _buildSearchBar() {
     return Container(
-      height: 50,
+      height:
+      50,
       decoration:
       BoxDecoration(
         color:
@@ -933,12 +963,14 @@ class _ExploreScreenState
           _borderColor,
         ),
       ),
-      child: TextField(
+      child:
+      TextField(
         controller:
         _searchController,
         textInputAction:
         TextInputAction.search,
-        onChanged: (
+        onChanged:
+            (
             String value,
             ) {
           setState(() {
@@ -1016,7 +1048,8 @@ class _ExploreScreenState
         SizedBox(
           width: 50,
           height: 50,
-          child: OutlinedButton(
+          child:
+          OutlinedButton(
             onPressed:
             _openFilters,
             style:
@@ -1053,12 +1086,14 @@ class _ExploreScreenState
             ),
           ),
         ),
-
         if (count > 0)
           Positioned(
-            right: -5,
-            top: -5,
-            child: Container(
+            right:
+            -5,
+            top:
+            -5,
+            child:
+            Container(
               width: 20,
               height: 20,
               alignment:
@@ -1074,14 +1109,17 @@ class _ExploreScreenState
                   color:
                   Theme.of(context)
                       .scaffoldBackgroundColor,
-                  width: 2,
+                  width:
+                  2,
                 ),
               ),
-              child: Text(
+              child:
+              Text(
                 '$count',
                 style:
                 TextStyle(
-                  fontSize: 9,
+                  fontSize:
+                  9,
                   fontWeight:
                   FontWeight.w800,
                   color:
@@ -1122,17 +1160,21 @@ class _ExploreScreenState
       true,
       backgroundColor:
       Colors.transparent,
-      builder: (
+      builder:
+          (
           BuildContext sheetContext,
           ) {
         return StatefulBuilder(
-          builder: (
+          builder:
+              (
               BuildContext context,
               StateSetter setSheetState,
               ) {
             return SafeArea(
-              top: false,
-              child: Container(
+              top:
+              false,
+              child:
+              Container(
                 padding:
                 EdgeInsets.fromLTRB(
                   20,
@@ -1157,16 +1199,20 @@ class _ExploreScreenState
                 ),
                 child:
                 SingleChildScrollView(
-                  child: Column(
+                  child:
+                  Column(
                     mainAxisSize:
                     MainAxisSize.min,
                     crossAxisAlignment:
                     CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Container(
-                          width: 42,
-                          height: 4,
+                        child:
+                        Container(
+                          width:
+                          42,
+                          height:
+                          4,
                           decoration:
                           BoxDecoration(
                             color:
@@ -1186,11 +1232,11 @@ class _ExploreScreenState
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
+                            child:
+                            Text(
                               'Explore Filters',
                               style:
-                              AppTextStyles
-                                  .cardTitle
+                              AppTextStyles.cardTitle
                                   .copyWith(
                                 color:
                                 _textColor,
@@ -1202,10 +1248,8 @@ class _ExploreScreenState
                               setSheetState(() {
                                 temporaryMode =
                                 'Any';
-
                                 temporaryCity =
                                 'Any';
-
                                 temporarySort =
                                 'A-Z';
                               });
@@ -1239,8 +1283,10 @@ class _ExploreScreenState
                       ),
 
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing:
+                        8,
+                        runSpacing:
+                        8,
                         children:
                         _modeOptions.map(
                               (
@@ -1259,7 +1305,8 @@ class _ExploreScreenState
                               selected,
                               showCheckmark:
                               false,
-                              onSelected: (_) {
+                              onSelected:
+                                  (_) {
                                 setSheetState(() {
                                   temporaryMode =
                                       mode;
@@ -1278,7 +1325,8 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize: 12,
+                                fontSize:
+                                12,
                                 fontWeight:
                                 FontWeight.w700,
                                 color:
@@ -1352,14 +1400,14 @@ class _ExploreScreenState
                             _surfaceColor,
                             icon:
                             Icon(
-                              Icons
-                                  .keyboard_arrow_down_rounded,
+                              Icons.keyboard_arrow_down_rounded,
                               color:
                               _mutedColor,
                             ),
                             style:
                             TextStyle(
-                              fontSize: 13,
+                              fontSize:
+                              13,
                               color:
                               _textColor,
                             ),
@@ -1379,11 +1427,11 @@ class _ExploreScreenState
                                     ),
                                   ),
                             ).toList(),
-                            onChanged: (
+                            onChanged:
+                                (
                                 String? value,
                                 ) {
-                              if (value ==
-                                  null) {
+                              if (value == null) {
                                 return;
                               }
 
@@ -1417,8 +1465,10 @@ class _ExploreScreenState
                       ),
 
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing:
+                        8,
+                        runSpacing:
+                        8,
                         children:
                         _sortOptions.map(
                               (
@@ -1437,7 +1487,8 @@ class _ExploreScreenState
                               selected,
                               showCheckmark:
                               false,
-                              onSelected: (_) {
+                              onSelected:
+                                  (_) {
                                 setSheetState(() {
                                   temporarySort =
                                       option;
@@ -1456,7 +1507,8 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize: 12,
+                                fontSize:
+                                12,
                                 fontWeight:
                                 FontWeight.w700,
                                 color:
@@ -1501,7 +1553,8 @@ class _ExploreScreenState
                           icon:
                           const Icon(
                             Icons.check_rounded,
-                            size: 18,
+                            size:
+                            18,
                           ),
                           label:
                           const Text(
@@ -1555,8 +1608,10 @@ class _ExploreScreenState
       double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        horizontal: 13,
-        vertical: 10,
+        horizontal:
+        13,
+        vertical:
+        10,
       ),
       decoration:
       BoxDecoration(
@@ -1572,25 +1627,28 @@ class _ExploreScreenState
           _softPrimaryBorderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Icon(
             Icons.tune_rounded,
-            size: 16,
+            size:
+            16,
             color:
             _primaryColor,
           ),
-
           const SizedBox(
-            width: 8,
+            width:
+            8,
           ),
-
           Expanded(
-            child: Text(
+            child:
+            Text(
               labels.join(
                 ' • ',
               ),
-              maxLines: 2,
+              maxLines:
+              2,
               overflow:
               TextOverflow.ellipsis,
               style:
@@ -1603,7 +1661,6 @@ class _ExploreScreenState
               ),
             ),
           ),
-
           TextButton(
             onPressed:
             _resetFilters,
@@ -1626,7 +1683,8 @@ class _ExploreScreenState
         _categories;
 
     return SizedBox(
-      height: 38,
+      height:
+      38,
       child:
       ListView.separated(
         scrollDirection:
@@ -1635,15 +1693,18 @@ class _ExploreScreenState
         const BouncingScrollPhysics(),
         itemCount:
         categories.length,
-        separatorBuilder: (
+        separatorBuilder:
+            (
             BuildContext context,
             int index,
             ) {
           return const SizedBox(
-            width: 8,
+            width:
+            8,
           );
         },
-        itemBuilder: (
+        itemBuilder:
+            (
             BuildContext context,
             int index,
             ) {
@@ -1669,11 +1730,13 @@ class _ExploreScreenState
             AnimatedContainer(
               duration:
               const Duration(
-                milliseconds: 180,
+                milliseconds:
+                180,
               ),
               padding:
               const EdgeInsets.symmetric(
-                horizontal: 15,
+                horizontal:
+                15,
               ),
               alignment:
               Alignment.center,
@@ -1703,11 +1766,11 @@ class _ExploreScreenState
                     .copyWith(
                   color:
                   selected
-                      ? _isDarkMode
+                      ? (_isDarkMode
                       ? const Color(
                     0xFF092E31,
                   )
-                      : Colors.white
+                      : Colors.white)
                       : _textColor,
                   fontWeight:
                   selected
@@ -1730,8 +1793,7 @@ class _ExploreScreenState
       Skill skill,
       ) {
     final List<User> providers =
-    _repository
-        .getProvidersForSkill(
+    _repository.getProvidersForSkill(
       skill.id,
     );
 
@@ -1756,7 +1818,8 @@ class _ExploreScreenState
           skill,
         );
       },
-      child: Container(
+      child:
+      Container(
         width:
         double.infinity,
         padding:
@@ -1779,8 +1842,7 @@ class _ExploreScreenState
           boxShadow: [
             BoxShadow(
               color:
-              Colors.black
-                  .withValues(
+              Colors.black.withValues(
                 alpha:
                 _isDarkMode
                     ? 0.12
@@ -1796,11 +1858,14 @@ class _ExploreScreenState
             ),
           ],
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width:
+              58,
+              height:
+              58,
               decoration:
               BoxDecoration(
                 color:
@@ -1820,7 +1885,8 @@ class _ExploreScreenState
                 skill.icon,
                 color:
                 _primaryColor,
-                size: 28,
+                size:
+                28,
               ),
             ),
 
@@ -1829,7 +1895,8 @@ class _ExploreScreenState
             ),
 
             Expanded(
-              child: Column(
+              child:
+              Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
@@ -1848,7 +1915,11 @@ class _ExploreScreenState
                   ),
 
                   Text(
-                    skill.category,
+                    '${skill.category} • ${skill.mode}',
+                    maxLines:
+                    1,
+                    overflow:
+                    TextOverflow.ellipsis,
                     style:
                     AppTextStyles.caption
                         .copyWith(
@@ -1861,13 +1932,21 @@ class _ExploreScreenState
                     height: 8,
                   ),
 
-                  Row(
+                  Wrap(
+                    spacing:
+                    9,
+                    runSpacing:
+                    6,
+                    crossAxisAlignment:
+                    WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding:
                         const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal:
+                          8,
+                          vertical:
+                          4,
                         ),
                         decoration:
                         BoxDecoration(
@@ -1882,8 +1961,7 @@ class _ExploreScreenState
                         Text(
                           skill.level,
                           style:
-                          AppTextStyles
-                              .caption
+                          AppTextStyles.caption
                               .copyWith(
                             color:
                             _primaryColor,
@@ -1893,65 +1971,63 @@ class _ExploreScreenState
                         ),
                       ),
 
-                      const SizedBox(
-                        width: 9,
-                      ),
-
-                      Icon(
-                        Icons
-                            .people_outline_rounded,
-                        size: 13,
-                        color:
-                        _mutedColor,
-                      ),
-
-                      const SizedBox(
-                        width: 4,
-                      ),
-
-                      Flexible(
-                        child: Text(
-                          '$providerCount provider${providerCount == 1 ? '' : 's'}',
-                          overflow:
-                          TextOverflow.ellipsis,
-                          style:
-                          AppTextStyles
-                              .caption
-                              .copyWith(
+                      Row(
+                        mainAxisSize:
+                        MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.people_outline_rounded,
+                            size:
+                            13,
                             color:
                             _mutedColor,
                           ),
-                        ),
+                          const SizedBox(
+                            width:
+                            4,
+                          ),
+                          Text(
+                            '$providerCount provider${providerCount == 1 ? '' : 's'}',
+                            style:
+                            AppTextStyles.caption
+                                .copyWith(
+                              color:
+                              _mutedColor,
+                            ),
+                          ),
+                        ],
                       ),
 
-                      if (providerCount >
-                          0) ...[
-                        const SizedBox(
-                          width: 8,
+                      if (highestRating > 0)
+                        Row(
+                          mainAxisSize:
+                          MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              size:
+                              13,
+                              color:
+                              AppTheme.accent,
+                            ),
+                            const SizedBox(
+                              width:
+                              3,
+                            ),
+                            Text(
+                              highestRating
+                                  .toStringAsFixed(
+                                1,
+                              ),
+                              style:
+                              AppTextStyles.caption
+                                  .copyWith(
+                                color:
+                                _mutedColor,
+                              ),
+                            ),
+                          ],
                         ),
-                        Icon(
-                          Icons.star_rounded,
-                          size: 13,
-                          color:
-                          AppTheme.accent,
-                        ),
-                        const SizedBox(
-                          width: 3,
-                        ),
-                        Text(
-                          highestRating
-                              .toStringAsFixed(
-                            1,
-                          ),
-                          style:
-                          AppTextStyles
-                              .caption
-                              .copyWith(
-                            color:
-                            _mutedColor,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ],
@@ -1959,13 +2035,14 @@ class _ExploreScreenState
             ),
 
             const SizedBox(
-              width: 8,
+              width:
+              8,
             ),
 
             Icon(
-              Icons
-                  .arrow_forward_ios_rounded,
-              size: 14,
+              Icons.arrow_forward_ios_rounded,
+              size:
+              14,
               color:
               _mutedColor,
             ),
@@ -1983,15 +2060,11 @@ class _ExploreScreenState
     String message =
         'No skills match your current search and filters.';
 
-    if (_searchQuery
-        .trim()
-        .isNotEmpty &&
+    if (_searchQuery.trim().isNotEmpty &&
         _activeFilterCount == 0) {
       message =
       'We couldn\'t find anything for "$_searchQuery".';
-    } else if (_searchQuery
-        .trim()
-        .isEmpty &&
+    } else if (_searchQuery.trim().isEmpty &&
         _activeFilterCount == 0) {
       message =
       'No skills are available right now.';
@@ -2002,19 +2075,25 @@ class _ExploreScreenState
       double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        vertical: 30,
-        horizontal: 20,
+        vertical:
+        30,
+        horizontal:
+        20,
       ),
-      child: Column(
+      child:
+      Column(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
-            width: 90,
-            height: 90,
+            width:
+            90,
+            height:
+            90,
           ),
 
           const SizedBox(
-            height: 12,
+            height:
+            12,
           ),
 
           Text(
@@ -2028,7 +2107,8 @@ class _ExploreScreenState
           ),
 
           const SizedBox(
-            height: 5,
+            height:
+            5,
           ),
 
           Text(
@@ -2045,7 +2125,8 @@ class _ExploreScreenState
 
           if (_hasActiveFilters) ...[
             const SizedBox(
-              height: 14,
+              height:
+              14,
             ),
             TextButton.icon(
               onPressed:
@@ -2053,7 +2134,8 @@ class _ExploreScreenState
               icon:
               const Icon(
                 Icons.refresh_rounded,
-                size: 18,
+                size:
+                18,
               ),
               label:
               const Text(

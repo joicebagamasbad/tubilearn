@@ -115,8 +115,7 @@ class SwapService {
     try {
       savedRequests =
       await _repository.getAllSwapRequests(
-        userId:
-        currentUserId,
+        userId: currentUserId,
       );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
@@ -265,13 +264,7 @@ class SwapService {
       );
     }
 
-    const Set<String> allowedModes =
-    <String>{
-      'Online',
-      'In-person',
-    };
-
-    if (!allowedModes.contains(
+    if (!_isAllowedSessionMode(
       mode,
     )) {
       throw const SwapServiceException(
@@ -293,9 +286,15 @@ class SwapService {
       );
     }
 
-    if (request.createdAt.millisecondsSinceEpoch <= 0 ||
-        request.updatedAt.millisecondsSinceEpoch <= 0 ||
-        request.proposedAt.millisecondsSinceEpoch <= 0) {
+    if (request.createdAt
+        .millisecondsSinceEpoch <=
+        0 ||
+        request.updatedAt
+            .millisecondsSinceEpoch <=
+            0 ||
+        request.proposedAt
+            .millisecondsSinceEpoch <=
+            0) {
       throw const SwapServiceException(
         'Saved swap data contains an invalid timestamp.',
       );
@@ -402,19 +401,19 @@ class SwapService {
       skillToOfferId,
     );
 
-    final String cleanProviderName =
+    final String suppliedProviderName =
     providerName.trim();
 
-    final String cleanProviderInitials =
+    final String suppliedProviderInitials =
     providerInitials.trim();
 
-    final String cleanProviderCity =
+    final String suppliedProviderCity =
     providerCity.trim();
 
-    final String cleanSkillToLearn =
+    final String suppliedSkillToLearn =
     skillToLearn.trim();
 
-    final String cleanSkillToOffer =
+    final String suppliedSkillToOffer =
     skillToOffer.trim();
 
     final String cleanMode =
@@ -450,25 +449,116 @@ class SwapService {
       );
     }
 
+    if (suppliedProviderName.isEmpty ||
+        suppliedProviderInitials.isEmpty ||
+        suppliedProviderCity.isEmpty ||
+        suppliedSkillToLearn.isEmpty ||
+        suppliedSkillToOffer.isEmpty) {
+      throw const SwapServiceException(
+        'Required swap request details are missing.',
+      );
+    }
+
+    if (!_isAllowedSessionMode(
+      cleanMode,
+    )) {
+      throw const SwapServiceException(
+        'Invalid session mode.',
+      );
+    }
+
+    await _refreshExploreForValidation();
+
+    final provider =
+    _exploreRepository.findUserById(
+      cleanProviderUserId!,
+    );
+
+    if (provider == null) {
+      throw const SwapServiceException(
+        'The selected provider is no longer available.',
+      );
+    }
+
+    final requester =
+    _exploreRepository.findUserById(
+      cleanRequesterUserId!,
+    );
+
+    if (requester == null) {
+      throw const SwapServiceException(
+        'Your local profile could not be found.',
+      );
+    }
+
+    final learnSkill =
+    _exploreRepository.findSkillById(
+      cleanSkillToLearnId!,
+    );
+
+    if (learnSkill == null) {
+      throw const SwapServiceException(
+        'The skill you want to learn is no longer available.',
+      );
+    }
+
+    final offerSkill =
+    _exploreRepository.findSkillById(
+      cleanSkillToOfferId!,
+    );
+
+    if (offerSkill == null) {
+      throw const SwapServiceException(
+        'The skill you want to offer is no longer available.',
+      );
+    }
+
+    if (!_userOffersSkill(
+      userId: provider.id,
+      skillId: learnSkill.id,
+    )) {
+      throw const SwapServiceException(
+        'This provider no longer offers the selected skill.',
+      );
+    }
+
+    if (!_userOffersSkill(
+      userId: requester.id,
+      skillId: offerSkill.id,
+    )) {
+      throw const SwapServiceException(
+        'You no longer offer the selected exchange skill.',
+      );
+    }
+
+    _validateModeSupportedBySkills(
+      skillToLearnId:
+      learnSkill.id,
+      skillToOfferId:
+      offerSkill.id,
+      mode:
+      cleanMode,
+    );
+
     _validateCreateRequest(
       requesterUserId:
-      cleanRequesterUserId!,
+      cleanRequesterUserId,
       providerUserId:
-      cleanProviderUserId!,
+      cleanProviderUserId,
       skillToLearnId:
-      cleanSkillToLearnId!,
+      learnSkill.id,
       skillToOfferId:
-      cleanSkillToOfferId!,
+      offerSkill.id,
       providerName:
-      cleanProviderName,
+      provider.name.trim(),
       providerInitials:
-      cleanProviderInitials,
+      provider.initials.trim(),
       providerCity:
-      cleanProviderCity,
+      provider.city.trim(),
       skillToLearn:
-      cleanSkillToLearn,
+      learnSkill.title.trim(),
       skillToOffer:
-      cleanSkillToOffer,
+      offerSkill.title.trim(),
       proposedAt:
       proposedAt,
       mode:
@@ -486,9 +576,9 @@ class SwapService {
       providerUserId:
       cleanProviderUserId,
       skillToLearnId:
-      cleanSkillToLearnId,
+      learnSkill.id,
       skillToOfferId:
-      cleanSkillToOfferId,
+      offerSkill.id,
     );
 
     final Future<SwapRequest>? pending =
@@ -507,19 +597,19 @@ class SwapService {
       providerUserId:
       cleanProviderUserId,
       skillToLearnId:
-      cleanSkillToLearnId,
+      learnSkill.id,
       skillToOfferId:
-      cleanSkillToOfferId,
+      offerSkill.id,
       providerName:
-      cleanProviderName,
+      provider.name.trim(),
       providerInitials:
-      cleanProviderInitials,
+      provider.initials.trim(),
       providerCity:
-      cleanProviderCity,
+      provider.city.trim(),
       skillToLearn:
-      cleanSkillToLearn,
+      learnSkill.title.trim(),
       skillToOffer:
-      cleanSkillToOffer,
+      offerSkill.title.trim(),
       proposedAt:
       proposedAt,
       mode:
@@ -764,6 +854,15 @@ class SwapService {
           );
         }
 
+        await _refreshExploreForValidation();
+
+        _validateModeSupportedByRequest(
+          request:
+          request,
+          mode:
+          request.mode,
+        );
+
         _ensureNoScheduleConflict(
           request:
           request,
@@ -933,8 +1032,7 @@ class SwapService {
     try {
       await _exploreRepository.refresh();
     } catch (_) {
-      // The completion itself is already safely stored.
-      // Explore data can refresh again on the next screen load.
+      // Completion is already safely persisted.
     }
   }
 
@@ -1106,8 +1204,9 @@ class SwapService {
       );
     }
 
-    if (cleanMode != 'Online' &&
-        cleanMode != 'In-person') {
+    if (!_isAllowedSessionMode(
+      cleanMode,
+    )) {
       throw const SwapServiceException(
         'Invalid session mode.',
       );
@@ -1125,6 +1224,15 @@ class SwapService {
         'Meeting details must be 150 characters or less.',
       );
     }
+
+    await _refreshExploreForValidation();
+
+    _validateModeSupportedByRequest(
+      request:
+      request,
+      mode:
+      cleanMode,
+    );
 
     final SwapRequestStatus nextStatus =
         SwapRequestStatus.accepted;
@@ -1889,6 +1997,110 @@ class SwapService {
   }
 
   // ============================================================
+  // EXPLORE / CURRENT DATA VALIDATION
+  // ============================================================
+
+  Future<void> _refreshExploreForValidation() async {
+    try {
+      await _exploreRepository.refresh();
+    } on ExploreRepositoryException catch (_) {
+      throw const SwapServiceException(
+        'Current skill data could not be verified. Please try again.',
+      );
+    } catch (_) {
+      throw const SwapServiceException(
+        'Current skill data could not be verified. Please try again.',
+      );
+    }
+  }
+
+  bool _userOffersSkill({
+    required String userId,
+    required String skillId,
+  }) {
+    return _exploreRepository
+        .getOfferedSkillsForUser(
+      userId,
+    )
+        .any(
+          (
+          relationship,
+          ) =>
+      relationship.skillId ==
+          skillId,
+    );
+  }
+
+  bool _isAllowedSessionMode(
+      String mode,
+      ) {
+    return mode == 'Online' ||
+        mode == 'In-person';
+  }
+
+  void _validateModeSupportedByRequest({
+    required SwapRequest request,
+    required String mode,
+  }) {
+    if (!request.hasStableIdentity) {
+      throw const SwapServiceException(
+        'This swap request does not have enough skill information to validate its session mode.',
+      );
+    }
+
+    _validateModeSupportedBySkills(
+      skillToLearnId:
+      request.skillToLearnId!,
+      skillToOfferId:
+      request.skillToOfferId!,
+      mode:
+      mode,
+    );
+  }
+
+  void _validateModeSupportedBySkills({
+    required String skillToLearnId,
+    required String skillToOfferId,
+    required String mode,
+  }) {
+    if (!_isAllowedSessionMode(
+      mode,
+    )) {
+      throw const SwapServiceException(
+        'Invalid session mode.',
+      );
+    }
+
+    final learnSkill =
+    _exploreRepository.findSkillById(
+      skillToLearnId,
+    );
+
+    final offerSkill =
+    _exploreRepository.findSkillById(
+      skillToOfferId,
+    );
+
+    if (learnSkill == null ||
+        offerSkill == null) {
+      throw const SwapServiceException(
+        'One of the skills in this swap is no longer available.',
+      );
+    }
+
+    if (!learnSkill.supportsSessionMode(
+      mode,
+    ) ||
+        !offerSkill.supportsSessionMode(
+          mode,
+        )) {
+      throw const SwapServiceException(
+        'The selected session mode is not supported by both skills in this swap.',
+      );
+    }
+  }
+
+  // ============================================================
   // IDENTITY VALIDATION
   // ============================================================
 
@@ -1965,13 +2177,38 @@ class SwapService {
     required String? meetingDetails,
     required String? note,
   }) {
-    if (providerName.isEmpty ||
+    if (requesterUserId.isEmpty ||
+        providerUserId.isEmpty ||
+        skillToLearnId.isEmpty ||
+        skillToOfferId.isEmpty ||
+        providerName.isEmpty ||
         providerInitials.isEmpty ||
         providerCity.isEmpty ||
         skillToLearn.isEmpty ||
         skillToOffer.isEmpty) {
       throw const SwapServiceException(
         'Required swap request details are missing.',
+      );
+    }
+
+    if (requesterUserId ==
+        providerUserId) {
+      throw const SwapServiceException(
+        'You cannot create a swap request with yourself.',
+      );
+    }
+
+    if (skillToLearnId ==
+        skillToOfferId) {
+      throw const SwapServiceException(
+        'The two skills must be different.',
+      );
+    }
+
+    if (skillToLearn.toLowerCase() ==
+        skillToOffer.toLowerCase()) {
+      throw const SwapServiceException(
+        'The two skills must be different.',
       );
     }
 
@@ -1983,8 +2220,9 @@ class SwapService {
       );
     }
 
-    if (mode != 'Online' &&
-        mode != 'In-person') {
+    if (!_isAllowedSessionMode(
+      mode,
+    )) {
       throw const SwapServiceException(
         'Invalid session mode.',
       );
@@ -2066,7 +2304,9 @@ class SwapService {
       providerUserId.trim(),
       skillToLearnId.trim(),
       skillToOfferId.trim(),
-    ].join('|');
+    ].join(
+      '|',
+    );
   }
 
   // ============================================================
@@ -2085,8 +2325,10 @@ class SwapService {
           request.createdAt
               .microsecondsSinceEpoch;
 
-      if (micros > highest) {
-        highest = micros;
+      if (micros >
+          highest) {
+        highest =
+            micros;
       }
 
       final int? id =
@@ -2095,8 +2337,10 @@ class SwapService {
       );
 
       if (id != null &&
-          id > highest) {
-        highest = id;
+          id >
+              highest) {
+        highest =
+            id;
       }
     }
 
@@ -2112,7 +2356,8 @@ class SwapService {
     if (candidate <=
         _lastRequestIdMicros) {
       candidate =
-          _lastRequestIdMicros + 1;
+          _lastRequestIdMicros +
+              1;
     }
 
     _lastRequestIdMicros =

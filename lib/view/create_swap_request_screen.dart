@@ -64,7 +64,7 @@ class _CreateSwapRequestScreenState
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
-  String _selectedMode = 'Online';
+  String? _selectedMode = 'Online';
 
   bool _isLoading = true;
   bool _isSending = false;
@@ -117,6 +117,55 @@ class _CreateSwapRequestScreenState
           : const Color(
         0xFFD2E5E2,
       );
+
+  List<String> get _supportedModes {
+    final Skill? learnSkill =
+        _resolvedSkillToLearn;
+
+    final Skill? offerSkill =
+        _selectedSkillToOffer;
+
+    if (learnSkill == null ||
+        offerSkill == null) {
+      return const <String>[];
+    }
+
+    final List<String> modes =
+    <String>[];
+
+    if (learnSkill.supportsSessionMode(
+      'Online',
+    ) &&
+        offerSkill.supportsSessionMode(
+          'Online',
+        )) {
+      modes.add(
+        'Online',
+      );
+    }
+
+    if (learnSkill.supportsSessionMode(
+      'In-person',
+    ) &&
+        offerSkill.supportsSessionMode(
+          'In-person',
+        )) {
+      modes.add(
+        'In-person',
+      );
+    }
+
+    return modes;
+  }
+
+  bool get _hasCommonSessionMode =>
+      _supportedModes.isNotEmpty;
+
+  bool get _canAttemptSend =>
+      !_isSending &&
+          _selectedSkillToOffer != null &&
+          _selectedMode != null &&
+          _hasCommonSessionMode;
 
   @override
   void initState() {
@@ -171,7 +220,8 @@ class _CreateSwapRequestScreenState
       )
           .where(
             (Skill skill) =>
-        skill.id != learnSkillId,
+        skill.id !=
+            learnSkillId,
       )
           .toList();
 
@@ -183,7 +233,8 @@ class _CreateSwapRequestScreenState
             first.title
                 .toLowerCase()
                 .compareTo(
-              second.title.toLowerCase(),
+              second.title
+                  .toLowerCase(),
             ),
       );
 
@@ -211,6 +262,10 @@ class _CreateSwapRequestScreenState
         _selectedSkillToOffer ??=
             preselectedSkill;
 
+        _normalizeSelectedMode(
+          clearMeetingDetails: false,
+        );
+
         _isLoading = false;
         _loadError = null;
       });
@@ -224,6 +279,15 @@ class _CreateSwapRequestScreenState
         _loadError = error.message;
       });
     } on SwapServiceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } on ExploreRepositoryException catch (error) {
       if (!mounted) {
         return;
       }
@@ -262,8 +326,10 @@ class _CreateSwapRequestScreenState
     );
 
     if (preferredId != null) {
-      for (final Skill skill in availableSkills) {
-        if (skill.id == preferredId) {
+      for (final Skill skill
+      in availableSkills) {
+        if (skill.id ==
+            preferredId) {
           return skill;
         }
       }
@@ -299,7 +365,8 @@ class _CreateSwapRequestScreenState
       return null;
     }
 
-    final Set<String> providerWantedSkillIds =
+    final Set<String>
+    providerWantedSkillIds =
     _exploreRepository
         .getWantedSkillsForUser(
       provider.id,
@@ -318,7 +385,8 @@ class _CreateSwapRequestScreenState
     availableSkills
         .where(
           (Skill skill) =>
-          providerWantedSkillIds.contains(
+          providerWantedSkillIds
+              .contains(
             skill.id,
           ),
     )
@@ -340,11 +408,73 @@ class _CreateSwapRequestScreenState
           first.title
               .toLowerCase()
               .compareTo(
-            second.title.toLowerCase(),
+            second.title
+                .toLowerCase(),
           ),
     );
 
     return reciprocalMatches.first;
+  }
+
+  // ============================================================
+  // SESSION MODE
+  // ============================================================
+
+  bool _isModeSupported(
+      String mode,
+      ) {
+    return _supportedModes.contains(
+      mode,
+    );
+  }
+
+  void _normalizeSelectedMode({
+    required bool clearMeetingDetails,
+  }) {
+    final List<String> modes =
+        _supportedModes;
+
+    final String? current =
+        _selectedMode;
+
+    if (current != null &&
+        modes.contains(
+          current,
+        )) {
+      return;
+    }
+
+    _selectedMode =
+    modes.isEmpty
+        ? null
+        : modes.first;
+
+    if (clearMeetingDetails) {
+      _meetingDetailsController.clear();
+    }
+  }
+
+  void _selectMode(
+      String mode,
+      ) {
+    if (_isSending ||
+        !_isModeSupported(
+          mode,
+        ) ||
+        _selectedMode ==
+            mode) {
+      return;
+    }
+
+    setState(() {
+      _selectedMode =
+          mode;
+
+      _meetingDetailsController.clear();
+
+      _hasUnsavedChanges =
+      true;
+    });
   }
 
   // ============================================================
@@ -424,18 +554,15 @@ class _CreateSwapRequestScreenState
           title:
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.warning_amber_rounded,
-                color:
-                AppTheme.accent,
+                color: AppTheme.accent,
               ),
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
               Expanded(
-                child:
-                Text(
+                child: Text(
                   'Discard this request?',
                   style:
                   AppTextStyles.cardTitle
@@ -581,6 +708,29 @@ class _CreateSwapRequestScreenState
     return matches.single;
   }
 
+  bool get _providerStillOffersLearnSkill {
+    final User? provider =
+        _resolvedProvider;
+
+    final Skill? skill =
+        _resolvedSkillToLearn;
+
+    if (provider == null ||
+        skill == null) {
+      return false;
+    }
+
+    return _exploreRepository
+        .getOfferedSkillsForUser(
+      provider.id,
+    )
+        .any(
+          (relationship) =>
+      relationship.skillId ==
+          skill.id,
+    );
+  }
+
   // ============================================================
   // DISPOSE
   // ============================================================
@@ -627,22 +777,24 @@ class _CreateSwapRequestScreenState
           Colors.transparent,
           elevation:
           0,
-          leading: IconButton(
+          leading:
+          IconButton(
             onPressed:
             _isSending
                 ? null
                 : _handleBackPressed,
-            icon: Icon(
+            icon:
+            Icon(
               Icons.arrow_back_ios_new_rounded,
-              size:
-              19,
+              size: 19,
               color:
               _isSending
                   ? _mutedColor
                   : _primaryColor,
             ),
           ),
-          title: Text(
+          title:
+          Text(
             'Request a Skill Swap',
             style:
             AppTextStyles.cardTitle
@@ -654,7 +806,8 @@ class _CreateSwapRequestScreenState
           centerTitle:
           false,
         ),
-        body: SafeArea(
+        body:
+        SafeArea(
           child:
           _buildBody(),
         ),
@@ -670,21 +823,17 @@ class _CreateSwapRequestScreenState
           MainAxisSize.min,
           children: [
             SizedBox(
-              width:
-              28,
-              height:
-              28,
+              width: 28,
+              height: 28,
               child:
               CircularProgressIndicator(
-                strokeWidth:
-                2.5,
+                strokeWidth: 2.5,
                 color:
                 _primaryColor,
               ),
             ),
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
             Text(
               'Loading your skills...',
@@ -722,6 +871,15 @@ class _CreateSwapRequestScreenState
       );
     }
 
+    if (!_providerStillOffersLearnSkill) {
+      return _buildUnavailableState(
+        title:
+        'Skill no longer offered',
+        message:
+        'This provider no longer offers the selected skill. Go back to Explore and choose another available provider.',
+      );
+    }
+
     return SingleChildScrollView(
       physics:
       const BouncingScrollPhysics(),
@@ -732,15 +890,15 @@ class _CreateSwapRequestScreenState
         20,
         30,
       ),
-      child: Column(
+      child:
+      Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           _buildIntroduction(),
 
           const SizedBox(
-            height:
-            26,
+            height: 26,
           ),
 
           _buildSectionLabel(
@@ -748,15 +906,13 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            8,
+            height: 8,
           ),
 
           _buildReadOnlySkill(),
 
           const SizedBox(
-            height:
-            22,
+            height: 22,
           ),
 
           _buildSectionLabel(
@@ -764,8 +920,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
 
           Text(
@@ -779,15 +934,13 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
 
           _buildSkillDropdown(),
 
           const SizedBox(
-            height:
-            22,
+            height: 22,
           ),
 
           _buildSectionLabel(
@@ -795,8 +948,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
 
           Text(
@@ -810,8 +962,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
 
           Row(
@@ -821,8 +972,7 @@ class _CreateSwapRequestScreenState
                 _buildDateSelector(),
               ),
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
               Expanded(
                 child:
@@ -832,8 +982,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            22,
+            height: 22,
           ),
 
           _buildSectionLabel(
@@ -841,12 +990,11 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
 
           Text(
-            'Choose how you prefer to conduct the skill swap.',
+            'Only modes supported by both skills can be selected.',
             style:
             AppTextStyles.secondary
                 .copyWith(
@@ -856,22 +1004,27 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
 
           _buildModeSelector(),
 
+          if (_selectedSkillToOffer != null &&
+              !_hasCommonSessionMode) ...[
+            const SizedBox(
+              height: 10,
+            ),
+            _buildNoCommonModeWarning(),
+          ],
+
           const SizedBox(
-            height:
-            16,
+            height: 16,
           ),
 
           _buildMeetingDetails(),
 
           const SizedBox(
-            height:
-            22,
+            height: 22,
           ),
 
           _buildSectionLabel(
@@ -879,8 +1032,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
 
           Text(
@@ -894,8 +1046,7 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
 
           TextField(
@@ -908,8 +1059,7 @@ class _CreateSwapRequestScreenState
             maxLength:
             300,
             maxLengthEnforcement:
-            MaxLengthEnforcement
-                .enforced,
+            MaxLengthEnforcement.enforced,
             onChanged:
                 (_) {
               _markChanged();
@@ -938,15 +1088,13 @@ class _CreateSwapRequestScreenState
           ),
 
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
 
           _buildRequestSummary(),
 
           const SizedBox(
-            height:
-            24,
+            height: 24,
           ),
 
           SizedBox(
@@ -957,9 +1105,9 @@ class _CreateSwapRequestScreenState
             child:
             ElevatedButton(
               onPressed:
-              _isSending
-                  ? null
-                  : _sendRequest,
+              _canAttemptSend
+                  ? _sendRequest
+                  : null,
               child:
               _isSending
                   ? Row(
@@ -967,10 +1115,8 @@ class _CreateSwapRequestScreenState
                 MainAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width:
-                    20,
-                    height:
-                    20,
+                    width: 20,
+                    height: 20,
                     child:
                     CircularProgressIndicator(
                       strokeWidth:
@@ -984,8 +1130,7 @@ class _CreateSwapRequestScreenState
                     ),
                   ),
                   const SizedBox(
-                    width:
-                    10,
+                    width: 10,
                   ),
                   const Text(
                     'SENDING...',
@@ -1017,20 +1162,19 @@ class _CreateSwapRequestScreenState
         const EdgeInsets.all(
           30,
         ),
-        child: Column(
+        child:
+        Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [
             Icon(
               Icons.error_outline_rounded,
-              size:
-              42,
+              size: 42,
               color:
               _mutedColor,
             ),
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
             Text(
               'Could not load your skills',
@@ -1042,8 +1186,7 @@ class _CreateSwapRequestScreenState
               ),
             ),
             const SizedBox(
-              height:
-              7,
+              height: 7,
             ),
             Text(
               _loadError ??
@@ -1058,8 +1201,7 @@ class _CreateSwapRequestScreenState
               ),
             ),
             const SizedBox(
-              height:
-              18,
+              height: 18,
             ),
             ElevatedButton(
               onPressed:
@@ -1087,22 +1229,20 @@ class _CreateSwapRequestScreenState
         const EdgeInsets.all(
           30,
         ),
-        child: Column(
+        child:
+        Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [
             Image.asset(
               'assets/images/mascot/tubi_confused.png',
-              width:
-              95,
-              height:
-              95,
+              width: 95,
+              height: 95,
               fit:
               BoxFit.contain,
             ),
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
             Text(
               title,
@@ -1116,8 +1256,7 @@ class _CreateSwapRequestScreenState
               ),
             ),
             const SizedBox(
-              height:
-              7,
+              height: 7,
             ),
             Text(
               message,
@@ -1131,8 +1270,7 @@ class _CreateSwapRequestScreenState
               ),
             ),
             const SizedBox(
-              height:
-              18,
+              height: 18,
             ),
             OutlinedButton(
               onPressed:
@@ -1177,23 +1315,22 @@ class _CreateSwapRequestScreenState
           _highlightBorder,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_planning.png',
-            width:
-            65,
-            height:
-            65,
+            width: 65,
+            height: 65,
             fit:
             BoxFit.contain,
           ),
           const SizedBox(
-            width:
-            13,
+            width: 13,
           ),
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -1207,8 +1344,7 @@ class _CreateSwapRequestScreenState
                   ),
                 ),
                 const SizedBox(
-                  height:
-                  5,
+                  height: 5,
                 ),
                 Text(
                   'Make a clear request so both of you know what you will learn, teach, and when you are available.',
@@ -1246,15 +1382,16 @@ class _CreateSwapRequestScreenState
   // ============================================================
 
   Widget _buildReadOnlySkill() {
+    final Skill skill =
+    _resolvedSkillToLearn!;
+
     return Container(
       width:
       double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        14,
-        vertical:
-        14,
+        horizontal: 14,
+        vertical: 14,
       ),
       decoration:
       BoxDecoration(
@@ -1270,36 +1407,53 @@ class _CreateSwapRequestScreenState
           _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Icon(
             Icons.school_outlined,
-            size:
-            20,
+            size: 20,
             color:
             _primaryColor,
           ),
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
           Expanded(
-            child: Text(
-              _resolvedSkillToLearn!.title,
-              style:
-              AppTextStyles.body
-                  .copyWith(
-                color:
-                _textColor,
-                fontWeight:
-                FontWeight.w600,
-              ),
+            child:
+            Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  skill.title,
+                  style:
+                  AppTextStyles.body
+                      .copyWith(
+                    color:
+                    _textColor,
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(
+                  height: 3,
+                ),
+                Text(
+                  skill.mode,
+                  style:
+                  AppTextStyles.caption
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
             ),
           ),
           Icon(
             Icons.lock_outline_rounded,
-            size:
-            16,
+            size: 16,
             color:
             _mutedColor,
           ),
@@ -1326,8 +1480,7 @@ class _CreateSwapRequestScreenState
           color:
           _isDarkMode
               ? AppTheme.accent.withValues(
-            alpha:
-            0.12,
+            alpha: 0.12,
           )
               : const Color(
             0xFFFFF6E8,
@@ -1341,31 +1494,30 @@ class _CreateSwapRequestScreenState
             color:
             _isDarkMode
                 ? AppTheme.accent.withValues(
-              alpha:
-              0.30,
+              alpha: 0.30,
             )
                 : const Color(
               0xFFF2D1A6,
             ),
           ),
         ),
-        child: Row(
+        child:
+        Row(
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
             const Icon(
               Icons.info_outline_rounded,
-              size:
-              19,
+              size: 19,
               color:
               AppTheme.accent,
             ),
             const SizedBox(
-              width:
-              9,
+              width: 9,
             ),
             Expanded(
-              child: Text(
+              child:
+              Text(
                 'You do not have another offered skill available for this swap. Add a skill in My Skills first.',
                 style:
                 AppTextStyles.secondary
@@ -1381,13 +1533,16 @@ class _CreateSwapRequestScreenState
     }
 
     return DropdownButtonFormField<Skill>(
-      key: ValueKey<String?>(
+      key:
+      ValueKey<String?>(
         _selectedSkillToOffer?.id,
       ),
       initialValue:
       _selectedSkillToOffer,
       dropdownColor:
       _surfaceColor,
+      isExpanded:
+      true,
       style:
       AppTextStyles.input
           .copyWith(
@@ -1422,8 +1577,33 @@ class _CreateSwapRequestScreenState
             value:
             skill,
             child:
-            Text(
-              skill.title,
+            Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              mainAxisAlignment:
+              MainAxisAlignment.center,
+              children: [
+                Text(
+                  skill.title,
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                ),
+                Text(
+                  skill.mode,
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style:
+                  AppTextStyles.caption
+                      .copyWith(
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -1435,8 +1615,22 @@ class _CreateSwapRequestScreenState
           Skill? value,
           ) {
         setState(() {
+          final String? oldMode =
+              _selectedMode;
+
           _selectedSkillToOffer =
               value;
+
+          _normalizeSelectedMode(
+            clearMeetingDetails:
+            false,
+          );
+
+          if (oldMode !=
+              _selectedMode) {
+            _meetingDetailsController
+                .clear();
+          }
 
           _hasUnsavedChanges =
           true;
@@ -1459,13 +1653,12 @@ class _CreateSwapRequestScreenState
       _isSending
           ? null
           : _selectDate,
-      child: Container(
-        height:
-        52,
+      child:
+      Container(
+        height: 52,
         padding:
         const EdgeInsets.symmetric(
-          horizontal:
-          12,
+          horizontal: 12,
         ),
         decoration:
         BoxDecoration(
@@ -1481,21 +1674,21 @@ class _CreateSwapRequestScreenState
             _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             Icon(
               Icons.calendar_month_outlined,
-              size:
-              19,
+              size: 19,
               color:
               _primaryColor,
             ),
             const SizedBox(
-              width:
-              8,
+              width: 8,
             ),
             Expanded(
-              child: Text(
+              child:
+              Text(
                 _selectedDate == null
                     ? 'Select date'
                     : _formatDate(
@@ -1543,8 +1736,7 @@ class _CreateSwapRequestScreenState
       initialDate:
       today.add(
         const Duration(
-          days:
-          1,
+          days: 1,
         ),
       ),
       firstDate:
@@ -1552,8 +1744,7 @@ class _CreateSwapRequestScreenState
       lastDate:
       today.add(
         const Duration(
-          days:
-          90,
+          days: 90,
         ),
       ),
     );
@@ -1587,13 +1778,12 @@ class _CreateSwapRequestScreenState
       _isSending
           ? null
           : _selectTime,
-      child: Container(
-        height:
-        52,
+      child:
+      Container(
+        height: 52,
         padding:
         const EdgeInsets.symmetric(
-          horizontal:
-          12,
+          horizontal: 12,
         ),
         decoration:
         BoxDecoration(
@@ -1609,21 +1799,21 @@ class _CreateSwapRequestScreenState
             _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             Icon(
               Icons.schedule_rounded,
-              size:
-              19,
+              size: 19,
               color:
               _primaryColor,
             ),
             const SizedBox(
-              width:
-              8,
+              width: 8,
             ),
             Expanded(
-              child: Text(
+              child:
+              Text(
                 _selectedTime == null
                     ? 'Select time'
                     : _selectedTime!.format(
@@ -1661,10 +1851,8 @@ class _CreateSwapRequestScreenState
       initialTime:
       _selectedTime ??
           const TimeOfDay(
-            hour:
-            16,
-            minute:
-            0,
+            hour: 16,
+            minute: 0,
           ),
     );
 
@@ -1700,8 +1888,7 @@ class _CreateSwapRequestScreenState
           ),
         ),
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
         Expanded(
           child:
@@ -1720,97 +1907,187 @@ class _CreateSwapRequestScreenState
     required String label,
     required IconData icon,
   }) {
+    final bool supported =
+    _isModeSupported(
+      label,
+    );
+
     final bool selected =
-        _selectedMode == label;
+        supported &&
+            _selectedMode ==
+                label;
 
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(
-        12,
-      ),
-      onTap:
-      _isSending
-          ? null
-          : () {
-        if (_selectedMode == label) {
-          return;
-        }
+    final bool enabled =
+        supported &&
+            !_isSending;
 
-        setState(() {
-          _selectedMode = label;
-
-          _meetingDetailsController.clear();
-
-          _hasUnsavedChanges = true;
-        });
-      },
-      child: AnimatedContainer(
-        duration:
-        const Duration(
-          milliseconds:
-          160,
+    return Opacity(
+      opacity:
+      supported
+          ? 1
+          : 0.48,
+      child:
+      InkWell(
+        borderRadius:
+        BorderRadius.circular(
+          12,
         ),
-        height:
-        62,
-        decoration:
-        BoxDecoration(
-          color:
-          selected
-              ? _primaryColor.withValues(
-            alpha:
-            _isDarkMode
-                ? 0.18
-                : 0.10,
-          )
-              : _surfaceColor,
-          borderRadius:
-          BorderRadius.circular(
-            12,
+        onTap:
+        enabled
+            ? () {
+          _selectMode(
+            label,
+          );
+        }
+            : null,
+        child:
+        AnimatedContainer(
+          duration:
+          const Duration(
+            milliseconds: 160,
           ),
-          border:
-          Border.all(
+          height: 68,
+          decoration:
+          BoxDecoration(
             color:
             selected
-                ? _primaryColor
-                : _borderColor,
-            width:
-            selected
-                ? 1.4
-                : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size:
-              20,
+                ? _primaryColor.withValues(
+              alpha:
+              _isDarkMode
+                  ? 0.18
+                  : 0.10,
+            )
+                : _surfaceColor,
+            borderRadius:
+            BorderRadius.circular(
+              12,
+            ),
+            border:
+            Border.all(
               color:
               selected
                   ? _primaryColor
-                  : _mutedColor,
-            ),
-            const SizedBox(
+                  : _borderColor,
               width:
-              7,
+              selected
+                  ? 1.4
+                  : 1,
             ),
+          ),
+          child:
+          Padding(
+            padding:
+            const EdgeInsets.symmetric(
+              horizontal: 8,
+            ),
+            child:
+            Row(
+              mainAxisAlignment:
+              MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color:
+                  selected
+                      ? _primaryColor
+                      : _mutedColor,
+                ),
+                const SizedBox(
+                  width: 7,
+                ),
+                Flexible(
+                  child:
+                  Text(
+                    supported
+                        ? label
+                        : '$label • unavailable',
+                    textAlign:
+                    TextAlign.center,
+                    maxLines: 2,
+                    overflow:
+                    TextOverflow.ellipsis,
+                    style:
+                    AppTextStyles.secondary
+                        .copyWith(
+                      color:
+                      selected
+                          ? _primaryColor
+                          : _mutedColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoCommonModeWarning() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        12,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _isDarkMode
+            ? AppTheme.accent.withValues(
+          alpha: 0.12,
+        )
+            : const Color(
+          0xFFFFF6E8,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+        border:
+        Border.all(
+          color:
+          _isDarkMode
+              ? AppTheme.accent.withValues(
+            alpha: 0.28,
+          )
+              : const Color(
+            0xFFF2D1A6,
+          ),
+        ),
+      ),
+      child:
+      Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color:
+            AppTheme.accent,
+          ),
+          const SizedBox(
+            width: 8,
+          ),
+          Expanded(
+            child:
             Text(
-              label,
+              'These two skills do not share a compatible session mode. Choose a different skill to offer.',
               style:
               AppTextStyles.secondary
                   .copyWith(
                 color:
-                selected
-                    ? _primaryColor
-                    : _textColor,
-                fontWeight:
-                FontWeight.w700,
+                _mutedColor,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1820,8 +2097,24 @@ class _CreateSwapRequestScreenState
   // ============================================================
 
   Widget _buildMeetingDetails() {
+    final String? selectedMode =
+        _selectedMode;
+
+    if (_selectedSkillToOffer == null) {
+      return _buildDisabledMeetingDetails(
+        'Select a skill you can offer before choosing meeting details.',
+      );
+    }
+
+    if (selectedMode == null) {
+      return _buildDisabledMeetingDetails(
+        'A compatible session mode is required before adding meeting details.',
+      );
+    }
+
     final bool online =
-        _selectedMode == 'Online';
+        selectedMode ==
+            'Online';
 
     return Column(
       crossAxisAlignment:
@@ -1834,15 +2127,13 @@ class _CreateSwapRequestScreenState
           style:
           AppTextStyles.cardTitle
               .copyWith(
-            fontSize:
-            13,
+            fontSize: 13,
             color:
             _textColor,
           ),
         ),
         const SizedBox(
-          height:
-          8,
+          height: 8,
         ),
         TextField(
           controller:
@@ -1852,8 +2143,7 @@ class _CreateSwapRequestScreenState
           maxLength:
           150,
           maxLengthEnforcement:
-          MaxLengthEnforcement
-              .enforced,
+          MaxLengthEnforcement.enforced,
           onChanged:
               (_) {
             _markChanged();
@@ -1881,8 +2171,7 @@ class _CreateSwapRequestScreenState
               online
                   ? Icons.language_rounded
                   : Icons.location_on_outlined,
-              size:
-              20,
+              size: 20,
               color:
               _primaryColor,
             ),
@@ -1894,8 +2183,7 @@ class _CreateSwapRequestScreenState
         ),
         if (!online) ...[
           const SizedBox(
-            height:
-            7,
+            height: 7,
           ),
           Text(
             'For safety, use a public meeting place. Exact details can be confirmed after the request is accepted.',
@@ -1908,6 +2196,61 @@ class _CreateSwapRequestScreenState
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildDisabledMeetingDetails(
+      String message,
+      ) {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceVariantColor,
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+        border:
+        Border.all(
+          color:
+          _borderColor,
+        ),
+      ),
+      child:
+      Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color:
+            _mutedColor,
+          ),
+          const SizedBox(
+            width: 8,
+          ),
+          Expanded(
+            child:
+            Text(
+              message,
+              style:
+              AppTextStyles.secondary
+                  .copyWith(
+                color:
+                _mutedColor,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1937,7 +2280,8 @@ class _CreateSwapRequestScreenState
           _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -1951,8 +2295,7 @@ class _CreateSwapRequestScreenState
             ),
           ),
           const SizedBox(
-            height:
-            12,
+            height: 12,
           ),
           _buildSummaryRow(
             'Learn',
@@ -1973,7 +2316,8 @@ class _CreateSwapRequestScreenState
           ),
           _buildSummaryRow(
             'Mode',
-            _selectedMode,
+            _selectedMode ??
+                'Not available',
             showDivider:
             false,
           ),
@@ -1994,8 +2338,7 @@ class _CreateSwapRequestScreenState
           CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width:
-              72,
+              width: 72,
               child:
               Text(
                 label,
@@ -2029,13 +2372,11 @@ class _CreateSwapRequestScreenState
           Padding(
             padding:
             const EdgeInsets.symmetric(
-              vertical:
-              9,
+              vertical: 9,
             ),
             child:
             Divider(
-              height:
-              1,
+              height: 1,
               color:
               _borderColor,
             ),
@@ -2069,6 +2410,9 @@ class _CreateSwapRequestScreenState
     final Skill? skillToOffer =
         _selectedSkillToOffer;
 
+    final String? selectedMode =
+        _selectedMode;
+
     if (requesterUserId.isEmpty) {
       _showError(
         'We could not identify the current user. Please sign in again.',
@@ -2098,6 +2442,14 @@ class _CreateSwapRequestScreenState
     if (skillToLearn == null) {
       _showError(
         'We could not identify the skill you want to learn. Please go back and try again.',
+      );
+
+      return;
+    }
+
+    if (!_providerStillOffersLearnSkill) {
+      _showError(
+        'This provider no longer offers the selected skill.',
       );
 
       return;
@@ -2141,6 +2493,23 @@ class _CreateSwapRequestScreenState
       return;
     }
 
+    if (selectedMode == null ||
+        !_isModeSupported(
+          selectedMode,
+        ) ||
+        !skillToLearn.supportsSessionMode(
+          selectedMode,
+        ) ||
+        !skillToOffer.supportsSessionMode(
+          selectedMode,
+        )) {
+      _showError(
+        'Please choose a session mode supported by both skills.',
+      );
+
+      return;
+    }
+
     if (_selectedDate == null ||
         _selectedTime == null) {
       _showError(
@@ -2169,21 +2538,14 @@ class _CreateSwapRequestScreenState
       return;
     }
 
-    if (_selectedMode != 'Online' &&
-        _selectedMode != 'In-person') {
-      _showError(
-        'Please select a valid session mode.',
-      );
-
-      return;
-    }
-
     final String meetingDetails =
-    _meetingDetailsController.text.trim();
+    _meetingDetailsController.text
+        .trim();
 
     if (meetingDetails.isEmpty) {
       _showError(
-        _selectedMode == 'Online'
+        selectedMode ==
+            'Online'
             ? 'Please enter your preferred online platform.'
             : 'Please enter a preferred public meeting area.',
       );
@@ -2239,7 +2601,7 @@ class _CreateSwapRequestScreenState
         proposedAt:
         proposedAt,
         mode:
-        _selectedMode,
+        selectedMode,
         meetingDetails:
         meetingDetails,
         note:
@@ -2358,8 +2720,7 @@ class _CreateSwapRequestScreenState
                 _primaryColor,
               ),
               const SizedBox(
-                width:
-                9,
+                width: 9,
               ),
               Expanded(
                 child:

@@ -31,4 +31,74 @@ class Skill {
     required this.description,
     required this.learnings,
   });
+
+  // ============================================================
+  // SESSION MODE SUPPORT
+  // ============================================================
+
+  bool get supportsOnline {
+    final String normalized =
+    mode.trim().toLowerCase();
+
+    return normalized.contains(
+      'online',
+    );
+  }
+
+  bool get supportsInPerson {
+    final String normalized =
+    mode.trim().toLowerCase();
+
+    return normalized.contains(
+      'meetup',
+    ) ||
+        normalized.contains(
+          'in-person',
+        ) ||
+        normalized.contains(
+          'in person',
+        );
+  }
+
+  bool supportsSessionMode(
+      String requestedMode,
+      ) {
+    final String normalized =
+    requestedMode
+        .trim()
+        .toLowerCase();
+
+    if (normalized == 'online') {
+      return supportsOnline;
+    }
+
+    if (normalized == 'in-person' ||
+        normalized == 'in person' ||
+        normalized == 'meetup') {
+      return supportsInPerson;
+    }
+
+    return false;
+  }
+
+  List<String> get supportedSessionModes {
+    final List<String> modes =
+    <String>[];
+
+    if (supportsOnline) {
+      modes.add(
+        'Online',
+      );
+    }
+
+    if (supportsInPerson) {
+      modes.add(
+        'In-person',
+      );
+    }
+
+    return List<String>.unmodifiable(
+      modes,
+    );
+  }
 }

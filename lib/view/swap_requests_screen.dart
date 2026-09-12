@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../model/repositories/explore_repository.dart';
+import '../model/skill.dart';
 import '../model/swap_request.dart';
 import '../model/user.dart';
 
@@ -2015,15 +2016,74 @@ class _SwapRequestsScreenState
       request.proposedAt.minute,
     );
 
+    if (!request.hasStableIdentity) {
+      _showMessage(
+        'This swap does not have enough skill information to edit its session mode.',
+      );
+      return;
+    }
+
+    final Skill? skillToLearn =
+    _exploreRepository.findSkillById(
+      request.skillToLearnId!,
+    );
+
+    final Skill? skillToOffer =
+    _exploreRepository.findSkillById(
+      request.skillToOfferId!,
+    );
+
+    if (skillToLearn == null ||
+        skillToOffer == null) {
+      _showMessage(
+        'One of the skills in this swap is no longer available.',
+      );
+      return;
+    }
+
+    final List<String> supportedModes =
+    <String>[
+      if (skillToLearn.supportsSessionMode(
+        'Online',
+      ) &&
+          skillToOffer.supportsSessionMode(
+            'Online',
+          ))
+        'Online',
+      if (skillToLearn.supportsSessionMode(
+        'In-person',
+      ) &&
+          skillToOffer.supportsSessionMode(
+            'In-person',
+          ))
+        'In-person',
+    ];
+
+    if (supportedModes.isEmpty) {
+      _showMessage(
+        'These two skills do not share a compatible session mode.',
+      );
+      return;
+    }
+
+    final bool previousModeStillSupported =
+    supportedModes.contains(
+      request.mode,
+    );
+
     String selectedMode =
-        request.mode;
+    previousModeStillSupported
+        ? request.mode
+        : supportedModes.first;
 
     final TextEditingController
     detailsController =
     TextEditingController(
       text:
-      request.meetingDetails ??
-          '',
+      previousModeStillSupported
+          ? request.meetingDetails ??
+          ''
+          : '',
     );
 
     final bool? shouldSave =
@@ -2280,26 +2340,65 @@ class _SwapRequestsScreenState
                       8,
                     ),
 
+                    Text(
+                      'Only modes supported by both skills can be selected.',
+                      style:
+                      TextStyle(
+                        fontSize:
+                        11,
+                        height:
+                        1.35,
+                        color:
+                        _mutedColor,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height:
+                      9,
+                    ),
+
                     Row(
                       children: [
                         Expanded(
                           child:
-                          ChoiceChip(
-                            label:
-                            const Text(
+                          Opacity(
+                            opacity:
+                            supportedModes.contains(
                               'Online',
-                            ),
-                            selected:
-                            selectedMode ==
+                            )
+                                ? 1
+                                : 0.48,
+                            child:
+                            ChoiceChip(
+                              label:
+                              const Text(
                                 'Online',
-                            showCheckmark:
-                            false,
-                            onSelected: (_) {
-                              setDialogState(() {
-                                selectedMode =
-                                'Online';
-                              });
-                            },
+                              ),
+                              selected:
+                              selectedMode ==
+                                  'Online',
+                              showCheckmark:
+                              false,
+                              onSelected:
+                              supportedModes.contains(
+                                'Online',
+                              )
+                                  ? (_) {
+                                if (selectedMode ==
+                                    'Online') {
+                                  return;
+                                }
+
+                                setDialogState(() {
+                                  selectedMode =
+                                  'Online';
+
+                                  detailsController.clear();
+                                });
+                              }
+                                  : null,
+                            ),
                           ),
                         ),
                         const SizedBox(
@@ -2308,22 +2407,43 @@ class _SwapRequestsScreenState
                         ),
                         Expanded(
                           child:
-                          ChoiceChip(
-                            label:
-                            const Text(
+                          Opacity(
+                            opacity:
+                            supportedModes.contains(
                               'In-person',
-                            ),
-                            selected:
-                            selectedMode ==
+                            )
+                                ? 1
+                                : 0.48,
+                            child:
+                            ChoiceChip(
+                              label:
+                              const Text(
                                 'In-person',
-                            showCheckmark:
-                            false,
-                            onSelected: (_) {
-                              setDialogState(() {
-                                selectedMode =
-                                'In-person';
-                              });
-                            },
+                              ),
+                              selected:
+                              selectedMode ==
+                                  'In-person',
+                              showCheckmark:
+                              false,
+                              onSelected:
+                              supportedModes.contains(
+                                'In-person',
+                              )
+                                  ? (_) {
+                                if (selectedMode ==
+                                    'In-person') {
+                                  return;
+                                }
+
+                                setDialogState(() {
+                                  selectedMode =
+                                  'In-person';
+
+                                  detailsController.clear();
+                                });
+                              }
+                                  : null,
+                            ),
                           ),
                         ),
                       ],
