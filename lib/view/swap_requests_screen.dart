@@ -965,7 +965,7 @@ class _SwapRequestsScreenState
                 ),
               ),
               child: Text(
-                'Schedule is awaiting confirmation.',
+                'Schedule is awaiting confirmation. Confirming checks both participants for overlapping confirmed sessions.',
                 style:
                 TextStyle(
                   fontSize:
@@ -2489,6 +2489,60 @@ class _SwapRequestsScreenState
                             : 'Example: DCT campus or public café',
                       ),
                     ),
+
+                    const SizedBox(
+                      height:
+                      8,
+                    ),
+
+                    Container(
+                      width:
+                      double.infinity,
+                      padding:
+                      const EdgeInsets.all(
+                        10,
+                      ),
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        _softPrimaryColor,
+                        borderRadius:
+                        BorderRadius.circular(
+                          10,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size:
+                            16,
+                            color:
+                            _primaryColor,
+                          ),
+                          const SizedBox(
+                            width:
+                            7,
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Confirmed sessions reserve a 1-hour slot. When this schedule is confirmed, TubiLearn checks both participants for overlapping confirmed sessions.',
+                              style:
+                              TextStyle(
+                                fontSize:
+                                11,
+                                height:
+                                1.4,
+                                color:
+                                _textColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -3233,10 +3287,106 @@ class _SwapRequestsScreenState
             'Confirm session schedule',
           ),
           content:
-          Text(
-            '${_formatDateTime(request.proposedAt)}\n\n'
-                '${request.mode}\n'
-                '${request.meetingDetails ?? ''}',
+          Column(
+            mainAxisSize:
+            MainAxisSize.min,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Text(
+                _formatDateTime(
+                  request.proposedAt,
+                ),
+                style:
+                TextStyle(
+                  fontWeight:
+                  FontWeight.w700,
+                  color:
+                  _textColor,
+                ),
+              ),
+              const SizedBox(
+                height:
+                8,
+              ),
+              Text(
+                request.mode,
+                style:
+                TextStyle(
+                  color:
+                  _textColor,
+                ),
+              ),
+              if (request.meetingDetails
+                  ?.trim()
+                  .isNotEmpty ==
+                  true) ...[
+                const SizedBox(
+                  height:
+                  4,
+                ),
+                Text(
+                  request.meetingDetails!.trim(),
+                  style:
+                  TextStyle(
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
+              const SizedBox(
+                height:
+                16,
+              ),
+              Container(
+                width:
+                double.infinity,
+                padding:
+                const EdgeInsets.all(
+                  10,
+                ),
+                decoration:
+                BoxDecoration(
+                  color:
+                  _softPrimaryColor,
+                  borderRadius:
+                  BorderRadius.circular(
+                    10,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.event_busy_outlined,
+                      size:
+                      17,
+                      color:
+                      _primaryColor,
+                    ),
+                    const SizedBox(
+                      width:
+                      7,
+                    ),
+                    Expanded(
+                      child: Text(
+                        'This will reserve a 1-hour session slot. TubiLearn will check both participants before confirming. If either person already has an overlapping confirmed session, this schedule will not be saved.',
+                        style:
+                        TextStyle(
+                          fontSize:
+                          11.5,
+                          height:
+                          1.4,
+                          color:
+                          _textColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(

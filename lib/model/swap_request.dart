@@ -184,6 +184,10 @@ class SwapRequest {
     required this.updatedAt,
   });
 
+  // ============================================================
+  // IDENTITY
+  // ============================================================
+
   bool get hasStableIdentity {
     return hasParticipantIdentity &&
         hasSkillIdentity;
@@ -226,14 +230,16 @@ class SwapRequest {
           providerUserId,
           skillToLearnId,
           skillToOfferId,
-        ].where(
+        ]
+            .where(
               (
               String? value,
               ) =>
               _hasValue(
                 value,
               ),
-        ).length;
+        )
+            .length;
 
     return presentValues >
         0 &&
@@ -267,6 +273,10 @@ class SwapRequest {
             .trim()
             .isNotEmpty;
   }
+
+  // ============================================================
+  // PARTICIPANTS
+  // ============================================================
 
   bool isRequester(
       String userId,
@@ -342,6 +352,49 @@ class SwapRequest {
     ) ==
         SwapRequestDirection.incoming;
   }
+
+  // ============================================================
+  // SESSION STATE
+  // ============================================================
+
+  bool isScheduledFor(
+      String userId,
+      ) {
+    return hasStableIdentity &&
+        involvesUser(
+          userId,
+        ) &&
+        status ==
+            SwapRequestStatus.scheduled;
+  }
+
+  bool isUpcomingScheduledSessionFor(
+      String userId,
+      DateTime referenceTime,
+      ) {
+    return isScheduledFor(
+      userId,
+    ) &&
+        proposedAt.isAfter(
+          referenceTime,
+        );
+  }
+
+  bool isScheduledSessionReadyForCompletionFor(
+      String userId,
+      DateTime referenceTime,
+      ) {
+    return isScheduledFor(
+      userId,
+    ) &&
+        !referenceTime.isBefore(
+          proposedAt,
+        );
+  }
+
+  // ============================================================
+  // PERMISSIONS
+  // ============================================================
 
   bool canCancel(
       String userId,
@@ -447,6 +500,18 @@ class SwapRequest {
             SwapRequestStatus.scheduled;
   }
 
+  bool canCompleteAt(
+      String userId,
+      DateTime referenceTime,
+      ) {
+    return canComplete(
+      userId,
+    ) &&
+        !referenceTime.isBefore(
+          proposedAt,
+        );
+  }
+
   bool canViewAsParticipant(
       String userId,
       ) {
@@ -481,6 +546,10 @@ class SwapRequest {
         );
   }
 
+  // ============================================================
+  // HISTORY
+  // ============================================================
+
   bool get canRemainAsHistory {
     return status.isTerminal &&
         hasUsableHistoricalSnapshot &&
@@ -492,6 +561,10 @@ class SwapRequest {
         hasStableIdentity &&
         hasStructurallyValidIdentityGroup;
   }
+
+  // ============================================================
+  // COPY
+  // ============================================================
 
   SwapRequest copyWith({
     DateTime? proposedAt,
@@ -542,6 +615,10 @@ class SwapRequest {
           this.updatedAt,
     );
   }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
   static bool _hasValue(
       String? value,

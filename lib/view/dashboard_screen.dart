@@ -134,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           return;
         }
 
-        _scheduleUpcomingSessionRefresh();
+        _scheduleSessionBoundaryRefresh();
       },
     );
   }
@@ -170,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       await _repository.refresh();
     } catch (_) {
-      // Keep the currently loaded local data if refresh fails.
+      // Keep currently loaded local data.
     }
 
     if (!mounted) {
@@ -179,23 +179,41 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     setState(() {});
 
-    _scheduleUpcomingSessionRefresh();
+    _scheduleSessionBoundaryRefresh();
   }
 
-  void _scheduleUpcomingSessionRefresh() {
+  void _scheduleSessionBoundaryRefresh() {
     _sessionBoundaryTimer?.cancel();
     _sessionBoundaryTimer = null;
 
-    final SwapRequest? upcomingSession =
-    _findUpcomingSession();
+    final SwapRequest? session =
+    _findPriorityScheduledSession();
 
-    if (upcomingSession == null) {
+    if (session == null) {
+      return;
+    }
+
+    final User? currentUser =
+        _currentUser;
+
+    if (currentUser == null) {
+      return;
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    if (session
+        .isScheduledSessionReadyForCompletionFor(
+      currentUser.id,
+      now,
+    )) {
       return;
     }
 
     final Duration remaining =
-    upcomingSession.proposedAt.difference(
-      DateTime.now(),
+    session.proposedAt.difference(
+      now,
     );
 
     if (remaining <=
@@ -207,21 +225,22 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
 
-    _sessionBoundaryTimer = Timer(
-      remaining +
-          const Duration(
-            seconds: 1,
-          ),
-          () {
-        if (!mounted) {
-          return;
-        }
+    _sessionBoundaryTimer =
+        Timer(
+          remaining +
+              const Duration(
+                seconds: 1,
+              ),
+              () {
+            if (!mounted) {
+              return;
+            }
 
-        setState(() {});
+            setState(() {});
 
-        _scheduleUpcomingSessionRefresh();
-      },
-    );
+            _scheduleSessionBoundaryRefresh();
+          },
+        );
   }
 
   Future<void> _openRouteAndRefresh(
@@ -231,7 +250,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     await Navigator.pushNamed(
       context,
       routeName,
-      arguments: arguments,
+      arguments:
+      arguments,
     );
 
     if (!mounted) {
@@ -252,18 +272,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     final SkillMatch? match =
     _findBestSmartMatch();
 
-    final SwapRequest? upcomingSession =
-    _findUpcomingSession();
+    final SwapRequest? session =
+    _findPriorityScheduledSession();
+
+    final bool sessionReady =
+        session != null &&
+            _isSessionReadyForCompletion(
+              session,
+            );
 
     return Scaffold(
       backgroundColor:
       Theme.of(context)
           .scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
+      body:
+      SafeArea(
+        child:
+        Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
+              child:
+              SingleChildScrollView(
                 controller:
                 _scrollController,
                 physics:
@@ -275,7 +304,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   20,
                   24,
                 ),
-                child: Column(
+                child:
+                Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
@@ -294,14 +324,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Container(
                       key:
                       _matchSectionKey,
-                      child: Column(
+                      child:
+                      Column(
                         children: [
                           _buildSectionHeader(
                             title:
                             '✦ Your Smart Match',
                             action:
                             'See all',
-                            onAction: () async {
+                            onAction:
+                                () async {
                               await _openRouteAndRefresh(
                                 '/smart-matches',
                               );
@@ -328,7 +360,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       'Featured Skills',
                       action:
                       'Explore',
-                      onAction: () async {
+                      onAction:
+                          () async {
                         await _openRouteAndRefresh(
                           '/explore',
                         );
@@ -347,10 +380,13 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                     _buildSectionHeader(
                       title:
-                      'Upcoming Session',
+                      sessionReady
+                          ? 'Session Ready to Complete'
+                          : 'Upcoming Session',
                       action:
                       'Requests',
-                      onAction: () async {
+                      onAction:
+                          () async {
                         await _openRouteAndRefresh(
                           '/swap-requests',
                         );
@@ -361,8 +397,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       height: 12,
                     ),
 
-                    _buildUpcomingSession(
-                      upcomingSession,
+                    _buildScheduledSession(
+                      session,
                     ),
                   ],
                 ),
@@ -396,7 +432,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             );
 
     return ClipOval(
-      child: SizedBox(
+      child:
+      SizedBox(
         width:
         size,
         height:
@@ -413,7 +450,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           size,
           fit:
           BoxFit.cover,
-          errorBuilder: (
+          errorBuilder:
+              (
               BuildContext context,
               Object error,
               StackTrace? stackTrace,
@@ -451,7 +489,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       AppTheme.accent,
       alignment:
       Alignment.center,
-      child: Text(
+      child:
+      Text(
         initials,
         style:
         TextStyle(
@@ -509,7 +548,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Row(
       children: [
         Expanded(
-          child: Column(
+          child:
+          Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -559,17 +599,20 @@ class _DashboardScreenState extends State<DashboardScreen>
               _borderColor,
             ),
           ),
-          child: IconButton(
+          child:
+          IconButton(
             tooltip:
             'Swap requests',
             padding:
             EdgeInsets.zero,
-            onPressed: () async {
+            onPressed:
+                () async {
               await _openRouteAndRefresh(
                 '/swap-requests',
               );
             },
-            icon: Icon(
+            icon:
+            Icon(
               Icons.swap_horiz_rounded,
               size:
               21,
@@ -588,7 +631,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           const CircleBorder(),
           onTap:
           _openProfile,
-          child: _buildUserAvatar(
+          child:
+          _buildUserAvatar(
             currentUser,
             size:
             42,
@@ -615,13 +659,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     setState(() {
-      _selectedNav =
-      0;
+      _selectedNav = 0;
     });
   }
 
   // ============================================================
-  // SEARCH BAR
+  // SEARCH
   // ============================================================
 
   Widget _buildSearchBar() {
@@ -630,12 +673,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       BorderRadius.circular(
         14,
       ),
-      onTap: () async {
+      onTap:
+          () async {
         await _openRouteAndRefresh(
           '/explore',
         );
       },
-      child: Container(
+      child:
+      Container(
         height:
         50,
         decoration:
@@ -652,7 +697,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             const SizedBox(
               width: 14,
@@ -671,7 +717,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
 
             Expanded(
-              child: Text(
+              child:
+              Text(
                 'Search skills or people',
                 style:
                 AppTextStyles.secondary
@@ -711,7 +758,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Row(
       children: [
         Expanded(
-          child: Text(
+          child:
+          Text(
             title,
             style:
             AppTextStyles.sectionTitle
@@ -731,15 +779,15 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             onTap:
             onAction,
-            child: Padding(
+            child:
+            Padding(
               padding:
               const EdgeInsets.symmetric(
-                horizontal:
-                4,
-                vertical:
-                4,
+                horizontal: 4,
+                vertical: 4,
               ),
-              child: Text(
+              child:
+              Text(
                 action,
                 style:
                 AppTextStyles.caption
@@ -810,7 +858,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -829,7 +878,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child: Column(
+                child:
+                Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
@@ -877,10 +927,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               Container(
                 padding:
                 const EdgeInsets.symmetric(
-                  horizontal:
-                  10,
-                  vertical:
-                  6,
+                  horizontal: 10,
+                  vertical: 6,
                 ),
                 decoration:
                 BoxDecoration(
@@ -891,7 +939,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     20,
                   ),
                 ),
-                child: Text(
+                child:
+                Text(
                   '${match.score}% Match',
                   style:
                   AppTextStyles.caption
@@ -927,7 +976,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child: Text(
+                child:
+                Text(
                   match.explanation,
                   style:
                   AppTextStyles.bodyMuted
@@ -992,8 +1042,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             double.infinity,
             height:
             44,
-            child: ElevatedButton(
-              onPressed: () async {
+            child:
+            ElevatedButton(
+              onPressed:
+                  () async {
                 await _openRouteAndRefresh(
                   '/user-profile',
                   arguments:
@@ -1019,10 +1071,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        9,
-        vertical:
-        6,
+        horizontal: 9,
+        vertical: 6,
       ),
       decoration:
       BoxDecoration(
@@ -1036,18 +1086,17 @@ class _DashboardScreenState extends State<DashboardScreen>
         Border.all(
           color:
           _primaryColor.withValues(
-            alpha:
-            0.18,
+            alpha: 0.18,
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         mainAxisSize:
         MainAxisSize.min,
         children: [
           Icon(
-            Icons
-                .check_circle_outline_rounded,
+            Icons.check_circle_outline_rounded,
             size:
             13,
             color:
@@ -1098,7 +1147,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           _borderColor,
         ),
       ),
-      child: Column(
+      child:
+      Column(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
@@ -1151,8 +1201,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             double.infinity,
             height:
             42,
-            child: OutlinedButton.icon(
-              onPressed: () async {
+            child:
+            OutlinedButton.icon(
+              onPressed:
+                  () async {
                 await _openRouteAndRefresh(
                   '/my-skills',
                 );
@@ -1206,21 +1258,20 @@ class _DashboardScreenState extends State<DashboardScreen>
             _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             Icon(
-              Icons
-                  .school_outlined,
+              Icons.school_outlined,
               color:
               _primaryColor,
             ),
-
             const SizedBox(
               width: 10,
             ),
-
             Expanded(
-              child: Text(
+              child:
+              Text(
                 'No skills are available right now.',
                 style:
                 AppTextStyles.secondary
@@ -1238,14 +1289,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     return SizedBox(
       height:
       138,
-      child: ListView.separated(
+      child:
+      ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
         const BouncingScrollPhysics(),
         itemCount:
         skills.length,
-        separatorBuilder: (
+        separatorBuilder:
+            (
             _,
             _,
             ) {
@@ -1253,7 +1306,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             width: 12,
           );
         },
-        itemBuilder: (
+        itemBuilder:
+            (
             BuildContext context,
             int index,
             ) {
@@ -1265,14 +1319,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             BorderRadius.circular(
               17,
             ),
-            onTap: () async {
+            onTap:
+                () async {
               await _openRouteAndRefresh(
                 '/skill-details',
                 arguments:
                 skill,
               );
             },
-            child: Container(
+            child:
+            Container(
               width:
               132,
               padding:
@@ -1293,7 +1349,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   _skillCardBorderColor,
                 ),
               ),
-              child: Column(
+              child:
+              Column(
                 mainAxisAlignment:
                 MainAxisAlignment.center,
                 children: [
@@ -1316,7 +1373,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                         _borderColor,
                       ),
                     ),
-                    child: Icon(
+                    child:
+                    Icon(
                       skill.icon,
                       color:
                       _primaryColor,
@@ -1356,10 +1414,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // UPCOMING SESSION
+  // SESSION PRIORITY
   // ============================================================
 
-  SwapRequest? _findUpcomingSession() {
+  SwapRequest? _findPriorityScheduledSession() {
     final User? currentUser =
         _currentUser;
 
@@ -1370,45 +1428,107 @@ class _DashboardScreenState extends State<DashboardScreen>
     final DateTime now =
     DateTime.now();
 
-    final List<SwapRequest> sessions =
-    _swapService.requests.where(
+    final List<SwapRequest> scheduled =
+    _swapService.requests
+        .where(
           (
           SwapRequest request,
-          ) {
-        return request.status ==
-            SwapRequestStatus.scheduled &&
-            request.hasStableIdentity &&
-            request.involvesUser(
-              currentUser.id,
-            ) &&
-            request.proposedAt.isAfter(
-              now,
-            );
-      },
-    ).toList();
+          ) =>
+          request.isScheduledFor(
+            currentUser.id,
+          ),
+    )
+        .toList();
 
-    if (sessions.isEmpty) {
+    if (scheduled.isEmpty) {
       return null;
     }
 
-    sessions.sort(
+    final List<SwapRequest> ready =
+    scheduled
+        .where(
           (
-          SwapRequest a,
-          SwapRequest b,
+          SwapRequest request,
           ) =>
-          a.proposedAt.compareTo(
-            b.proposedAt,
+          request
+              .isScheduledSessionReadyForCompletionFor(
+            currentUser.id,
+            now,
+          ),
+    )
+        .toList();
+
+    if (ready.isNotEmpty) {
+      ready.sort(
+            (
+            SwapRequest first,
+            SwapRequest second,
+            ) =>
+            first.proposedAt.compareTo(
+              second.proposedAt,
+            ),
+      );
+
+      return ready.first;
+    }
+
+    final List<SwapRequest> upcoming =
+    scheduled
+        .where(
+          (
+          SwapRequest request,
+          ) =>
+          request
+              .isUpcomingScheduledSessionFor(
+            currentUser.id,
+            now,
+          ),
+    )
+        .toList();
+
+    if (upcoming.isEmpty) {
+      return null;
+    }
+
+    upcoming.sort(
+          (
+          SwapRequest first,
+          SwapRequest second,
+          ) =>
+          first.proposedAt.compareTo(
+            second.proposedAt,
           ),
     );
 
-    return sessions.first;
+    return upcoming.first;
   }
 
-  Widget _buildUpcomingSession(
+  bool _isSessionReadyForCompletion(
+      SwapRequest request,
+      ) {
+    final User? currentUser =
+        _currentUser;
+
+    if (currentUser == null) {
+      return false;
+    }
+
+    return request
+        .isScheduledSessionReadyForCompletionFor(
+      currentUser.id,
+      DateTime.now(),
+    );
+  }
+
+  // ============================================================
+  // SESSION CARD
+  // ============================================================
+
+  Widget _buildScheduledSession(
       SwapRequest? request,
       ) {
     if (request == null) {
-      return _buildNoUpcomingSession();
+      return _buildNoScheduledSession();
     }
 
     final User? currentUser =
@@ -1437,6 +1557,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     final String skillText =
         '${request.skillToLearn} ↔ ${request.skillToOffer}';
 
+    final bool ready =
+    _isSessionReadyForCompletion(
+      request,
+    );
+
     return Container(
       width:
       double.infinity,
@@ -1455,130 +1580,229 @@ class _DashboardScreenState extends State<DashboardScreen>
         border:
         Border.all(
           color:
-          _borderColor,
+          ready
+              ? _primaryColor.withValues(
+            alpha: 0.55,
+          )
+              : _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Column(
         children: [
-          _buildUserAvatar(
-            otherUser,
-            size:
-            46,
-            fallbackInitials:
-            initials,
-          ),
+          Row(
+            children: [
+              _buildUserAvatar(
+                otherUser,
+                size:
+                46,
+                fallbackInitials:
+                initials,
+              ),
 
-          const SizedBox(
-            width: 12,
-          ),
+              const SizedBox(
+                width: 12,
+              ),
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  maxLines:
-                  1,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  AppTextStyles.cardTitle
-                      .copyWith(
-                    color:
-                    _textColor,
-                  ),
-                ),
+              Expanded(
+                child:
+                Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.cardTitle
+                          .copyWith(
+                        color:
+                        _textColor,
+                      ),
+                    ),
 
-                const SizedBox(
-                  height: 3,
-                ),
+                    const SizedBox(
+                      height: 3,
+                    ),
 
-                Text(
-                  skillText,
-                  maxLines:
-                  1,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  AppTextStyles.secondary
-                      .copyWith(
-                    fontSize:
-                    12,
-                    color:
-                    _mutedColor,
-                  ),
-                ),
+                    Text(
+                      skillText,
+                      maxLines:
+                      1,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.secondary
+                          .copyWith(
+                        fontSize:
+                        12,
+                        color:
+                        _mutedColor,
+                      ),
+                    ),
 
-                const SizedBox(
-                  height: 3,
-                ),
+                    const SizedBox(
+                      height: 3,
+                    ),
 
-                Text(
-                  '${_formatSessionDate(request.proposedAt)} • ${request.mode}',
-                  maxLines:
-                  2,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  AppTextStyles.caption
-                      .copyWith(
-                    color:
-                    _mutedColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(
-            width: 10,
-          ),
-
-          SizedBox(
-            height:
-            38,
-            child: ElevatedButton(
-              onPressed: () {
-                _showSessionDetails(
-                  request,
-                  displayName,
-                );
-              },
-              style:
-              ElevatedButton.styleFrom(
-                backgroundColor:
-                _primaryColor,
-                foregroundColor:
-                _isDarkMode
-                    ? const Color(
-                  0xFF092E31,
-                )
-                    : Colors.white,
-                padding:
-                const EdgeInsets.symmetric(
-                  horizontal:
-                  12,
+                    Text(
+                      '${_formatSessionDate(request.proposedAt)} • ${request.mode}',
+                      maxLines:
+                      2,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.caption
+                          .copyWith(
+                        color:
+                        _mutedColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Text(
-                'SESSION INFO',
-                style:
-                AppTextStyles.button
-                    .copyWith(
-                  fontSize:
-                  9.5,
+
+              const SizedBox(
+                width: 10,
+              ),
+
+              SizedBox(
+                height:
+                38,
+                child:
+                ElevatedButton(
+                  onPressed:
+                      () {
+                    _showSessionDetails(
+                      request,
+                      displayName,
+                    );
+                  },
+                  style:
+                  ElevatedButton.styleFrom(
+                    backgroundColor:
+                    _primaryColor,
+                    foregroundColor:
+                    _isDarkMode
+                        ? const Color(
+                      0xFF092E31,
+                    )
+                        : Colors.white,
+                    padding:
+                    const EdgeInsets.symmetric(
+                      horizontal: 12,
+                    ),
+                  ),
+                  child:
+                  Text(
+                    'SESSION INFO',
+                    style:
+                    AppTextStyles.button
+                        .copyWith(
+                      fontSize:
+                      9.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (ready) ...[
+            const SizedBox(
+              height: 12,
+            ),
+
+            Container(
+              width:
+              double.infinity,
+              padding:
+              const EdgeInsets.all(
+                10,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _softPrimaryColor,
+                borderRadius:
+                BorderRadius.circular(
+                  11,
+                ),
+              ),
+              child:
+              Row(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.task_alt_rounded,
+                    size:
+                    18,
+                    color:
+                    _primaryColor,
+                  ),
+
+                  const SizedBox(
+                    width: 8,
+                  ),
+
+                  Expanded(
+                    child:
+                    Text(
+                      'The scheduled start time has been reached. Open the request when you are ready to mark this swap as completed.',
+                      style:
+                      AppTextStyles.secondary
+                          .copyWith(
+                        fontSize:
+                        11.5,
+                        color:
+                        _textColor,
+                        fontWeight:
+                        FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(
+              height: 10,
+            ),
+
+            SizedBox(
+              width:
+              double.infinity,
+              child:
+              OutlinedButton.icon(
+                onPressed:
+                    () async {
+                  await _openRouteAndRefresh(
+                    '/swap-requests',
+                  );
+                },
+                icon:
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  size:
+                  17,
+                ),
+                label:
+                const Text(
+                  'OPEN SWAP REQUEST',
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildNoUpcomingSession() {
+  Widget _buildNoScheduledSession() {
     return Container(
       width:
       double.infinity,
@@ -1600,7 +1824,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           _borderColor,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           Container(
             width:
@@ -1616,9 +1841,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 14,
               ),
             ),
-            child: Icon(
-              Icons
-                  .event_available_outlined,
+            child:
+            Icon(
+              Icons.event_available_outlined,
               color:
               _primaryColor,
               size:
@@ -1631,12 +1856,13 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
 
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  'No scheduled session yet',
+                  'No confirmed session yet',
                   style:
                   AppTextStyles.cardTitle
                       .copyWith(
@@ -1650,7 +1876,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
 
                 Text(
-                  'Accept a swap request and schedule it to make the session appear here.',
+                  'Accepted swaps still need schedule confirmation before they appear here.',
                   style:
                   AppTextStyles.secondary
                       .copyWith(
@@ -1671,8 +1897,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           SizedBox(
             height:
             38,
-            child: OutlinedButton(
-              onPressed: () async {
+            child:
+            OutlinedButton(
+              onPressed:
+                  () async {
                 await _openRouteAndRefresh(
                   '/swap-requests',
                 );
@@ -1681,11 +1909,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               OutlinedButton.styleFrom(
                 padding:
                 const EdgeInsets.symmetric(
-                  horizontal:
-                  12,
+                  horizontal: 12,
                 ),
               ),
-              child: Text(
+              child:
+              Text(
                 'VIEW',
                 style:
                 AppTextStyles.button
@@ -1702,6 +1930,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
+
+  // ============================================================
+  // SESSION PARTICIPANT
+  // ============================================================
 
   User? _findOtherUser(
       SwapRequest request,
@@ -1746,7 +1978,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         request.isRequester(
           currentUser.id,
         ) &&
-        request.providerName.trim().isNotEmpty) {
+        request.providerName
+            .trim()
+            .isNotEmpty) {
       return request.providerName.trim();
     }
 
@@ -1761,12 +1995,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         request.isRequester(
           currentUser.id,
         ) &&
-        request.providerInitials.trim().isNotEmpty) {
+        request.providerInitials
+            .trim()
+            .isNotEmpty) {
       return request.providerInitials.trim();
     }
 
     return '?';
   }
+
+  // ============================================================
+  // SESSION DETAILS
+  // ============================================================
 
   void _showSessionDetails(
       SwapRequest request,
@@ -1780,16 +2020,23 @@ class _DashboardScreenState extends State<DashboardScreen>
         ? request.meetingDetails!.trim()
         : 'No meeting details provided.';
 
+    final bool ready =
+    _isSessionReadyForCompletion(
+      request,
+    );
+
     showDialog<void>(
       context:
       context,
-      builder: (
+      builder:
+          (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
           backgroundColor:
           _surfaceColor,
-          title: Row(
+          title:
+          Row(
             children: [
               Container(
                 width:
@@ -1805,7 +2052,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     11,
                   ),
                 ),
-                child: Icon(
+                child:
+                Icon(
                   request.mode ==
                       'Online'
                       ? Icons.videocam_outlined
@@ -1822,7 +2070,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child: Text(
+                child:
+                Text(
                   'Session with $displayName',
                   style:
                   AppTextStyles.cardTitle
@@ -1834,77 +2083,138 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize:
-            MainAxisSize.min,
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              _buildSessionDetailRow(
-                icon:
-                Icons.schedule_rounded,
-                label:
-                'Schedule',
-                value:
-                _formatSessionDate(
-                  request.proposedAt,
+          content:
+          SingleChildScrollView(
+            child:
+            Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                if (ready) ...[
+                  Container(
+                    width:
+                    double.infinity,
+                    padding:
+                    const EdgeInsets.all(
+                      10,
+                    ),
+                    decoration:
+                    BoxDecoration(
+                      color:
+                      _softPrimaryColor,
+                      borderRadius:
+                      BorderRadius.circular(
+                        10,
+                      ),
+                    ),
+                    child:
+                    Row(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.task_alt_rounded,
+                          size:
+                          18,
+                          color:
+                          _primaryColor,
+                        ),
+                        const SizedBox(
+                          width: 8,
+                        ),
+                        Expanded(
+                          child:
+                          Text(
+                            'This scheduled session has reached its start time and can now be completed from Swap Requests.',
+                            style:
+                            AppTextStyles.secondary
+                                .copyWith(
+                              fontSize:
+                              11.5,
+                              color:
+                              _textColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 14,
+                  ),
+                ],
+
+                _buildSessionDetailRow(
+                  icon:
+                  Icons.schedule_rounded,
+                  label:
+                  'Schedule',
+                  value:
+                  _formatSessionDate(
+                    request.proposedAt,
+                  ),
                 ),
-              ),
 
-              const SizedBox(
-                height: 14,
-              ),
+                const SizedBox(
+                  height: 14,
+                ),
 
-              _buildSessionDetailRow(
-                icon:
-                request.mode ==
-                    'Online'
-                    ? Icons.language_rounded
-                    : Icons.location_on_outlined,
-                label:
-                'Mode',
-                value:
-                request.mode,
-              ),
+                _buildSessionDetailRow(
+                  icon:
+                  request.mode ==
+                      'Online'
+                      ? Icons.language_rounded
+                      : Icons.location_on_outlined,
+                  label:
+                  'Mode',
+                  value:
+                  request.mode,
+                ),
 
-              const SizedBox(
-                height: 14,
-              ),
+                const SizedBox(
+                  height: 14,
+                ),
 
-              _buildSessionDetailRow(
-                icon:
-                Icons.info_outline_rounded,
-                label:
-                request.mode ==
-                    'Online'
-                    ? 'Meeting details'
-                    : 'Location details',
-                value:
-                meetingDetails,
-              ),
+                _buildSessionDetailRow(
+                  icon:
+                  Icons.info_outline_rounded,
+                  label:
+                  request.mode ==
+                      'Online'
+                      ? 'Meeting details'
+                      : 'Location details',
+                  value:
+                  meetingDetails,
+                ),
 
-              const SizedBox(
-                height: 14,
-              ),
+                const SizedBox(
+                  height: 14,
+                ),
 
-              _buildSessionDetailRow(
-                icon:
-                Icons.swap_horiz_rounded,
-                label:
-                'Skill exchange',
-                value:
-                '${request.skillToLearn} ↔ ${request.skillToOffer}',
-              ),
-            ],
+                _buildSessionDetailRow(
+                  icon:
+                  Icons.swap_horiz_rounded,
+                  label:
+                  'Skill exchange',
+                  value:
+                  '${request.skillToLearn} ↔ ${request.skillToOffer}',
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.of(
                   dialogContext,
                 ).pop();
               },
-              child: Text(
+              child:
+              Text(
                 'CLOSE',
                 style:
                 AppTextStyles.button
@@ -1916,7 +2226,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
 
             FilledButton(
-              onPressed: () async {
+              onPressed:
+                  () async {
                 Navigator.of(
                   dialogContext,
                 ).pop();
@@ -1926,8 +2237,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                 );
               },
               child:
-              const Text(
-                'VIEW REQUEST',
+              Text(
+                ready
+                    ? 'OPEN REQUEST'
+                    : 'VIEW REQUEST',
                 style:
                 AppTextStyles.button,
               ),
@@ -1960,7 +2273,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
 
         Expanded(
-          child: Column(
+          child:
+          Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -1997,6 +2311,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       ],
     );
   }
+
+  // ============================================================
+  // DATE
+  // ============================================================
 
   String _formatSessionDate(
       DateTime date,
@@ -2051,7 +2369,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       ];
 
       dayLabel =
-      '${months[date.month - 1]} ${date.day}, ${date.year}';
+      '${months[date.month - 1]} '
+          '${date.day}, '
+          '${date.year}';
     }
 
     final int hour12 =
@@ -2074,17 +2394,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         ? 'PM'
         : 'AM';
 
-    return '$dayLabel • $hour12:$minute $period';
+    return '$dayLabel • '
+        '$hour12:$minute '
+        '$period';
   }
 
   // ============================================================
-  // NAVIGATION HELPERS
+  // NAVIGATION
   // ============================================================
 
   Future<void> _scrollToHome() async {
     setState(() {
-      _selectedNav =
-      0;
+      _selectedNav = 0;
     });
 
     if (!_scrollController.hasClients) {
@@ -2095,8 +2416,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       0,
       duration:
       const Duration(
-        milliseconds:
-        280,
+        milliseconds: 280,
       ),
       curve:
       Curves.easeOut,
@@ -2105,8 +2425,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _scrollToMatch() async {
     setState(() {
-      _selectedNav =
-      2;
+      _selectedNav = 2;
     });
 
     final BuildContext? matchContext =
@@ -2120,8 +2439,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       matchContext,
       duration:
       const Duration(
-        milliseconds:
-        280,
+        milliseconds: 280,
       ),
       curve:
       Curves.easeOut,
@@ -2131,11 +2449,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // BOTTOM NAVIGATION
+  // BOTTOM NAV
   // ============================================================
 
   Widget _buildBottomNavigation() {
-    final List<Map<String, dynamic>> items = [
+    final List<Map<String, dynamic>> items =
+    <Map<String, dynamic>>[
       {
         'icon':
         Icons.home_outlined,
@@ -2197,9 +2516,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children:
-        List.generate(
+        List<Widget>.generate(
           items.length,
               (
               int index,
@@ -2209,8 +2529,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                     index;
 
             return Expanded(
-              child: InkWell(
-                onTap: () async {
+              child:
+              InkWell(
+                onTap:
+                    () async {
                   if (index == 0) {
                     await _scrollToHome();
                     return;
@@ -2220,7 +2542,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                     await _openRouteAndRefresh(
                       '/explore',
                     );
-
                     return;
                   }
 
@@ -2233,7 +2554,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                     await _openRouteAndRefresh(
                       '/chat',
                     );
-
                     return;
                   }
 
@@ -2241,15 +2561,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                     await _openProfile();
                   }
                 },
-                child: Column(
+                child:
+                Column(
                   mainAxisAlignment:
                   MainAxisAlignment.center,
                   children: [
                     AnimatedContainer(
                       duration:
                       const Duration(
-                        milliseconds:
-                        180,
+                        milliseconds: 180,
                       ),
                       width:
                       36,
@@ -2266,7 +2586,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           12,
                         ),
                       ),
-                      child: Icon(
+                      child:
+                      Icon(
                         selected
                             ? items[index]['selected']
                         as IconData

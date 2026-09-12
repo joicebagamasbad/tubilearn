@@ -115,7 +115,8 @@ class SwapService {
     try {
       savedRequests =
       await _repository.getAllSwapRequests(
-        userId: currentUserId,
+        userId:
+        currentUserId,
       );
     } on SwapRepositoryException catch (_) {
       throw const SwapServiceException(
@@ -514,8 +515,10 @@ class SwapService {
     }
 
     if (!_userOffersSkill(
-      userId: provider.id,
-      skillId: learnSkill.id,
+      userId:
+      provider.id,
+      skillId:
+      learnSkill.id,
     )) {
       throw const SwapServiceException(
         'This provider no longer offers the selected skill.',
@@ -523,8 +526,10 @@ class SwapService {
     }
 
     if (!_userOffersSkill(
-      userId: requester.id,
-      skillId: offerSkill.id,
+      userId:
+      requester.id,
+      skillId:
+      offerSkill.id,
     )) {
       throw const SwapServiceException(
         'You no longer offer the selected exchange skill.',
@@ -866,8 +871,6 @@ class SwapService {
         _ensureNoScheduleConflict(
           request:
           request,
-          userId:
-          actor,
         );
 
         await _changeStatus(
@@ -1087,8 +1090,25 @@ class SwapService {
 
   void _ensureNoScheduleConflict({
     required SwapRequest request,
-    required String userId,
   }) {
+    if (!request.hasParticipantIdentity) {
+      throw const SwapServiceException(
+        'Swap participants could not be identified for schedule validation.',
+      );
+    }
+
+    final String requesterUserId =
+    request.requesterUserId!.trim();
+
+    final String providerUserId =
+    request.providerUserId!.trim();
+
+    final Set<String> participantUserIds =
+    <String>{
+      requesterUserId,
+      providerUserId,
+    };
+
     final DateTime proposedStart =
         request.proposedAt;
 
@@ -1109,9 +1129,17 @@ class SwapService {
         continue;
       }
 
-      if (!existing.involvesUser(
-        userId,
-      )) {
+      final bool sharesParticipant =
+      participantUserIds.any(
+            (
+            String participantUserId,
+            ) =>
+            existing.involvesUser(
+              participantUserId,
+            ),
+      );
+
+      if (!sharesParticipant) {
         continue;
       }
 
@@ -1133,7 +1161,7 @@ class SwapService {
 
       if (overlaps) {
         throw const SwapServiceException(
-          'This schedule overlaps another confirmed session. Please choose a different time.',
+          'This schedule overlaps another confirmed session for one of the participants. Please choose a different time.',
         );
       }
     }
