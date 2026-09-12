@@ -346,11 +346,28 @@ class SwapRequest {
   bool canCancel(
       String userId,
       ) {
-    return hasStableIdentity &&
-        isRequester(
-          userId,
-        ) &&
-        status.canBeCancelled;
+    if (!hasStableIdentity ||
+        !status.canBeCancelled) {
+      return false;
+    }
+
+    if (status ==
+        SwapRequestStatus.pending) {
+      return isRequester(
+        userId,
+      );
+    }
+
+    if (status ==
+        SwapRequestStatus.accepted ||
+        status ==
+            SwapRequestStatus.scheduled) {
+      return involvesUser(
+        userId,
+      );
+    }
+
+    return false;
   }
 
   bool canAccept(

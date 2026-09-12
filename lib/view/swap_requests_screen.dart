@@ -1465,10 +1465,9 @@ class _SwapRequestsScreenState
               ),
             ),
           ),
-          if (isOutgoing &&
-              request.canCancel(
-                _currentUserId,
-              )) ...[
+          if (request.canCancel(
+            _currentUserId,
+          )) ...[
             const SizedBox(
               height:
               9,
@@ -1546,10 +1545,9 @@ class _SwapRequestsScreenState
             ),
           ),
 
-          if (isOutgoing &&
-              request.canCancel(
-                _currentUserId,
-              )) ...[
+          if (request.canCancel(
+            _currentUserId,
+          )) ...[
             const SizedBox(
               height:
               9,
@@ -1641,10 +1639,9 @@ class _SwapRequestsScreenState
       );
     }
 
-    if (isOutgoing &&
-        request.canCancel(
-          _currentUserId,
-        )) {
+    if (request.canCancel(
+      _currentUserId,
+    )) {
       return _buildCancelButton(
         request,
         blocked:
