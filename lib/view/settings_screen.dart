@@ -35,6 +35,11 @@ class _SettingsScreenState
   Color get _surfaceColor =>
       Theme.of(context).colorScheme.surface;
 
+  Color get _surfaceVariantColor =>
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
+
   Color get _textColor =>
       Theme.of(context).colorScheme.onSurface;
 
@@ -55,6 +60,23 @@ class _SettingsScreenState
       )
           : _primaryColor.withValues(
         alpha: 0.07,
+      );
+
+  Color get _successColor =>
+      _isDarkMode
+          ? const Color(
+        0xFF75B88D,
+      )
+          : const Color(
+        0xFF3F7D59,
+      );
+
+  Color get _softSuccessColor =>
+      _successColor.withValues(
+        alpha:
+        _isDarkMode
+            ? 0.15
+            : 0.09,
       );
 
   @override
@@ -101,7 +123,7 @@ class _SettingsScreenState
   }
 
   // ============================================================
-  // NOTIFICATION PREFERENCE
+  // NOTIFICATIONS
   // ============================================================
 
   Future<void> _toggleNotifications(
@@ -150,11 +172,16 @@ class _SettingsScreenState
   }
 
   String _notificationSubtitle() {
-    if (_settingsService.notificationsEnabled) {
-      return 'Preferred on • real alerts are not active yet';
+    if (_isSavingNotifications) {
+      return 'Saving preference...';
     }
 
-    return 'Preferred off • saved locally';
+    if (_settingsService
+        .notificationsEnabled) {
+      return 'On • push notifications are not connected yet';
+    }
+
+    return 'Off • preference saved locally';
   }
 
   // ============================================================
@@ -173,13 +200,15 @@ class _SettingsScreenState
     await showModalBottomSheet<
         AppLanguagePreference>(
       context: context,
-      backgroundColor: _surfaceColor,
+      backgroundColor:
+      _surfaceColor,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (
           BuildContext sheetContext,
           ) {
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding:
             const EdgeInsets.fromLTRB(
               20,
@@ -197,7 +226,8 @@ class _SettingsScreenState
                   'Language preference',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight.w800,
                     color: _textColor,
                   ),
                 ),
@@ -207,7 +237,7 @@ class _SettingsScreenState
                 ),
 
                 Text(
-                  'Choose the language you want TubiLearn to use when localization is connected.',
+                  'Choose your preferred TubiLearn language.',
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.4,
@@ -223,7 +253,8 @@ class _SettingsScreenState
                     AppLanguagePreference>(
                   groupValue: current,
                   onChanged: (
-                      AppLanguagePreference? value,
+                      AppLanguagePreference?
+                      value,
                       ) {
                     if (value == null) {
                       return;
@@ -244,13 +275,18 @@ class _SettingsScreenState
                         title: Text(
                           'English',
                           style: TextStyle(
-                            color: _textColor,
+                            color:
+                            _textColor,
+                            fontWeight:
+                            FontWeight
+                                .w600,
                           ),
                         ),
                         subtitle: Text(
-                          'Save English as your preferred app language.',
+                          'Save English as your preferred language.',
                           style: TextStyle(
-                            color: _mutedColor,
+                            color:
+                            _mutedColor,
                           ),
                         ),
                         value:
@@ -265,13 +301,18 @@ class _SettingsScreenState
                         title: Text(
                           'Filipino',
                           style: TextStyle(
-                            color: _textColor,
+                            color:
+                            _textColor,
+                            fontWeight:
+                            FontWeight
+                                .w600,
                           ),
                         ),
                         subtitle: Text(
-                          'Save Filipino as your preferred app language.',
+                          'Save Filipino as your preferred language.',
                           style: TextStyle(
-                            color: _mutedColor,
+                            color:
+                            _mutedColor,
                           ),
                         ),
                         value:
@@ -286,10 +327,13 @@ class _SettingsScreenState
                   height: 8,
                 ),
 
-                _buildDevelopmentNotice(
-                  icon: Icons.translate_rounded,
+                _buildInfoNotice(
+                  icon:
+                  Icons.translate_rounded,
+                  title:
+                  'Preference only',
                   text:
-                  'This setting is saved locally. Full English/Filipino text translation is part of the later localization phase.',
+                  'This choice is saved on this device. Full English and Filipino interface translation will be connected during the localization phase.',
                 ),
               ],
             ),
@@ -355,13 +399,15 @@ class _SettingsScreenState
     await showModalBottomSheet<
         AppThemePreference>(
       context: context,
-      backgroundColor: _surfaceColor,
+      backgroundColor:
+      _surfaceColor,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (
           BuildContext sheetContext,
           ) {
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding:
             const EdgeInsets.fromLTRB(
               20,
@@ -379,7 +425,8 @@ class _SettingsScreenState
                   'Appearance',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight.w800,
                     color: _textColor,
                   ),
                 ),
@@ -392,6 +439,7 @@ class _SettingsScreenState
                   'Choose how TubiLearn should look on this device.',
                   style: TextStyle(
                     fontSize: 14,
+                    height: 1.4,
                     color: _mutedColor,
                   ),
                 ),
@@ -400,10 +448,12 @@ class _SettingsScreenState
                   height: 16,
                 ),
 
-                RadioGroup<AppThemePreference>(
+                RadioGroup<
+                    AppThemePreference>(
                   groupValue: current,
                   onChanged: (
-                      AppThemePreference? value,
+                      AppThemePreference?
+                      value,
                       ) {
                     if (value == null) {
                       return;
@@ -421,16 +471,26 @@ class _SettingsScreenState
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
+                        secondary:
+                        const Icon(
+                          Icons
+                              .settings_suggest_outlined,
+                        ),
                         title: Text(
                           'System',
                           style: TextStyle(
-                            color: _textColor,
+                            color:
+                            _textColor,
+                            fontWeight:
+                            FontWeight
+                                .w600,
                           ),
                         ),
                         subtitle: Text(
                           'Follow your device appearance.',
                           style: TextStyle(
-                            color: _mutedColor,
+                            color:
+                            _mutedColor,
                           ),
                         ),
                         value:
@@ -442,16 +502,26 @@ class _SettingsScreenState
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
+                        secondary:
+                        const Icon(
+                          Icons
+                              .light_mode_outlined,
+                        ),
                         title: Text(
                           'Light',
                           style: TextStyle(
-                            color: _textColor,
+                            color:
+                            _textColor,
+                            fontWeight:
+                            FontWeight
+                                .w600,
                           ),
                         ),
                         subtitle: Text(
                           'Always use light mode.',
                           style: TextStyle(
-                            color: _mutedColor,
+                            color:
+                            _mutedColor,
                           ),
                         ),
                         value:
@@ -463,16 +533,26 @@ class _SettingsScreenState
                           AppThemePreference>(
                         contentPadding:
                         EdgeInsets.zero,
+                        secondary:
+                        const Icon(
+                          Icons
+                              .dark_mode_outlined,
+                        ),
                         title: Text(
                           'Dark',
                           style: TextStyle(
-                            color: _textColor,
+                            color:
+                            _textColor,
+                            fontWeight:
+                            FontWeight
+                                .w600,
                           ),
                         ),
                         subtitle: Text(
                           'Always use dark mode.',
                           style: TextStyle(
-                            color: _mutedColor,
+                            color:
+                            _mutedColor,
                           ),
                         ),
                         value:
@@ -531,29 +611,300 @@ class _SettingsScreenState
   }
 
   // ============================================================
-  // ABOUT
+  // LOCAL DATA
+  // ============================================================
+
+  void _showLocalDataDialog() {
+    _showInformationDialog(
+      icon:
+      Icons.storage_outlined,
+      title:
+      'On-device data',
+      children: <Widget>[
+        _dialogParagraph(
+          'This TubiLearn prototype keeps its working data on this device using local storage and SQLite.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.school_outlined,
+          title:
+          'Skills and preferences',
+          text:
+          'Your offered skills, learning interests, profile settings, and app preferences are stored locally.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.swap_horiz_rounded,
+          title:
+          'Swaps and sessions',
+          text:
+          'Swap requests and scheduled-session information are stored in the local app database.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.chat_bubble_outline_rounded,
+          title:
+          'Messages',
+          text:
+          'Prototype conversations and messages remain on this device unless the app data is removed.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.cloud_off_outlined,
+          title:
+          'No cloud backup',
+          text:
+          'Cloud synchronization and cross-device recovery are not connected in this phase.',
+        ),
+      ],
+    );
+  }
+
+  void _showProfilePhotoStorageDialog() {
+    _showInformationDialog(
+      icon:
+      Icons.photo_outlined,
+      title:
+      'Profile photo storage',
+      children: <Widget>[
+        _dialogParagraph(
+          'Profile photos selected in this prototype are copied into TubiLearn-managed storage on this device.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.smartphone_rounded,
+          title:
+          'Local file',
+          text:
+          'The current profile stores a local image path, so the photo belongs to this device installation.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.sync_disabled_rounded,
+          title:
+          'Not cross-device',
+          text:
+          'The image is not uploaded to remote storage and will not automatically appear on another device.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.cloud_upload_outlined,
+          title:
+          'Production later',
+          text:
+          'A production version will need secure remote image storage and account-based synchronization.',
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // PROTOTYPE ACCOUNT
+  // ============================================================
+
+  void _showPrototypeAccountDialog() {
+    _showInformationDialog(
+      icon:
+      Icons.person_outline_rounded,
+      title:
+      'Local prototype profile',
+      children: <Widget>[
+        _dialogParagraph(
+          'TubiLearn currently uses a local prototype identity instead of a real signed-in account.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.check_circle_outline_rounded,
+          title:
+          'Working locally',
+          text:
+          'Profile information, skills, swaps, reviews, settings, and messages can use the current local user identity.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.lock_outline_rounded,
+          title:
+          'Authentication not connected',
+          text:
+          'There is no real email/password sign-in, secure server session, password reset, or account verification yet.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.devices_outlined,
+          title:
+          'Single-device prototype',
+          text:
+          'The current identity is intended for this local prototype and does not represent a cloud account.',
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // ABOUT / PRIVACY
   // ============================================================
 
   void _showAboutDialog() {
+    _showInformationDialog(
+      icon:
+      Icons.info_outline_rounded,
+      title:
+      'About TubiLearn',
+      children: <Widget>[
+        _dialogParagraph(
+          'TubiLearn is a skill-exchange platform designed to help people teach what they know and learn practical skills from others.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.swap_horiz_rounded,
+          title:
+          'Skill exchange',
+          text:
+          'Learners can offer their own skills while requesting skills they want to learn.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.auto_awesome_outlined,
+          title:
+          'Smart matching',
+          text:
+          'Local matching considers skill compatibility together with relevant profile and session preferences.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.phone_android_rounded,
+          title:
+          'Current build',
+          text:
+          'This is the local-first prototype phase of TubiLearn.',
+        ),
+      ],
+    );
+  }
+
+  void _showPrivacyDialog() {
+    _showInformationDialog(
+      icon:
+      Icons.privacy_tip_outlined,
+      title:
+      'Privacy',
+      children: <Widget>[
+        _dialogParagraph(
+          'This prototype stores its working data locally on the device. It does not currently send profile, chat, swap, or settings data to a TubiLearn production backend.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.storage_rounded,
+          title:
+          'Local storage',
+          text:
+          'Prototype records remain in local app storage unless they are changed or removed through the app or the application data is cleared.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.cloud_off_rounded,
+          title:
+          'No production cloud account',
+          text:
+          'Cloud synchronization, account recovery, and remote backup are not active.',
+        ),
+        _dialogPoint(
+          icon:
+          Icons.policy_outlined,
+          title:
+          'Production requirement',
+          text:
+          'Before real-user release, TubiLearn will need a full privacy policy, secure backend handling, authentication, authorization, and account-data controls.',
+        ),
+      ],
+    );
+  }
+
+  void _showInformationDialog({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
     showDialog<void>(
       context: context,
       builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          backgroundColor: _surfaceColor,
-          title: Text(
-            'About TubiLearn',
-            style: TextStyle(
-              color: _textColor,
-              fontWeight: FontWeight.w800,
-            ),
+          backgroundColor:
+          _surfaceColor,
+          titlePadding:
+          const EdgeInsets.fromLTRB(
+            24,
+            22,
+            24,
+            0,
           ),
-          content: Text(
-            'TubiLearn is a skill exchange platform designed to help people teach what they know and learn new skills from others.',
-            style: TextStyle(
-              color: _mutedColor,
-              height: 1.45,
+          contentPadding:
+          const EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            8,
+          ),
+          actionsPadding:
+          const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            12,
+          ),
+          title: Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration:
+                BoxDecoration(
+                  color:
+                  _softPrimaryColor,
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    12,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color:
+                  _primaryColor,
+                  size: 21,
+                ),
+              ),
+
+              const SizedBox(
+                width: 12,
+              ),
+
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color:
+                    _textColor,
+                    fontSize: 19,
+                    fontWeight:
+                    FontWeight
+                        .w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content:
+          SingleChildScrollView(
+            child: Column(
+              mainAxisSize:
+              MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment
+                  .start,
+              children: children,
             ),
           ),
           actions: <Widget>[
@@ -573,42 +924,100 @@ class _SettingsScreenState
     );
   }
 
-  void _showPrivacyDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (
-          BuildContext dialogContext,
-          ) {
-        return AlertDialog(
-          backgroundColor: _surfaceColor,
-          title: Text(
-            'Privacy',
-            style: TextStyle(
-              color: _textColor,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: Text(
-            'This local version of TubiLearn stores prototype data on this device. A full privacy policy and secure backend data handling will be required before production release.',
-            style: TextStyle(
-              color: _mutedColor,
-              height: 1.45,
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop();
-              },
-              child: const Text(
-                'CLOSE',
+  Widget _dialogParagraph(
+      String text,
+      ) {
+    return Padding(
+      padding:
+      const EdgeInsets.only(
+        bottom: 14,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: _mutedColor,
+          fontSize: 13.5,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogPoint({
+    required IconData icon,
+    required String title,
+    required String text,
+  }) {
+    return Padding(
+      padding:
+      const EdgeInsets.only(
+        bottom: 14,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 34,
+            height: 34,
+            decoration:
+            BoxDecoration(
+              color:
+              _surfaceVariantColor,
+              borderRadius:
+              BorderRadius
+                  .circular(
+                10,
               ),
             ),
-          ],
-        );
-      },
+            child: Icon(
+              icon,
+              size: 18,
+              color:
+              _primaryColor,
+            ),
+          ),
+
+          const SizedBox(
+            width: 10,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment
+                  .start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: TextStyle(
+                    color:
+                    _textColor,
+                    fontSize: 13,
+                    fontWeight:
+                    FontWeight
+                        .w700,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 3,
+                ),
+
+                Text(
+                  text,
+                  style: TextStyle(
+                    color:
+                    _mutedColor,
+                    fontSize: 12.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -688,7 +1097,8 @@ class _SettingsScreenState
           'Settings',
           style: TextStyle(
             color: _textColor,
-            fontWeight: FontWeight.w800,
+            fontWeight:
+            FontWeight.w800,
           ),
         ),
       ),
@@ -699,7 +1109,8 @@ class _SettingsScreenState
   Widget _buildBody() {
     if (_isLoading) {
       return Center(
-        child: CircularProgressIndicator(
+        child:
+        CircularProgressIndicator(
           color: _primaryColor,
         ),
       );
@@ -716,14 +1127,45 @@ class _SettingsScreenState
             mainAxisSize:
             MainAxisSize.min,
             children: <Widget>[
-              Icon(
-                Icons.error_outline_rounded,
-                size: 48,
-                color: _mutedColor,
+              Container(
+                width: 58,
+                height: 58,
+                decoration:
+                BoxDecoration(
+                  color:
+                  _softPrimaryColor,
+                  borderRadius:
+                  BorderRadius
+                      .circular(
+                    18,
+                  ),
+                ),
+                child: Icon(
+                  Icons
+                      .error_outline_rounded,
+                  size: 30,
+                  color:
+                  _primaryColor,
+                ),
               ),
 
               const SizedBox(
-                height: 12,
+                height: 14,
+              ),
+
+              Text(
+                'Settings unavailable',
+                style: TextStyle(
+                  color:
+                  _textColor,
+                  fontSize: 17,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+
+              const SizedBox(
+                height: 6,
               ),
 
               Text(
@@ -731,17 +1173,24 @@ class _SettingsScreenState
                 textAlign:
                 TextAlign.center,
                 style: TextStyle(
-                  color: _textColor,
+                  color:
+                  _mutedColor,
+                  height: 1.4,
                 ),
               ),
 
               const SizedBox(
-                height: 16,
+                height: 18,
               ),
 
-              ElevatedButton(
-                onPressed: _loadSettings,
-                child: const Text(
+              ElevatedButton.icon(
+                onPressed:
+                _loadSettings,
+                icon: const Icon(
+                  Icons
+                      .refresh_rounded,
+                ),
+                label: const Text(
                   'RETRY',
                 ),
               ),
@@ -763,11 +1212,17 @@ class _SettingsScreenState
           padding:
           const EdgeInsets.fromLTRB(
             16,
-            20,
+            14,
             16,
             32,
           ),
           children: <Widget>[
+            _buildIntroCard(),
+
+            const SizedBox(
+              height: 24,
+            ),
+
             _sectionTitle(
               'APP PREFERENCES',
             ),
@@ -780,27 +1235,31 @@ class _SettingsScreenState
               children: <Widget>[
                 SwitchListTile(
                   contentPadding:
-                  const EdgeInsets.symmetric(
+                  const EdgeInsets
+                      .symmetric(
                     horizontal: 16,
                     vertical: 6,
                   ),
-                  secondary: Icon(
+                  secondary:
+                  _settingsIcon(
                     Icons
                         .notifications_outlined,
-                    color: _primaryColor,
                   ),
                   title: Text(
-                    'Notification preference',
+                    'Notifications',
                     style: TextStyle(
                       fontWeight:
                       FontWeight.w700,
-                      color: _textColor,
+                      color:
+                      _textColor,
                     ),
                   ),
                   subtitle: Text(
                     _notificationSubtitle(),
                     style: TextStyle(
-                      color: _mutedColor,
+                      color:
+                      _mutedColor,
+                      fontSize: 12.5,
                     ),
                   ),
                   value:
@@ -812,94 +1271,40 @@ class _SettingsScreenState
                       : _toggleNotifications,
                 ),
 
-                const Divider(
-                  height: 1,
-                ),
+                _divider(),
 
-                ListTile(
-                  leading: Icon(
-                    Icons.language_rounded,
-                    color: _primaryColor,
-                  ),
-                  title: Text(
-                    'Language preference',
-                    style: TextStyle(
-                      fontWeight:
-                      FontWeight.w700,
-                      color: _textColor,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${_languageLabel()} • translation not active yet',
-                    style: TextStyle(
-                      color: _mutedColor,
-                    ),
-                  ),
-                  trailing:
+                _actionTile(
+                  icon:
+                  Icons
+                      .language_rounded,
+                  title:
+                  'Language',
+                  subtitle:
                   _isSavingLanguage
-                      ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color:
-                      _primaryColor,
-                    ),
-                  )
-                      : Icon(
-                    Icons
-                        .chevron_right_rounded,
-                    color:
-                    _mutedColor,
-                  ),
+                      ? 'Saving preference...'
+                      : '${_languageLabel()} • preference only',
+                  isBusy:
+                  _isSavingLanguage,
                   onTap:
                   _isSavingLanguage
                       ? null
                       : _showLanguagePicker,
                 ),
 
-                const Divider(
-                  height: 1,
-                ),
+                _divider(),
 
-                ListTile(
-                  leading: Icon(
-                    Icons.palette_outlined,
-                    color: _primaryColor,
-                  ),
-                  title: Text(
-                    'Appearance',
-                    style: TextStyle(
-                      fontWeight:
-                      FontWeight.w700,
-                      color: _textColor,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _themeLabel(),
-                    style: TextStyle(
-                      color: _mutedColor,
-                    ),
-                  ),
-                  trailing:
+                _actionTile(
+                  icon:
+                  Icons
+                      .palette_outlined,
+                  title:
+                  'Appearance',
+                  subtitle:
                   _isSavingTheme
-                      ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color:
-                      _primaryColor,
-                    ),
-                  )
-                      : Icon(
-                    Icons
-                        .chevron_right_rounded,
-                    color:
-                    _mutedColor,
-                  ),
+                      ? 'Applying appearance...'
+                      : '${_themeLabel()} • active now',
+                  isBusy:
+                  _isSavingTheme,
                   onTap:
                   _isSavingTheme
                       ? null
@@ -913,7 +1318,7 @@ class _SettingsScreenState
             ),
 
             _sectionTitle(
-              'LOCAL APP STATUS',
+              'LOCAL DATA & PRIVACY',
             ),
 
             const SizedBox(
@@ -922,24 +1327,116 @@ class _SettingsScreenState
 
             _settingsCard(
               children: <Widget>[
+                _actionTile(
+                  icon:
+                  Icons
+                      .storage_outlined,
+                  title:
+                  'On-device data',
+                  subtitle:
+                  'SQLite and local app storage',
+                  onTap:
+                  _showLocalDataDialog,
+                ),
+
+                _divider(),
+
+                _actionTile(
+                  icon:
+                  Icons
+                      .photo_outlined,
+                  title:
+                  'Profile photo storage',
+                  subtitle:
+                  'Stored locally on this device',
+                  onTap:
+                  _showProfilePhotoStorageDialog,
+                ),
+
+                _divider(),
+
+                _actionTile(
+                  icon:
+                  Icons
+                      .privacy_tip_outlined,
+                  title:
+                  'Privacy',
+                  subtitle:
+                  'How this prototype handles your data',
+                  onTap:
+                  _showPrivacyDialog,
+                ),
+              ],
+            ),
+
+            const SizedBox(
+              height: 24,
+            ),
+
+            _sectionTitle(
+              'ACCOUNT STATUS',
+            ),
+
+            const SizedBox(
+              height: 8,
+            ),
+
+            _settingsCard(
+              children: <Widget>[
+                _actionTile(
+                  icon:
+                  Icons
+                      .person_outline_rounded,
+                  title:
+                  'Local prototype profile',
+                  subtitle:
+                  'No real sign-in account is connected',
+                  trailing:
+                  _buildStatusBadge(
+                    label:
+                    'LOCAL',
+                    positive: true,
+                  ),
+                  onTap:
+                  _showPrototypeAccountDialog,
+                ),
+
+                _divider(),
+
                 ListTile(
-                  leading: Icon(
-                    Icons.smartphone_rounded,
-                    color: _primaryColor,
+                  contentPadding:
+                  const EdgeInsets
+                      .symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  leading:
+                  _settingsIcon(
+                    Icons
+                        .cloud_off_outlined,
                   ),
                   title: Text(
-                    'Local prototype session',
+                    'Cloud sync',
                     style: TextStyle(
+                      color:
+                      _textColor,
                       fontWeight:
                       FontWeight.w700,
-                      color: _textColor,
                     ),
                   ),
                   subtitle: Text(
-                    'Account authentication and cloud sync are not connected yet.',
+                    'Cross-device sync is not connected yet',
                     style: TextStyle(
-                      color: _mutedColor,
+                      color:
+                      _mutedColor,
+                      fontSize: 12.5,
                     ),
+                  ),
+                  trailing:
+                  _buildStatusBadge(
+                    label:
+                    'OFF',
+                    positive: false,
                   ),
                 ),
               ],
@@ -959,55 +1456,16 @@ class _SettingsScreenState
 
             _settingsCard(
               children: <Widget>[
-                ListTile(
-                  leading: Icon(
-                    Icons.info_outline_rounded,
-                    color: _primaryColor,
-                  ),
-                  title: Text(
-                    'About TubiLearn',
-                    style: TextStyle(
-                      fontWeight:
-                      FontWeight.w700,
-                      color: _textColor,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: _mutedColor,
-                  ),
-                  onTap: _showAboutDialog,
-                ),
-
-                const Divider(
-                  height: 1,
-                ),
-
-                ListTile(
-                  leading: Icon(
-                    Icons
-                        .privacy_tip_outlined,
-                    color: _primaryColor,
-                  ),
-                  title: Text(
-                    'Privacy',
-                    style: TextStyle(
-                      fontWeight:
-                      FontWeight.w700,
-                      color: _textColor,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Prototype data is stored locally',
-                    style: TextStyle(
-                      color: _mutedColor,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: _mutedColor,
-                  ),
-                  onTap: _showPrivacyDialog,
+                _actionTile(
+                  icon:
+                  Icons
+                      .info_outline_rounded,
+                  title:
+                  'About TubiLearn',
+                  subtitle:
+                  'Local-first skill exchange prototype',
+                  onTap:
+                  _showAboutDialog,
                 ),
               ],
             ),
@@ -1016,15 +1474,119 @@ class _SettingsScreenState
               height: 20,
             ),
 
-            _buildDevelopmentNotice(
+            _buildInfoNotice(
               icon:
-              Icons.construction_rounded,
+              Icons
+                  .construction_rounded,
+              title:
+              'Prototype boundary',
               text:
-              'Real authentication, account security, cloud sync, realtime chat, push notifications, and remote profile photos belong to the production/backend phase.',
+              'Real authentication, password management, account deletion, cloud sync, realtime delivery, and push notifications require the production backend. They are intentionally not presented here as working account features.',
             ),
           ],
         );
       },
+    );
+  }
+
+  // ============================================================
+  // INTRO
+  // ============================================================
+
+  Widget _buildIntroCard() {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _softPrimaryColor,
+        borderRadius:
+        BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color:
+          _primaryColor.withValues(
+            alpha:
+            _isDarkMode
+                ? 0.24
+                : 0.12,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration:
+            BoxDecoration(
+              color:
+              _surfaceColor,
+              borderRadius:
+              BorderRadius.circular(
+                14,
+              ),
+              border: Border.all(
+                color:
+                _borderColor,
+              ),
+            ),
+            child: Icon(
+              Icons
+                  .tune_rounded,
+              color:
+              _primaryColor,
+              size: 23,
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment
+                  .start,
+              children: <Widget>[
+                Text(
+                  'Your TubiLearn preferences',
+                  style: TextStyle(
+                    color:
+                    _textColor,
+                    fontSize: 15,
+                    fontWeight:
+                    FontWeight
+                        .w800,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
+                Text(
+                  'Manage working app preferences and see clearly which features are local-only in this prototype.',
+                  style: TextStyle(
+                    color:
+                    _mutedColor,
+                    fontSize: 12.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1043,9 +1605,10 @@ class _SettingsScreenState
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
+          fontSize: 11.5,
+          fontWeight:
+          FontWeight.w700,
+          letterSpacing: 0.9,
           color: _mutedColor,
         ),
       ),
@@ -1056,14 +1619,19 @@ class _SettingsScreenState
     required List<Widget> children,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        color: _surfaceColor,
+      clipBehavior:
+      Clip.antiAlias,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
         border: Border.all(
-          color: _borderColor,
+          color:
+          _borderColor,
         ),
       ),
       child: Column(
@@ -1072,8 +1640,142 @@ class _SettingsScreenState
     );
   }
 
-  Widget _buildDevelopmentNotice({
+  Widget _settingsIcon(
+      IconData icon,
+      ) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration:
+      BoxDecoration(
+        color:
+        _softPrimaryColor,
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+      ),
+      child: Icon(
+        icon,
+        size: 20,
+        color:
+        _primaryColor,
+      ),
+    );
+  }
+
+  Widget _actionTile({
     required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+    bool isBusy = false,
+    Widget? trailing,
+  }) {
+    return ListTile(
+      contentPadding:
+      const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 7,
+      ),
+      leading:
+      _settingsIcon(
+        icon,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: _textColor,
+          fontWeight:
+          FontWeight.w700,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          color: _mutedColor,
+          fontSize: 12.5,
+        ),
+      ),
+      trailing:
+      isBusy
+          ? SizedBox(
+        width: 20,
+        height: 20,
+        child:
+        CircularProgressIndicator(
+          strokeWidth: 2,
+          color:
+          _primaryColor,
+        ),
+      )
+          : trailing ??
+          Icon(
+            Icons
+                .chevron_right_rounded,
+            color:
+            _mutedColor,
+          ),
+      onTap:
+      isBusy
+          ? null
+          : onTap,
+    );
+  }
+
+  Widget _divider() {
+    return Divider(
+      height: 1,
+      indent: 68,
+      endIndent: 16,
+      color: _borderColor,
+    );
+  }
+
+  Widget _buildStatusBadge({
+    required String label,
+    required bool positive,
+  }) {
+    final Color foreground =
+    positive
+        ? _successColor
+        : _mutedColor;
+
+    final Color background =
+    positive
+        ? _softSuccessColor
+        : _surfaceVariantColor;
+
+    return Container(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
+      decoration:
+      BoxDecoration(
+        color: background,
+        borderRadius:
+        BorderRadius.circular(
+          20,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 9.5,
+          fontWeight:
+          FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoNotice({
+    required IconData icon,
+    required String title,
     required String text,
   }) {
     return Container(
@@ -1082,8 +1784,10 @@ class _SettingsScreenState
       const EdgeInsets.all(
         14,
       ),
-      decoration: BoxDecoration(
-        color: _softPrimaryColor,
+      decoration:
+      BoxDecoration(
+        color:
+        _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           14,
@@ -1105,7 +1809,8 @@ class _SettingsScreenState
           Icon(
             icon,
             size: 20,
-            color: _primaryColor,
+            color:
+            _primaryColor,
           ),
 
           const SizedBox(
@@ -1113,13 +1818,37 @@ class _SettingsScreenState
           ),
 
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.45,
-                color: _mutedColor,
-              ),
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment
+                  .start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: TextStyle(
+                    color:
+                    _textColor,
+                    fontSize: 12.5,
+                    fontWeight:
+                    FontWeight
+                        .w700,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 3,
+                ),
+
+                Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color:
+                    _mutedColor,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
