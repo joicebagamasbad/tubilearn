@@ -22,6 +22,7 @@ import 'view/chat_screen.dart';
 import 'view/conversation_screen.dart';
 import 'view/swap_requests_screen.dart';
 import 'view/smart_matches_screen.dart';
+import 'view/video_call_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,29 +81,50 @@ class TubiLearnApp extends StatelessWidget {
           const SplashScreen(),
 
           routes: {
-            '/add-skill': (context) =>
+            '/add-skill': (
+                context,
+                ) =>
             const AddSkillScreen(),
 
-            '/my-skills': (context) =>
+            '/my-skills': (
+                context,
+                ) =>
             const MySkillsScreen(),
 
-            '/explore': (context) =>
+            '/explore': (
+                context,
+                ) =>
             const ExploreScreen(),
 
-            '/chat': (context) =>
+            '/chat': (
+                context,
+                ) =>
             const ChatScreen(),
 
-            '/swap-requests': (context) =>
+            '/swap-requests': (
+                context,
+                ) =>
             const SwapRequestsScreen(),
 
-            '/profile': (context) =>
+            '/profile': (
+                context,
+                ) =>
             const ProfileScreen(),
 
-            '/smart-matches': (context) =>
+            '/smart-matches': (
+                context,
+                ) =>
             const SmartMatchesScreen(),
+
+            '/video-call': (
+                context,
+                ) =>
+            const VideoCallScreen(),
           },
 
-          onGenerateRoute: (settings) {
+          onGenerateRoute: (
+              RouteSettings settings,
+              ) {
             // ==================================================
             // SKILL DETAILS
             // ==================================================
@@ -114,7 +136,9 @@ class TubiLearnApp extends StatelessWidget {
               as Skill;
 
               return MaterialPageRoute(
-                builder: (context) =>
+                builder: (
+                    context,
+                    ) =>
                     SkillDetailsScreen(
                       skill:
                       skill,
@@ -133,7 +157,9 @@ class TubiLearnApp extends StatelessWidget {
               as User;
 
               return MaterialPageRoute(
-                builder: (context) =>
+                builder: (
+                    context,
+                    ) =>
                     UserProfileScreen(
                       user:
                       user,
@@ -147,12 +173,15 @@ class TubiLearnApp extends StatelessWidget {
 
             if (settings.name ==
                 '/conversation') {
-              final String conversationId =
+              final String
+              conversationId =
               settings.arguments
               as String;
 
               return MaterialPageRoute(
-                builder: (context) =>
+                builder: (
+                    context,
+                    ) =>
                     ConversationScreen(
                       conversationId:
                       conversationId,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import 'dashboard_screen.dart';
+import 'dashboard_video_session_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
@@ -16,35 +16,47 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState
     extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+  late final AnimationController
+  _animationController;
+
+  late final Animation<double>
+  _fadeAnimation;
+
+  late final Animation<double>
+  _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        milliseconds: 850,
-      ),
-    );
+    _animationController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(
+            milliseconds: 850,
+          ),
+        );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
+    _fadeAnimation =
+        CurvedAnimation(
+          parent:
+          _animationController,
+          curve:
+          Curves.easeOut,
+        );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.95,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutBack,
-      ),
-    );
+    _scaleAnimation =
+        Tween<double>(
+          begin: 0.95,
+          end: 1.0,
+        ).animate(
+          CurvedAnimation(
+            parent:
+            _animationController,
+            curve:
+            Curves.easeOutBack,
+          ),
+        );
 
     _animationController.forward();
 
@@ -69,7 +81,7 @@ class _SplashScreenState
         builder: (
             BuildContext context,
             ) =>
-        const DashboardScreen(),
+        const DashboardVideoSessionShell(),
       ),
     );
   }
@@ -122,15 +134,22 @@ class _SplashScreenState
         AppTheme.primary;
 
     return Scaffold(
-      backgroundColor: backgroundTop,
+      backgroundColor:
+      backgroundTop,
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
+        width:
+        double.infinity,
+        height:
+        double.infinity,
+        decoration:
+        const BoxDecoration(
+          gradient:
+          LinearGradient(
+            begin:
+            Alignment.topCenter,
+            end:
+            Alignment.bottomCenter,
+            colors: <Color>[
               backgroundTop,
               backgroundBottom,
             ],
@@ -144,30 +163,44 @@ class _SplashScreenState
               vertical: 24,
             ),
             child: Column(
-              children: [
+              children: <Widget>[
                 const Spacer(),
 
                 FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Container(
+                  opacity:
+                  _fadeAnimation,
+                  child:
+                  ScaleTransition(
+                    scale:
+                    _scaleAnimation,
+                    child:
+                    Container(
                       width: 156,
                       height: 156,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: mascotSurface,
-                        border: Border.all(
-                          color: mascotBorder,
-                          width: 1.5,
+                      decoration:
+                      BoxDecoration(
+                        shape:
+                        BoxShape.circle,
+                        color:
+                        mascotSurface,
+                        border:
+                        Border.all(
+                          color:
+                          mascotBorder,
+                          width:
+                          1.5,
                         ),
-                        boxShadow: [
+                        boxShadow:
+                        <BoxShadow>[
                           BoxShadow(
                             color:
-                            Colors.black.withValues(
-                              alpha: 0.06,
+                            Colors.black
+                                .withValues(
+                              alpha:
+                              0.06,
                             ),
-                            blurRadius: 28,
+                            blurRadius:
+                            28,
                             offset:
                             const Offset(
                               0,
@@ -176,12 +209,17 @@ class _SplashScreenState
                           ),
                         ],
                       ),
-                      alignment: Alignment.center,
-                      child: Image.asset(
+                      alignment:
+                      Alignment.center,
+                      child:
+                      Image.asset(
                         'assets/images/mascot/tubi_happy.png',
-                        width: 118,
-                        height: 118,
-                        fit: BoxFit.contain,
+                        width:
+                        118,
+                        height:
+                        118,
+                        fit:
+                        BoxFit.contain,
                       ),
                     ),
                   ),
@@ -192,11 +230,15 @@ class _SplashScreenState
                 ),
 
                 FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: Image.asset(
+                  opacity:
+                  _fadeAnimation,
+                  child:
+                  Image.asset(
                     'assets/images/tubilearn_logo.png',
-                    width: 185,
-                    fit: BoxFit.contain,
+                    width:
+                    185,
+                    fit:
+                    BoxFit.contain,
                   ),
                 ),
 
@@ -205,15 +247,21 @@ class _SplashScreenState
                 ),
 
                 FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: const Text(
+                  opacity:
+                  _fadeAnimation,
+                  child:
+                  const Text(
                     'Learn together. Grow together.',
                     textAlign:
                     TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 17,
-                      height: 1.3,
-                      color: titleColor,
+                    style:
+                    TextStyle(
+                      fontSize:
+                      17,
+                      height:
+                      1.3,
+                      color:
+                      titleColor,
                       fontWeight:
                       FontWeight.w800,
                     ),
@@ -225,20 +273,28 @@ class _SplashScreenState
                 ),
 
                 FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: const Padding(
+                  opacity:
+                  _fadeAnimation,
+                  child:
+                  const Padding(
                     padding:
                     EdgeInsets.symmetric(
-                      horizontal: 8,
+                      horizontal:
+                      8,
                     ),
-                    child: Text(
+                    child:
+                    Text(
                       'Share what you know and discover something new.',
                       textAlign:
                       TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.45,
-                        color: subtitleColor,
+                      style:
+                      TextStyle(
+                        fontSize:
+                        13,
+                        height:
+                        1.45,
+                        color:
+                        subtitleColor,
                         fontWeight:
                         FontWeight.w500,
                       ),
@@ -249,27 +305,37 @@ class _SplashScreenState
                 const Spacer(),
 
                 FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: Column(
-                    children: [
+                  opacity:
+                  _fadeAnimation,
+                  child:
+                  Column(
+                    children:
+                    <Widget>[
                       SizedBox(
-                        width: 21,
-                        height: 21,
+                        width:
+                        21,
+                        height:
+                        21,
                         child:
                         CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: accentColor,
+                          strokeWidth:
+                          2.2,
+                          color:
+                          accentColor,
                         ),
                       ),
 
                       const SizedBox(
-                        height: 11,
+                        height:
+                        11,
                       ),
 
                       const Text(
                         'Getting things ready...',
-                        style: TextStyle(
-                          fontSize: 12,
+                        style:
+                        TextStyle(
+                          fontSize:
+                          12,
                           color:
                           loadingTextColor,
                           fontWeight:
