@@ -22,8 +22,7 @@ class ProfileScreen extends StatefulWidget {
       _ProfileScreenState();
 }
 
-class _ProfileScreenState
-    extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> {
   final ExploreRepository _repository =
       ExploreRepository.instance;
 
@@ -45,8 +44,7 @@ class _ProfileScreenState
   String? _loadError;
 
   bool get _isDarkMode =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      Theme.of(context).brightness == Brightness.dark;
 
   Color get _primaryColor =>
       Theme.of(context).colorScheme.primary;
@@ -55,22 +53,16 @@ class _ProfileScreenState
       Theme.of(context).colorScheme.surface;
 
   Color get _surfaceVariantColor =>
-      Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest;
+      Theme.of(context).colorScheme.surfaceContainerHighest;
 
   Color get _textColor =>
       Theme.of(context).colorScheme.onSurface;
 
   Color get _mutedColor =>
-      Theme.of(context)
-          .colorScheme
-          .onSurfaceVariant;
+      Theme.of(context).colorScheme.onSurfaceVariant;
 
   Color get _borderColor =>
-      Theme.of(context)
-          .colorScheme
-          .outlineVariant;
+      Theme.of(context).colorScheme.outlineVariant;
 
   Color get _softPrimaryColor =>
       _isDarkMode
@@ -153,102 +145,44 @@ class _ProfileScreenState
       }
 
       setState(() {
-        _currentUser =
-            user;
-
-        _offeredSkills =
-            offeredSkills;
-
-        _wantedSkills =
-            wantedSkills;
-
-        _isLoading =
-        false;
-
-        _isRefreshing =
-        false;
-
-        _loadError =
-        null;
+        _currentUser = user;
+        _offeredSkills = offeredSkills;
+        _wantedSkills = wantedSkills;
+        _isLoading = false;
+        _isRefreshing = false;
+        _loadError = null;
       });
     } on CurrentUserServiceException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _currentUser =
-        null;
-
-        _offeredSkills =
-        <Skill>[];
-
-        _wantedSkills =
-        <Skill>[];
-
-        _isLoading =
-        false;
-
-        _isRefreshing =
-        false;
-
-        _loadError =
-            error.message;
-      });
+      _setLoadFailure(
+        error.message,
+      );
     } on ExploreRepositoryException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _currentUser =
-        null;
-
-        _offeredSkills =
-        <Skill>[];
-
-        _wantedSkills =
-        <Skill>[];
-
-        _isLoading =
-        false;
-
-        _isRefreshing =
-        false;
-
-        _loadError =
-            error.message;
-      });
+      _setLoadFailure(
+        error.message,
+      );
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _currentUser =
-        null;
-
-        _offeredSkills =
-        <Skill>[];
-
-        _wantedSkills =
-        <Skill>[];
-
-        _isLoading =
-        false;
-
-        _isRefreshing =
-        false;
-
-        _loadError =
-        'Your profile could not be loaded. Please try again.';
-      });
+      _setLoadFailure(
+        'Your profile could not be loaded. Please try again.',
+      );
     }
   }
 
-  // ============================================================
-  // RESOLVE SKILLS
-  // ============================================================
+  void _setLoadFailure(
+      String message,
+      ) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _currentUser = null;
+      _offeredSkills = <Skill>[];
+      _wantedSkills = <Skill>[];
+      _isLoading = false;
+      _isRefreshing = false;
+      _loadError = message;
+    });
+  }
 
   List<Skill> _resolveSkills(
       List<UserSkill> relationships,
@@ -281,13 +215,13 @@ class _ProfileScreenState
 
     result.sort(
           (
-          Skill a,
-          Skill b,
+          Skill first,
+          Skill second,
           ) =>
-          a.title
+          first.title
               .toLowerCase()
               .compareTo(
-            b.title.toLowerCase(),
+            second.title.toLowerCase(),
           ),
     );
 
@@ -306,13 +240,11 @@ class _ProfileScreenState
     }
 
     setState(() {
-      _isRefreshing =
-      true;
+      _isRefreshing = true;
     });
 
     await _loadProfile(
-      refreshRepository:
-      true,
+      refreshRepository: true,
     );
   }
 
@@ -322,8 +254,7 @@ class _ProfileScreenState
     }
 
     await _loadProfile(
-      refreshRepository:
-      true,
+      refreshRepository: true,
     );
   }
 
@@ -350,12 +281,9 @@ class _ProfileScreenState
 
     final String? action =
     await showModalBottomSheet<String>(
-      context:
-      context,
-      backgroundColor:
-      _surfaceColor,
-      showDragHandle:
-      true,
+      context: context,
+      backgroundColor: _surfaceColor,
+      showDragHandle: true,
       builder: (
           BuildContext sheetContext,
           ) {
@@ -369,37 +297,26 @@ class _ProfileScreenState
               14,
             ),
             child: Column(
-              mainAxisSize:
-              MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading:
-                  Icon(
-                    Icons
-                        .photo_library_outlined,
-                    color:
-                    _primaryColor,
+                  leading: Icon(
+                    Icons.photo_library_outlined,
+                    color: _primaryColor,
                   ),
-                  title:
-                  Text(
+                  title: Text(
                     hasExistingPhoto
                         ? 'Change profile photo'
                         : 'Choose profile photo',
-                    style:
-                    TextStyle(
-                      fontWeight:
-                      FontWeight.w700,
-                      color:
-                      _textColor,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: _textColor,
                     ),
                   ),
-                  subtitle:
-                  Text(
+                  subtitle: Text(
                     'Select a photo from your gallery',
-                    style:
-                    TextStyle(
-                      color:
-                      _mutedColor,
+                    style: TextStyle(
+                      color: _mutedColor,
                     ),
                   ),
                   onTap: () {
@@ -409,25 +326,17 @@ class _ProfileScreenState
                     );
                   },
                 ),
-
                 if (hasExistingPhoto)
                   ListTile(
-                    leading:
-                    const Icon(
-                      Icons
-                          .delete_outline_rounded,
-                      color:
-                      AppTheme.error,
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppTheme.error,
                     ),
-                    title:
-                    const Text(
+                    title: const Text(
                       'Remove profile photo',
-                      style:
-                      TextStyle(
-                        fontWeight:
-                        FontWeight.w700,
-                        color:
-                        AppTheme.error,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.error,
                       ),
                     ),
                     onTap: () {
@@ -449,14 +358,12 @@ class _ProfileScreenState
       return;
     }
 
-    if (action ==
-        'choose') {
+    if (action == 'choose') {
       await _pickProfileImage();
       return;
     }
 
-    if (action ==
-        'remove') {
+    if (action == 'remove') {
       await _confirmRemoveProfileImage();
     }
   }
@@ -467,8 +374,7 @@ class _ProfileScreenState
     }
 
     setState(() {
-      _isUpdatingProfileImage =
-      true;
+      _isUpdatingProfileImage = true;
     });
 
     try {
@@ -485,8 +391,7 @@ class _ProfileScreenState
       }
 
       setState(() {
-        _currentUser =
-            updatedUser;
+        _currentUser = updatedUser;
       });
 
       _showMessage(
@@ -511,8 +416,7 @@ class _ProfileScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isUpdatingProfileImage =
-          false;
+          _isUpdatingProfileImage = false;
         });
       }
     }
@@ -525,32 +429,23 @@ class _ProfileScreenState
 
     final bool? confirmed =
     await showDialog<bool>(
-      context:
-      context,
+      context: context,
       builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
-          backgroundColor:
-          _surfaceColor,
-          title:
-          Text(
+          backgroundColor: _surfaceColor,
+          title: Text(
             'Remove profile photo?',
-            style:
-            TextStyle(
-              color:
-              _textColor,
-              fontWeight:
-              FontWeight.w800,
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          content:
-          Text(
+          content: Text(
             'Your initials will be shown again instead.',
-            style:
-            TextStyle(
-              color:
-              _mutedColor,
+            style: TextStyle(
+              color: _mutedColor,
             ),
           ),
           actions: [
@@ -561,18 +456,14 @@ class _ProfileScreenState
                   false,
                 );
               },
-              child:
-              Text(
+              child: Text(
                 'CANCEL',
                 style:
-                AppTextStyles.button
-                    .copyWith(
-                  color:
-                  _mutedColor,
+                AppTextStyles.button.copyWith(
+                  color: _mutedColor,
                 ),
               ),
             ),
-
             TextButton(
               onPressed: () {
                 Navigator.pop(
@@ -580,15 +471,11 @@ class _ProfileScreenState
                   true,
                 );
               },
-              child:
-              const Text(
+              child: const Text(
                 'REMOVE',
-                style:
-                TextStyle(
-                  fontWeight:
-                  FontWeight.w800,
-                  color:
-                  AppTheme.error,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.error,
                 ),
               ),
             ),
@@ -611,8 +498,7 @@ class _ProfileScreenState
     }
 
     setState(() {
-      _isUpdatingProfileImage =
-      true;
+      _isUpdatingProfileImage = true;
     });
 
     try {
@@ -625,8 +511,7 @@ class _ProfileScreenState
       }
 
       setState(() {
-        _currentUser =
-            updatedUser;
+        _currentUser = updatedUser;
       });
 
       _showMessage(
@@ -651,8 +536,7 @@ class _ProfileScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isUpdatingProfileImage =
-          false;
+          _isUpdatingProfileImage = false;
         });
       }
     }
@@ -694,22 +578,17 @@ class _ProfileScreenState
 
     return ClipOval(
       child: SizedBox(
-        width:
-        size,
-        height:
-        size,
+        width: size,
+        height: size,
         child:
         hasImage
             ? Image.file(
           File(
             path,
           ),
-          width:
-          size,
-          height:
-          size,
-          fit:
-          BoxFit.cover,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
           errorBuilder: (
               BuildContext context,
               Object error,
@@ -717,15 +596,13 @@ class _ProfileScreenState
               ) {
             return _buildInitialAvatar(
               user,
-              size:
-              size,
+              size: size,
             );
           },
         )
             : _buildInitialAvatar(
           user,
-          size:
-          size,
+          size: size,
         ),
       ),
     );
@@ -736,26 +613,17 @@ class _ProfileScreenState
         required double size,
       }) {
     return Container(
-      width:
-      size,
-      height:
-      size,
-      color:
-      AppTheme.accent,
-      alignment:
-      Alignment.center,
+      width: size,
+      height: size,
+      color: AppTheme.accent,
+      alignment: Alignment.center,
       child: Text(
         user.initials,
-        style:
-        TextStyle(
+        style: TextStyle(
           fontSize:
-          size >= 70
-              ? 20
-              : 16,
-          fontWeight:
-          FontWeight.w800,
-          color:
-          Colors.white,
+          size >= 70 ? 20 : 16,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
         ),
       ),
     );
@@ -785,8 +653,7 @@ class _ProfileScreenState
       return;
     }
 
-    if (updated ==
-        true) {
+    if (updated == true) {
       await _refreshAfterRoute();
 
       if (!mounted) {
@@ -872,40 +739,30 @@ class _ProfileScreenState
       backgroundColor:
       Theme.of(context)
           .scaffoldBackgroundColor,
-      appBar:
-      AppBar(
+      appBar: AppBar(
         backgroundColor:
         Theme.of(context)
             .scaffoldBackgroundColor,
-        surfaceTintColor:
-        Colors.transparent,
-        elevation:
-        0,
-        title:
-        Text(
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
           'My Profile',
-          style:
-          TextStyle(
-            fontSize:
-            19,
-            fontWeight:
-            FontWeight.w800,
-            color:
-            _textColor,
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            color: _textColor,
           ),
         ),
         actions: [
           if (!_isLoading &&
               _loadError == null)
             IconButton(
-              tooltip:
-              'Settings',
+              tooltip: 'Settings',
               onPressed:
               _isUpdatingProfileImage
                   ? null
                   : _openSettings,
-              icon:
-              Icon(
+              icon: Icon(
                 Icons.settings_outlined,
                 color:
                 _isUpdatingProfileImage
@@ -915,18 +772,15 @@ class _ProfileScreenState
             ),
         ],
       ),
-      body:
-      _buildBody(),
+      body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (_isLoading) {
       return Center(
-        child:
-        CircularProgressIndicator(
-          color:
-          _primaryColor,
+        child: CircularProgressIndicator(
+          color: _primaryColor,
         ),
       );
     }
@@ -943,8 +797,7 @@ class _ProfileScreenState
     }
 
     return RefreshIndicator(
-      onRefresh:
-      _refreshProfile,
+      onRefresh: _refreshProfile,
       child: SingleChildScrollView(
         physics:
         const BouncingScrollPhysics(
@@ -965,132 +818,90 @@ class _ProfileScreenState
             _buildProfileHeader(
               user,
             ),
-
             const SizedBox(
-              height:
-              20,
+              height: 20,
             ),
-
             _buildStats(
               user,
             ),
-
             const SizedBox(
-              height:
-              26,
+              height: 26,
             ),
-
             _buildSectionTitle(
-              title:
-              'About me',
-              action:
-              'EDIT',
-              onAction:
-              _openEditProfile,
+              title: 'About me',
+              action: 'EDIT',
+              onAction: _openEditProfile,
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             _buildAboutCard(
               user,
             ),
-
             const SizedBox(
-              height:
-              26,
+              height: 26,
             ),
-
             _buildSectionTitle(
-              title:
-              'Skills I offer',
-              action:
-              'MANAGE',
-              onAction:
-              _openMySkills,
+              title: 'Skills I offer',
+              action: 'MANAGE',
+              onAction: _openMySkills,
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             _buildSkillsCard(
-              skills:
-              _offeredSkills,
+              skills: _offeredSkills,
               emptyTitle:
               'No skills offered yet',
               emptyMessage:
               'Add a skill you can teach so other learners can discover you.',
-              icon:
-              Icons.school_outlined,
+              icon: Icons.school_outlined,
             ),
-
             const SizedBox(
-              height:
-              26,
+              height: 26,
             ),
-
             _buildSectionTitle(
               title:
               'Skills I want to learn',
-              action:
-              'MANAGE',
-              onAction:
-              _openMySkills,
+              action: 'MANAGE',
+              onAction: _openMySkills,
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             _buildSkillsCard(
-              skills:
-              _wantedSkills,
+              skills: _wantedSkills,
               emptyTitle:
               'No learning interests yet',
               emptyMessage:
               'Add skills you want to learn to make future matching more useful.',
               icon:
               Icons.auto_awesome_outlined,
-              wanted:
-              true,
+              wanted: true,
             ),
-
             const SizedBox(
-              height:
-              26,
+              height: 26,
             ),
-
             Text(
               'Your activity',
               style:
               AppTextStyles.sectionTitle
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
               ),
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             _buildMenuCard(
               children: [
                 _ProfileMenuItem(
                   icon:
                   Icons.school_outlined,
-                  title:
-                  'My Skills',
+                  title: 'My Skills',
                   subtitle:
                   'Manage the skills you offer and want to learn',
-                  onTap:
-                  _openMySkills,
+                  onTap: _openMySkills,
                 ),
                 _ProfileMenuItem(
                   icon:
@@ -1099,72 +910,55 @@ class _ProfileScreenState
                   'My Swap Requests',
                   subtitle:
                   'View active and previous skill exchanges',
-                  onTap:
-                  _openSwapRequests,
+                  onTap: _openSwapRequests,
                 ),
                 _ProfileMenuItem(
                   icon:
                   Icons.chat_bubble_outline_rounded,
-                  title:
-                  'Messages',
+                  title: 'Messages',
                   subtitle:
                   'Open your conversations with other learners',
-                  onTap:
-                  _openMessages,
+                  onTap: _openMessages,
                 ),
               ],
             ),
-
             const SizedBox(
-              height:
-              26,
+              height: 26,
             ),
-
             Text(
               'Account & preferences',
               style:
               AppTextStyles.sectionTitle
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
               ),
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             _buildMenuCard(
               children: [
                 _ProfileMenuItem(
                   icon:
                   Icons.person_outline_rounded,
-                  title:
-                  'Profile details',
+                  title: 'Profile details',
                   subtitle:
                   'Edit your personal and learning information',
-                  onTap:
-                  _openEditProfile,
+                  onTap: _openEditProfile,
                 ),
                 _ProfileMenuItem(
                   icon:
                   Icons.settings_outlined,
-                  title:
-                  'Settings',
+                  title: 'Settings',
                   subtitle:
                   'Local app preferences',
-                  onTap:
-                  _openSettings,
+                  onTap: _openSettings,
                 ),
               ],
             ),
-
             const SizedBox(
-              height:
-              24,
+              height: 24,
             ),
-
             _buildPrototypeNotice(),
           ],
         ),
@@ -1180,24 +974,19 @@ class _ProfileScreenState
       User user,
       ) {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         18,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
       child: Column(
@@ -1205,64 +994,46 @@ class _ProfileScreenState
           Row(
             children: [
               Stack(
-                clipBehavior:
-                Clip.none,
+                clipBehavior: Clip.none,
                 children: [
                   _buildProfileAvatar(
                     user,
-                    size:
-                    72,
+                    size: 72,
                   ),
-
                   Positioned(
-                    right:
-                    -2,
-                    bottom:
-                    -2,
-                    child:
-                    Material(
-                      color:
-                      _primaryColor,
+                    right: -2,
+                    bottom: -2,
+                    child: Material(
+                      color: _primaryColor,
                       shape:
                       const CircleBorder(),
-                      elevation:
-                      2,
-                      child:
-                      InkWell(
+                      elevation: 2,
+                      child: InkWell(
                         customBorder:
                         const CircleBorder(),
                         onTap:
                         _isUpdatingProfileImage
                             ? null
                             : _openProfileImageOptions,
-                        child:
-                        SizedBox(
-                          width:
-                          30,
-                          height:
-                          30,
-                          child:
-                          Center(
+                        child: SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: Center(
                             child:
                             _isUpdatingProfileImage
                                 ? const SizedBox(
-                              width:
-                              14,
-                              height:
-                              14,
+                              width: 14,
+                              height: 14,
                               child:
                               CircularProgressIndicator(
-                                strokeWidth:
-                                2,
+                                strokeWidth: 2,
                                 color:
                                 Colors.white,
                               ),
                             )
                                 : const Icon(
-                              Icons
-                                  .camera_alt_rounded,
-                              size:
-                              16,
+                              Icons.camera_alt_rounded,
+                              size: 16,
                               color:
                               Colors.white,
                             ),
@@ -1273,12 +1044,9 @@ class _ProfileScreenState
                   ),
                 ],
               ),
-
               const SizedBox(
-                width:
-                15,
+                width: 15,
               ),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -1286,118 +1054,86 @@ class _ProfileScreenState
                   children: [
                     Text(
                       user.name,
-                      maxLines:
-                      2,
+                      maxLines: 2,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
                       AppTextStyles.pageTitle
                           .copyWith(
-                        color:
-                        _textColor,
+                        color: _textColor,
                       ),
                     ),
-
                     const SizedBox(
-                      height:
-                      5,
+                      height: 5,
                     ),
-
                     Row(
                       children: [
                         Icon(
-                          Icons
-                              .location_on_outlined,
-                          size:
-                          15,
-                          color:
-                          _mutedColor,
+                          Icons.location_on_outlined,
+                          size: 15,
+                          color: _mutedColor,
                         ),
                         const SizedBox(
-                          width:
-                          4,
+                          width: 4,
                         ),
                         Expanded(
-                          child:
-                          Text(
+                          child: Text(
                             user.city,
-                            maxLines:
-                            1,
+                            maxLines: 1,
                             overflow:
                             TextOverflow.ellipsis,
                             style:
                             AppTextStyles.secondary
                                 .copyWith(
-                              color:
-                              _mutedColor,
+                              color: _mutedColor,
                             ),
                           ),
                         ),
                       ],
                     ),
-
                     const SizedBox(
-                      height:
-                      7,
+                      height: 7,
                     ),
-
                     Text(
                       'Member since ${user.memberSince}',
                       style:
                       AppTextStyles.caption
                           .copyWith(
-                        color:
-                        _mutedColor,
+                        color: _mutedColor,
                       ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(
-                width:
-                8,
+                width: 8,
               ),
-
               Image.asset(
                 'assets/images/mascot/tubi_happy.png',
-                width:
-                58,
-                height:
-                58,
-                fit:
-                BoxFit.contain,
+                width: 58,
+                height: 58,
+                fit: BoxFit.contain,
               ),
             ],
           ),
-
           const SizedBox(
-            height:
-            16,
+            height: 16,
           ),
-
           SizedBox(
-            width:
-            double.infinity,
-            height:
-            42,
-            child:
-            OutlinedButton.icon(
+            width: double.infinity,
+            height: 42,
+            child: OutlinedButton.icon(
               onPressed:
               _isUpdatingProfileImage
                   ? null
                   : _openEditProfile,
-              icon:
-              const Icon(
+              icon: const Icon(
                 Icons.edit_outlined,
-                size:
-                17,
+                size: 17,
               ),
-              label:
-              const Text(
+              label: const Text(
                 'EDIT PROFILE',
-                style:
-                AppTextStyles.button,
+                style: AppTextStyles.button,
               ),
             ),
           ),
@@ -1413,53 +1149,47 @@ class _ProfileScreenState
   Widget _buildStats(
       User user,
       ) {
+    final bool hasReviews =
+        user.reviewCount > 0;
+
     return Row(
       children: [
         Expanded(
-          child:
-          _buildStatCard(
-            icon:
-            Icons.star_rounded,
+          child: _buildStatCard(
+            icon: Icons.star_rounded,
             value:
-            user.rating.toStringAsFixed(
+            hasReviews
+                ? user.rating.toStringAsFixed(
               1,
-            ),
+            )
+                : '—',
             label:
-            '${user.reviewCount} reviews',
+            hasReviews
+                ? '${user.reviewCount} reviews'
+                : 'No reviews',
           ),
         ),
-
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
-
         Expanded(
-          child:
-          _buildStatCard(
+          child: _buildStatCard(
             icon:
             Icons.swap_horiz_rounded,
             value:
             '${user.completedSwaps}',
-            label:
-            'Completed',
+            label: 'Completed',
           ),
         ),
-
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
-
         Expanded(
-          child:
-          _buildStatCard(
-            icon:
-            Icons.bolt_rounded,
+          child: _buildStatCard(
+            icon: Icons.school_outlined,
             value:
-            '${user.responseRate}%',
-            label:
-            'Response',
+            '${_offeredSkills.length}',
+            label: 'Skills offered',
           ),
         ),
       ],
@@ -1474,68 +1204,50 @@ class _ProfileScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        vertical:
-        14,
-        horizontal:
-        8,
+        vertical: 14,
+        horizontal: 8,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           15,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
       child: Column(
         children: [
           Icon(
             icon,
-            size:
-            18,
-            color:
-            _primaryColor,
+            size: 18,
+            color: _primaryColor,
           ),
-
           const SizedBox(
-            height:
-            6,
+            height: 6,
           ),
-
           Text(
             value,
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
-
           const SizedBox(
-            height:
-            3,
+            height: 3,
           ),
-
           Text(
             label,
-            maxLines:
-            1,
+            maxLines: 1,
             overflow:
             TextOverflow.ellipsis,
-            textAlign:
-            TextAlign.center,
+            textAlign: TextAlign.center,
             style:
             AppTextStyles.caption
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
         ],
@@ -1555,18 +1267,15 @@ class _ProfileScreenState
     return Row(
       children: [
         Expanded(
-          child:
-          Text(
+          child: Text(
             title,
             style:
             AppTextStyles.sectionTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
         ),
-
         if (action != null &&
             onAction != null)
           TextButton(
@@ -1574,30 +1283,23 @@ class _ProfileScreenState
             _isUpdatingProfileImage
                 ? null
                 : onAction,
-            style:
-            TextButton.styleFrom(
+            style: TextButton.styleFrom(
               padding:
               const EdgeInsets.symmetric(
-                horizontal:
-                8,
-                vertical:
-                4,
+                horizontal: 8,
+                vertical: 4,
               ),
-              minimumSize:
-              Size.zero,
+              minimumSize: Size.zero,
               tapTargetSize:
               MaterialTapTargetSize.shrinkWrap,
             ),
-            child:
-            Text(
+            child: Text(
               action,
               style:
               AppTextStyles.button
                   .copyWith(
-                color:
-                _primaryColor,
-                fontSize:
-                11,
+                color: _primaryColor,
+                fontSize: 11,
               ),
             ),
           ),
@@ -1613,24 +1315,19 @@ class _ProfileScreenState
       User user,
       ) {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
       child: Column(
@@ -1642,77 +1339,47 @@ class _ProfileScreenState
             style:
             AppTextStyles.bodyMuted
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
-
           const SizedBox(
-            height:
-            16,
+            height: 16,
           ),
-
           Divider(
-            height:
-            1,
-            color:
-            _borderColor,
+            height: 1,
+            color: _borderColor,
           ),
-
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
-
           _buildInfoRow(
-            icon:
-            Icons.language_rounded,
-            label:
-            'Languages',
-            value:
-            user.language,
+            icon: Icons.language_rounded,
+            label: 'Languages',
+            value: user.language,
           ),
-
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
-
           _buildInfoRow(
-            icon:
-            Icons.schedule_rounded,
-            label:
-            'Availability',
-            value:
-            user.availability,
+            icon: Icons.schedule_rounded,
+            label: 'Availability',
+            value: user.availability,
           ),
-
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
-
           _buildInfoRow(
-            icon:
-            Icons.devices_rounded,
-            label:
-            'Preferred mode',
-            value:
-            user.preferredMode,
+            icon: Icons.devices_rounded,
+            label: 'Preferred mode',
+            value: user.preferredMode,
           ),
-
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
-
           _buildInfoRow(
-            icon:
-            Icons.school_outlined,
-            label:
-            'Teaching style',
-            value:
-            user.teachingStyle,
+            icon: Icons.school_outlined,
+            label: 'Teaching style',
+            value: user.teachingStyle,
           ),
         ],
       ),
@@ -1729,37 +1396,26 @@ class _ProfileScreenState
       CrossAxisAlignment.start,
       children: [
         Container(
-          width:
-          34,
-          height:
-          34,
-          decoration:
-          BoxDecoration(
-            color:
-            _softPrimaryColor,
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: _softPrimaryColor,
             borderRadius:
             BorderRadius.circular(
               10,
             ),
           ),
-          child:
-          Icon(
+          child: Icon(
             icon,
-            size:
-            17,
-            color:
-            _primaryColor,
+            size: 17,
+            color: _primaryColor,
           ),
         ),
-
         const SizedBox(
-          width:
-          10,
+          width: 10,
         ),
-
         Expanded(
-          child:
-          Column(
+          child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -1768,23 +1424,18 @@ class _ProfileScreenState
                 style:
                 AppTextStyles.caption
                     .copyWith(
-                  color:
-                  _mutedColor,
+                  color: _mutedColor,
                 ),
               ),
-
               const SizedBox(
-                height:
-                2,
+                height: 2,
               ),
-
               Text(
                 value,
                 style:
                 AppTextStyles.secondary
                     .copyWith(
-                  color:
-                  _textColor,
+                  color: _textColor,
                   fontWeight:
                   FontWeight.w600,
                 ),
@@ -1809,12 +1460,9 @@ class _ProfileScreenState
   }) {
     if (skills.isEmpty) {
       return _buildEmptySkillsCard(
-        title:
-        emptyTitle,
-        message:
-        emptyMessage,
-        icon:
-        icon,
+        title: emptyTitle,
+        message: emptyMessage,
+        icon: icon,
       );
     }
 
@@ -1824,28 +1472,22 @@ class _ProfileScreenState
     ).toList();
 
     final int remaining =
-        skills.length -
-            visibleSkills.length;
+        skills.length - visibleSkills.length;
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
       child: Column(
@@ -1853,10 +1495,8 @@ class _ProfileScreenState
         CrossAxisAlignment.start,
         children: [
           Wrap(
-            spacing:
-            8,
-            runSpacing:
-            8,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               ...visibleSkills.map(
                     (
@@ -1864,44 +1504,34 @@ class _ProfileScreenState
                     ) {
                   return _buildSkillChip(
                     skill.title,
-                    wanted:
-                    wanted,
+                    wanted: wanted,
                   );
                 },
               ),
-
-              if (remaining >
-                  0)
+              if (remaining > 0)
                 Container(
                   padding:
                   const EdgeInsets.symmetric(
-                    horizontal:
-                    11,
-                    vertical:
-                    8,
+                    horizontal: 11,
+                    vertical: 8,
                   ),
-                  decoration:
-                  BoxDecoration(
+                  decoration: BoxDecoration(
                     color:
                     _surfaceVariantColor,
                     borderRadius:
                     BorderRadius.circular(
                       20,
                     ),
-                    border:
-                    Border.all(
-                      color:
-                      _borderColor,
+                    border: Border.all(
+                      color: _borderColor,
                     ),
                   ),
-                  child:
-                  Text(
+                  child: Text(
                     '+$remaining more',
                     style:
                     AppTextStyles.caption
                         .copyWith(
-                      color:
-                      _mutedColor,
+                      color: _mutedColor,
                       fontWeight:
                       FontWeight.w700,
                     ),
@@ -1909,12 +1539,9 @@ class _ProfileScreenState
                 ),
             ],
           ),
-
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
-
           InkWell(
             borderRadius:
             BorderRadius.circular(
@@ -1924,34 +1551,27 @@ class _ProfileScreenState
             _isUpdatingProfileImage
                 ? null
                 : _openMySkills,
-            child:
-            Padding(
+            child: Padding(
               padding:
               const EdgeInsets.symmetric(
-                vertical:
-                6,
+                vertical: 6,
               ),
-              child:
-              Row(
+              child: Row(
                 children: [
                   Icon(
                     Icons.edit_outlined,
-                    size:
-                    16,
-                    color:
-                    _primaryColor,
+                    size: 16,
+                    color: _primaryColor,
                   ),
                   const SizedBox(
-                    width:
-                    6,
+                    width: 6,
                   ),
                   Text(
                     'Manage skills',
                     style:
                     AppTextStyles.secondary
                         .copyWith(
-                      color:
-                      _primaryColor,
+                      color: _primaryColor,
                       fontWeight:
                       FontWeight.w700,
                     ),
@@ -1982,30 +1602,23 @@ class _ProfileScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        11,
-        vertical:
-        8,
+        horizontal: 11,
+        vertical: 8,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        backgroundColor,
+      decoration: BoxDecoration(
+        color: backgroundColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
       ),
-      child:
-      Text(
+      child: Text(
         title,
         style:
         AppTextStyles.secondary
             .copyWith(
-          color:
-          textColor,
-          fontWeight:
-          FontWeight.w600,
+          color: textColor,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -2017,105 +1630,75 @@ class _ProfileScreenState
     required IconData icon,
   }) {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         18,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
       child: Column(
         children: [
           Container(
-            width:
-            46,
-            height:
-            46,
-            decoration:
-            BoxDecoration(
-              color:
-              _softPrimaryColor,
-              shape:
-              BoxShape.circle,
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: _softPrimaryColor,
+              shape: BoxShape.circle,
             ),
-            child:
-            Icon(
+            child: Icon(
               icon,
-              color:
-              _primaryColor,
-              size:
-              22,
+              color: _primaryColor,
+              size: 22,
             ),
           ),
-
           const SizedBox(
-            height:
-            10,
+            height: 10,
           ),
-
           Text(
             title,
-            textAlign:
-            TextAlign.center,
+            textAlign: TextAlign.center,
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
-
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
-
           Text(
             message,
-            textAlign:
-            TextAlign.center,
+            textAlign: TextAlign.center,
             style:
             AppTextStyles.bodyMuted
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
-
           const SizedBox(
-            height:
-            12,
+            height: 12,
           ),
-
           OutlinedButton.icon(
             onPressed:
             _isUpdatingProfileImage
                 ? null
                 : _openMySkills,
-            icon:
-            const Icon(
+            icon: const Icon(
               Icons.add_rounded,
-              size:
-              17,
+              size: 17,
             ),
-            label:
-            const Text(
+            label: const Text(
               'MANAGE SKILLS',
-              style:
-              AppTextStyles.button,
+              style: AppTextStyles.button,
             ),
           ),
         ],
@@ -2131,24 +1714,18 @@ class _ProfileScreenState
     required List<Widget> children,
   }) {
     return Container(
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
-      child:
-      Column(
-        children:
-        _withDividers(
+      child: Column(
+        children: _withDividers(
           children,
         ),
       ),
@@ -2168,17 +1745,12 @@ class _ProfileScreenState
         children[index],
       );
 
-      if (index !=
-          children.length -
-              1) {
+      if (index != children.length - 1) {
         result.add(
           Divider(
-            height:
-            1,
-            indent:
-            58,
-            color:
-            _borderColor,
+            height: 1,
+            indent: 58,
+            color: _borderColor,
           ),
         );
       }
@@ -2193,64 +1765,47 @@ class _ProfileScreenState
 
   Widget _buildPrototypeNotice() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _softPrimaryColor,
+      decoration: BoxDecoration(
+        color: _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           14,
         ),
-        border:
-        Border.all(
+        border: Border.all(
           color:
           _isDarkMode
               ? _primaryColor.withValues(
-            alpha:
-            0.24,
+            alpha: 0.24,
           )
               : const Color(
             0xFFD2E5E2,
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons
-                .info_outline_rounded,
-            size:
-            18,
-            color:
-            _primaryColor,
+            Icons.info_outline_rounded,
+            size: 18,
+            color: _primaryColor,
           ),
-
           const SizedBox(
-            width:
-            9,
+            width: 9,
           ),
-
           Expanded(
-            child:
-            Text(
+            child: Text(
               'This version currently uses a local user session. Authentication, cloud account syncing, and production account security will be added later.',
-              style:
-              TextStyle(
-                fontSize:
-                12,
-                height:
-                1.4,
-                color:
-                _mutedColor,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: _mutedColor,
               ),
             ),
           ),
@@ -2265,90 +1820,65 @@ class _ProfileScreenState
 
   Widget _buildErrorState() {
     return Center(
-      child:
-      SingleChildScrollView(
+      child: SingleChildScrollView(
         physics:
         const AlwaysScrollableScrollPhysics(),
         padding:
         const EdgeInsets.all(
           24,
         ),
-        child:
-        Column(
-          mainAxisSize:
-          MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons
-                  .error_outline_rounded,
-              size:
-              44,
-              color:
-              _mutedColor,
+              Icons.error_outline_rounded,
+              size: 44,
+              color: _mutedColor,
             ),
-
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
-
             Text(
               'Could not load your profile',
               style:
               AppTextStyles.cardTitle
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
               ),
             ),
-
             const SizedBox(
-              height:
-              6,
+              height: 6,
             ),
-
             Text(
               _loadError ??
                   'Your profile could not be loaded.',
-              textAlign:
-              TextAlign.center,
+              textAlign: TextAlign.center,
               style:
               AppTextStyles.bodyMuted
                   .copyWith(
-                color:
-                _mutedColor,
+                color: _mutedColor,
               ),
             ),
-
             const SizedBox(
-              height:
-              18,
+              height: 18,
             ),
-
             OutlinedButton.icon(
               onPressed: () {
                 setState(() {
-                  _isLoading =
-                  true;
-
-                  _loadError =
-                  null;
+                  _isLoading = true;
+                  _loadError = null;
                 });
 
                 _loadProfile(
-                  refreshRepository:
-                  true,
+                  refreshRepository: true,
                 );
               },
-              icon:
-              const Icon(
+              icon: const Icon(
                 Icons.refresh_rounded,
               ),
-              label:
-              const Text(
+              label: const Text(
                 'TRY AGAIN',
-                style:
-                AppTextStyles.button,
+                style: AppTextStyles.button,
               ),
             ),
           ],
@@ -2374,8 +1904,7 @@ class _ProfileScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content:
-          Text(
+          content: Text(
             message,
           ),
           behavior:
@@ -2385,8 +1914,7 @@ class _ProfileScreenState
   }
 }
 
-class _ProfileMenuItem
-    extends StatelessWidget {
+class _ProfileMenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
@@ -2425,8 +1953,7 @@ class _ProfileMenuItem
     final Color softPrimaryColor =
     isDarkMode
         ? primaryColor.withValues(
-      alpha:
-      0.16,
+      alpha: 0.16,
     )
         : const Color(
       0xFFE4F0EF,
@@ -2437,99 +1964,68 @@ class _ProfileMenuItem
       BorderRadius.circular(
         18,
       ),
-      onTap:
-      onTap,
-      child:
-      Padding(
+      onTap: onTap,
+      child: Padding(
         padding:
         const EdgeInsets.symmetric(
-          horizontal:
-          14,
-          vertical:
-          14,
+          horizontal: 14,
+          vertical: 14,
         ),
-        child:
-        Row(
+        child: Row(
           children: [
             Container(
-              width:
-              36,
-              height:
-              36,
-              decoration:
-              BoxDecoration(
-                color:
-                softPrimaryColor,
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: softPrimaryColor,
                 borderRadius:
                 BorderRadius.circular(
                   10,
                 ),
               ),
-              child:
-              Icon(
+              child: Icon(
                 icon,
-                size:
-                19,
-                color:
-                primaryColor,
+                size: 19,
+                color: primaryColor,
               ),
             ),
-
             const SizedBox(
-              width:
-              10,
+              width: 10,
             ),
-
             Expanded(
-              child:
-              Column(
+              child: Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style:
-                    TextStyle(
-                      fontSize:
-                      14,
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight:
                       FontWeight.w700,
-                      color:
-                      textColor,
+                      color: textColor,
                     ),
                   ),
-
                   const SizedBox(
-                    height:
-                    3,
+                    height: 3,
                   ),
-
                   Text(
                     subtitle,
-                    style:
-                    TextStyle(
-                      fontSize:
-                      11.5,
-                      height:
-                      1.3,
-                      color:
-                      mutedColor,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: mutedColor,
                     ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(
-              width:
-              8,
+              width: 8,
             ),
-
             Icon(
-              Icons
-                  .chevron_right_rounded,
-              color:
-              mutedColor,
+              Icons.chevron_right_rounded,
+              color: mutedColor,
             ),
           ],
         ),
