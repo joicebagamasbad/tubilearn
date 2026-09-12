@@ -425,7 +425,7 @@ class ExploreRepository {
       currentUserId =
           CurrentUserService.instance
               .requireUserId();
-    } on CurrentUserServiceException catch (_) {
+    } on CurrentUserServiceException {
       throw const ExploreRepositoryException(
         'No active local user is available.',
       );
@@ -619,7 +619,6 @@ class ExploreRepository {
     return updatedUser;
   }
 
-
   // ============================================================
   // UPDATE CURRENT USER PROFILE IMAGE
   // ============================================================
@@ -635,7 +634,7 @@ class ExploreRepository {
       currentUserId =
           CurrentUserService.instance
               .requireUserId();
-    } on CurrentUserServiceException catch (_) {
+    } on CurrentUserServiceException {
       throw const ExploreRepositoryException(
         'No active local user is available.',
       );
@@ -658,7 +657,8 @@ class ExploreRepository {
     );
 
     if (cleanProfileImagePath != null &&
-        cleanProfileImagePath.length > 1000) {
+        cleanProfileImagePath.length >
+            1000) {
       throw const ExploreRepositoryException(
         'Profile image path is too long.',
       );
@@ -701,7 +701,8 @@ class ExploreRepository {
       profileImagePath:
       cleanProfileImagePath,
       clearProfileImagePath:
-      cleanProfileImagePath == null,
+      cleanProfileImagePath ==
+          null,
     );
 
     final int userIndex =
@@ -794,17 +795,20 @@ class ExploreRepository {
         continue;
       }
 
-      final List<UserSkill> candidateOffered =
+      final List<UserSkill>
+      candidateOffered =
       getOfferedSkillsForUser(
         candidate.id,
       );
 
-      final List<UserSkill> candidateWanted =
+      final List<UserSkill>
+      candidateWanted =
       getWantedSkillsForUser(
         candidate.id,
       );
 
-      final Set<String> candidateOfferedIds =
+      final Set<String>
+      candidateOfferedIds =
       candidateOffered
           .map(
             (
@@ -814,7 +818,8 @@ class ExploreRepository {
       )
           .toSet();
 
-      final Set<String> candidateWantedIds =
+      final Set<String>
+      candidateWantedIds =
       candidateWanted
           .map(
             (
@@ -873,51 +878,39 @@ class ExploreRepository {
         candidate.availability,
       );
 
-      int score =
-      0;
+      int score = 0;
 
       if (hasLearningMatch) {
-        score +=
-        40;
+        score += 40;
       }
 
       if (hasTeachingMatch) {
-        score +=
-        25;
+        score += 25;
       }
 
       if (modeCompatible) {
-        score +=
-        8;
+        score += 10;
       }
 
       if (availabilityCompatible) {
-        score +=
-        6;
+        score += 8;
       }
 
       if (languageCompatible) {
-        score +=
-        5;
+        score += 6;
       }
 
       if (sameCity) {
-        score +=
-        4;
+        score += 4;
       }
 
       score +=
-          _responseRateScore(
-            candidate.responseRate,
-          );
-
-      score +=
           _ratingScore(
-            candidate.rating,
+            candidate,
           );
 
       score +=
-          _trustScore(
+          _activityScore(
             candidate,
           );
 
@@ -1013,21 +1006,39 @@ class ExploreRepository {
         }
 
         final int ratingComparison =
-        second.user.rating.compareTo(
-          first.user.rating,
+        _effectiveRating(
+          second.user,
+        ).compareTo(
+          _effectiveRating(
+            first.user,
+          ),
         );
 
         if (ratingComparison != 0) {
           return ratingComparison;
         }
 
-        final int responseComparison =
-        second.user.responseRate.compareTo(
-          first.user.responseRate,
+        final int completedComparison =
+        second.user.completedSwaps
+            .compareTo(
+          first.user.completedSwaps,
         );
 
-        if (responseComparison != 0) {
-          return responseComparison;
+        if (completedComparison != 0) {
+          return completedComparison;
+        }
+
+        final int profileComparison =
+        _boolRank(
+          second.user.profileCompleted,
+        ).compareTo(
+          _boolRank(
+            first.user.profileCompleted,
+          ),
+        );
+
+        if (profileComparison != 0) {
+          return profileComparison;
         }
 
         return first.user.name
@@ -1160,14 +1171,8 @@ class ExploreRepository {
       );
     }
 
-    if (candidate.responseRate >= 90) {
-      reasons.add(
-        'High response rate',
-      );
-    }
-
-    if (candidate.rating >= 4.5 &&
-        candidate.reviewCount > 0) {
+    if (candidate.reviewCount > 0 &&
+        candidate.rating >= 4.5) {
       reasons.add(
         'Strong community rating',
       );
@@ -1182,24 +1187,15 @@ class ExploreRepository {
     return reasons;
   }
 
-  int _responseRateScore(
-      int responseRate,
-      ) {
-    final int safeRate =
-    responseRate.clamp(
-      0,
-      100,
-    );
-
-    return ((safeRate / 100) * 5)
-        .round();
-  }
-
   int _ratingScore(
-      double rating,
+      User user,
       ) {
+    if (user.reviewCount <= 0) {
+      return 0;
+    }
+
     final double safeRating =
-    rating.clamp(
+    user.rating.clamp(
       0,
       5,
     );
@@ -1208,25 +1204,30 @@ class ExploreRepository {
         .round();
   }
 
-  int _trustScore(
+  double _effectiveRating(
       User user,
       ) {
-    int score =
-    0;
-
-    if (user.emailVerified) {
-      score +=
-      1;
+    if (user.reviewCount <= 0) {
+      return 0;
     }
 
+    return user.rating.clamp(
+      0,
+      5,
+    );
+  }
+
+  int _activityScore(
+      User user,
+      ) {
+    int score = 0;
+
     if (user.profileCompleted) {
-      score +=
-      1;
+      score += 1;
     }
 
     if (user.completedSwaps > 0) {
-      score +=
-      1;
+      score += 2;
     }
 
     return score;
@@ -1613,6 +1614,8 @@ class ExploreRepository {
       'User completed swaps',
     );
 
+    // Kept only for legacy database/model compatibility.
+    // Smart Match does not use this value.
     final int responseRate =
     _requireInt(
       map,
@@ -1655,6 +1658,8 @@ class ExploreRepository {
       'User teaching style',
     );
 
+    // Kept only for legacy database/model compatibility.
+    // It is not used as a verification or ranking signal.
     final bool emailVerified =
     _requireBooleanFlag(
       map,
@@ -1849,7 +1854,7 @@ class ExploreRepository {
   }
 
   // ============================================================
-  // ICON CODE POINT -> MATERIAL ICON CONSTANT
+  // ICON
   // ============================================================
 
   IconData _iconFromCodePoint(
@@ -1933,16 +1938,18 @@ class ExploreRepository {
       'User-skill availability',
     );
 
-    late final UserSkillType parsedType;
+    final UserSkillType parsedType;
 
     switch (type) {
       case 'offered':
         parsedType =
             UserSkillType.offered;
+        break;
 
       case 'wanted':
         parsedType =
             UserSkillType.wanted;
+        break;
 
       default:
         throw const ExploreRepositoryException(
@@ -1995,7 +2002,6 @@ class ExploreRepository {
 
     return cleaned;
   }
-
 
   String? _readNullableString(
       Map<String, Object?> row,
@@ -2290,7 +2296,7 @@ class ExploreRepository {
   }
 
   // ============================================================
-  // PROVIDERS FOR SKILL
+  // PROVIDERS
   // ============================================================
 
   List<User> getProvidersForSkill(
@@ -2335,7 +2341,7 @@ class ExploreRepository {
   }
 
   // ============================================================
-  // FIND USER SKILL RELATIONSHIP
+  // FIND USER SKILL
   // ============================================================
 
   UserSkill? findUserSkill({

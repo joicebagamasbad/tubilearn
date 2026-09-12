@@ -36,9 +36,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ScrollController _scrollController =
   ScrollController();
 
-  final GlobalKey _matchSectionKey =
-  GlobalKey();
-
   Timer? _sessionBoundaryTimer;
 
   int _selectedNav = 0;
@@ -321,34 +318,29 @@ class _DashboardScreenState extends State<DashboardScreen>
                       height: 24,
                     ),
 
-                    Container(
-                      key:
-                      _matchSectionKey,
-                      child:
-                      Column(
-                        children: [
-                          _buildSectionHeader(
-                            title:
-                            '✦ Your Smart Match',
-                            action:
-                            'See all',
-                            onAction:
-                                () async {
-                              await _openRouteAndRefresh(
-                                '/smart-matches',
-                              );
-                            },
-                          ),
+                    Column(
+                      children: [
+                        _buildSectionHeader(
+                          title:
+                          '✦ Your Smart Match',
+                          action:
+                          'See all',
+                          onAction:
+                              () async {
+                            await _openRouteAndRefresh(
+                              '/smart-matches',
+                            );
+                          },
+                        ),
 
-                          const SizedBox(
-                            height: 12,
-                          ),
+                        const SizedBox(
+                          height: 12,
+                        ),
 
-                          _buildMatchCard(
-                            match,
-                          ),
-                        ],
-                      ),
+                        _buildMatchCard(
+                          match,
+                        ),
+                      ],
                     ),
 
                     const SizedBox(
@@ -1181,7 +1173,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
 
           Text(
-            'Add offered skills and learning interests so TubiLearn can compare skills, availability, mode, language, location, and trust signals.',
+            'Add offered skills and learning interests so TubiLearn can compare skills, availability, mode, language, location, completed swaps, and reviewed ratings.',
             textAlign:
             TextAlign.center,
             style:
@@ -2423,31 +2415,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Future<void> _scrollToMatch() async {
-    setState(() {
-      _selectedNav = 2;
-    });
-
-    final BuildContext? matchContext =
-        _matchSectionKey.currentContext;
-
-    if (matchContext == null) {
-      return;
-    }
-
-    await Scrollable.ensureVisible(
-      matchContext,
-      duration:
-      const Duration(
-        milliseconds: 280,
-      ),
-      curve:
-      Curves.easeOut,
-      alignment:
-      0.08,
-    );
-  }
-
   // ============================================================
   // BOTTOM NAV
   // ============================================================
@@ -2546,7 +2513,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                   }
 
                   if (index == 2) {
-                    await _scrollToMatch();
+                    await _openRouteAndRefresh(
+                      '/smart-matches',
+                    );
                     return;
                   }
 

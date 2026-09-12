@@ -6,6 +6,7 @@ import '../model/repositories/explore_repository.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
 import '../model/user_skill.dart';
+import '../services/current_user_service.dart';
 import '../theme/app_theme.dart';
 import 'create_swap_request_screen.dart';
 
@@ -20,84 +21,124 @@ class SkillDetailsScreen extends StatelessWidget {
   static final ExploreRepository _repository =
       ExploreRepository.instance;
 
+  static final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
+  // ============================================================
+  // THEME
+  // ============================================================
+
   Color _primaryColor(
       BuildContext context,
-      ) =>
-      Theme.of(context).colorScheme.primary;
+      ) {
+    return Theme.of(
+      context,
+    ).colorScheme.primary;
+  }
 
   Color _surfaceColor(
       BuildContext context,
-      ) =>
-      Theme.of(context).colorScheme.surface;
+      ) {
+    return Theme.of(
+      context,
+    ).colorScheme.surface;
+  }
 
   Color _textColor(
       BuildContext context,
-      ) =>
-      Theme.of(context).colorScheme.onSurface;
+      ) {
+    return Theme.of(
+      context,
+    ).colorScheme.onSurface;
+  }
 
   Color _mutedColor(
       BuildContext context,
-      ) =>
-      Theme.of(context)
-          .colorScheme
-          .onSurfaceVariant;
+      ) {
+    return Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant;
+  }
 
   Color _borderColor(
       BuildContext context,
-      ) =>
-      Theme.of(context)
-          .colorScheme
-          .outlineVariant;
+      ) {
+    return Theme.of(
+      context,
+    ).colorScheme.outlineVariant;
+  }
 
   bool _isDarkMode(
       BuildContext context,
-      ) =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      ) {
+    return Theme.of(
+      context,
+    ).brightness ==
+        Brightness.dark;
+  }
 
   Color _softPrimaryColor(
       BuildContext context,
-      ) =>
-      _isDarkMode(
-        context,
-      )
-          ? _primaryColor(
-        context,
-      ).withValues(
-        alpha: 0.16,
-      )
-          : const Color(
-        0xFFE4F0EF,
-      );
+      ) {
+    return _isDarkMode(
+      context,
+    )
+        ? _primaryColor(
+      context,
+    ).withValues(
+      alpha: 0.16,
+    )
+        : const Color(
+      0xFFE4F0EF,
+    );
+  }
 
   Color _softPrimaryBorderColor(
       BuildContext context,
-      ) =>
-      _isDarkMode(
-        context,
-      )
-          ? _primaryColor(
-        context,
-      ).withValues(
-        alpha: 0.28,
-      )
-          : const Color(
-        0xFFD2E5E2,
-      );
+      ) {
+    return _isDarkMode(
+      context,
+    )
+        ? _primaryColor(
+      context,
+    ).withValues(
+      alpha: 0.28,
+    )
+        : const Color(
+      0xFFD2E5E2,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
       BuildContext context,
       ) {
+    final String? currentUserId =
+    _currentUserIdOrNull();
+
     final List<User> providers =
-    _repository.getProvidersForSkill(
+    _repository
+        .getProvidersForSkill(
       skill.id,
-    );
+    )
+        .where(
+          (
+          User provider,
+          ) =>
+      provider.id.trim().isNotEmpty &&
+          provider.id != currentUserId,
+    )
+        .toList();
 
     return Scaffold(
       backgroundColor:
-      Theme.of(context)
-          .scaffoldBackgroundColor,
+      Theme.of(
+        context,
+      ).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -105,7 +146,8 @@ class SkillDetailsScreen extends StatelessWidget {
               context,
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child:
+              SingleChildScrollView(
                 physics:
                 const BouncingScrollPhysics(),
                 padding:
@@ -183,19 +225,31 @@ class SkillDetailsScreen extends StatelessWidget {
                       height: 10,
                     ),
 
-                    ...skill.learnings.map(
-                          (
-                          String item,
-                          ) =>
-                          Padding(
+                    if (skill.learnings.isEmpty)
+                      Text(
+                        'No learning topics are listed for this skill yet.',
+                        style:
+                        AppTextStyles.bodyMuted
+                            .copyWith(
+                          color:
+                          _mutedColor(
+                            context,
+                          ),
+                        ),
+                      )
+                    else
+                      ...skill.learnings.map(
+                            (
+                            String item,
+                            ) {
+                          return Padding(
                             padding:
                             const EdgeInsets.only(
                               bottom: 8,
                             ),
                             child: Row(
                               crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                              CrossAxisAlignment.start,
                               children: [
                                 Container(
                                   margin:
@@ -238,8 +292,7 @@ class SkillDetailsScreen extends StatelessWidget {
                                   child: Text(
                                     item,
                                     style:
-                                    AppTextStyles
-                                        .secondary
+                                    AppTextStyles.secondary
                                         .copyWith(
                                       color:
                                       _textColor(
@@ -250,8 +303,9 @@ class SkillDetailsScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          ),
-                    ),
+                          );
+                        },
+                      ),
 
                     const SizedBox(
                       height: 20,
@@ -265,35 +319,10 @@ class SkillDetailsScreen extends StatelessWidget {
                       height: 28,
                     ),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'People offering this skill',
-                            style:
-                            AppTextStyles
-                                .cardTitle
-                                .copyWith(
-                              color:
-                              _textColor(
-                                context,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${providers.length} available',
-                          style:
-                          AppTextStyles
-                              .caption
-                              .copyWith(
-                            color:
-                            _mutedColor(
-                              context,
-                            ),
-                          ),
-                        ),
-                      ],
+                    _buildProviderHeader(
+                      context,
+                      providerCount:
+                      providers.length,
                     ),
 
                     const SizedBox(
@@ -301,7 +330,7 @@ class SkillDetailsScreen extends StatelessWidget {
                     ),
 
                     Text(
-                      'Choose someone based on availability, experience, and what they want to learn in exchange.',
+                      'Choose someone based on their profile, experience, and listed learning interests.',
                       style:
                       AppTextStyles.secondary
                           .copyWith(
@@ -324,18 +353,19 @@ class SkillDetailsScreen extends StatelessWidget {
                       ...providers.map(
                             (
                             User provider,
-                            ) =>
-                            Padding(
-                              padding:
-                              const EdgeInsets.only(
-                                bottom: 14,
-                              ),
-                              child:
-                              _buildProviderCard(
-                                context,
-                                provider,
-                              ),
+                            ) {
+                          return Padding(
+                            padding:
+                            const EdgeInsets.only(
+                              bottom: 14,
                             ),
+                            child:
+                            _buildProviderCard(
+                              context,
+                              provider,
+                            ),
+                          );
+                        },
                       ),
                   ],
                 ),
@@ -345,6 +375,27 @@ class SkillDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // CURRENT USER
+  // ============================================================
+
+  String? _currentUserIdOrNull() {
+    try {
+      final String userId =
+      _currentUserService
+          .requireUserId()
+          .trim();
+
+      if (userId.isEmpty) {
+        return null;
+      }
+
+      return userId;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ============================================================
@@ -382,12 +433,14 @@ class SkillDetailsScreen extends StatelessWidget {
           IconButton(
             tooltip:
             'Back',
-            onPressed: () {
+            onPressed:
+                () {
               Navigator.pop(
                 context,
               );
             },
-            icon: Icon(
+            icon:
+            Icon(
               Icons
                   .arrow_back_ios_new_rounded,
               size: 18,
@@ -399,8 +452,10 @@ class SkillDetailsScreen extends StatelessWidget {
           ),
 
           Expanded(
-            child: Center(
-              child: Text(
+            child:
+            Center(
+              child:
+              Text(
                 'Skill Details',
                 style:
                 AppTextStyles.cardTitle
@@ -481,7 +536,8 @@ class SkillDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            child: Icon(
+            child:
+            Icon(
               skill.icon,
               color:
               _primaryColor(
@@ -496,7 +552,8 @@ class SkillDetailsScreen extends StatelessWidget {
           ),
 
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -556,7 +613,8 @@ class SkillDetailsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  child: Text(
+                  child:
+                  Text(
                     skill.level,
                     style:
                     AppTextStyles.caption
@@ -578,7 +636,8 @@ class SkillDetailsScreen extends StatelessWidget {
             'assets/images/mascot/tubi_explaining.png',
             width: 70,
             height: 70,
-            fit: BoxFit.contain,
+            fit:
+            BoxFit.contain,
           ),
         ],
       ),
@@ -595,7 +654,8 @@ class SkillDetailsScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _infoBox(
+          child:
+          _infoBox(
             context:
             context,
             icon:
@@ -606,11 +666,14 @@ class SkillDetailsScreen extends StatelessWidget {
             skill.sessionLength,
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
-          child: _infoBox(
+          child:
+          _infoBox(
             context:
             context,
             icon:
@@ -621,11 +684,14 @@ class SkillDetailsScreen extends StatelessWidget {
             skill.language,
           ),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         Expanded(
-          child: _infoBox(
+          child:
+          _infoBox(
             context:
             context,
             icon:
@@ -646,6 +712,11 @@ class SkillDetailsScreen extends StatelessWidget {
     required String label,
     required String value,
   }) {
+    final String displayValue =
+    value.trim().isEmpty
+        ? 'Not listed'
+        : value.trim();
+
     return Container(
       padding:
       const EdgeInsets.symmetric(
@@ -680,9 +751,11 @@ class SkillDetailsScreen extends StatelessWidget {
             ),
             size: 19,
           ),
+
           const SizedBox(
             height: 6,
           ),
+
           Text(
             label,
             style:
@@ -694,11 +767,13 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(
             height: 3,
           ),
+
           Text(
-            value,
+            displayValue,
             maxLines: 2,
             textAlign:
             TextAlign.center,
@@ -727,6 +802,14 @@ class SkillDetailsScreen extends StatelessWidget {
   Widget _buildPrerequisiteCard(
       BuildContext context,
       ) {
+    final String prerequisite =
+    skill.prerequisite
+        .trim()
+        .isEmpty
+        ? 'No prerequisite listed.'
+        : skill.prerequisite
+        .trim();
+
     return Container(
       width:
       double.infinity,
@@ -774,11 +857,14 @@ class SkillDetailsScreen extends StatelessWidget {
             AppTheme.accent,
             size: 19,
           ),
+
           const SizedBox(
             width: 10,
           ),
+
           Expanded(
-            child: Column(
+            child:
+            Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -795,11 +881,13 @@ class SkillDetailsScreen extends StatelessWidget {
                     FontWeight.w800,
                   ),
                 ),
+
                 const SizedBox(
                   height: 4,
                 ),
+
                 Text(
-                  skill.prerequisite,
+                  prerequisite,
                   style:
                   AppTextStyles.secondary
                       .copyWith(
@@ -814,6 +902,55 @@ class SkillDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // ============================================================
+  // PROVIDER HEADER
+  // ============================================================
+
+  Widget _buildProviderHeader(
+      BuildContext context, {
+        required int providerCount,
+      }) {
+    final String providerLabel =
+    providerCount == 1
+        ? '1 provider'
+        : '$providerCount providers';
+
+    return Row(
+      children: [
+        Expanded(
+          child:
+          Text(
+            'People offering this skill',
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              color:
+              _textColor(
+                context,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(
+          width: 10,
+        ),
+
+        Text(
+          providerLabel,
+          style:
+          AppTextStyles.caption
+              .copyWith(
+            color:
+            _mutedColor(
+              context,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -840,10 +977,24 @@ class SkillDetailsScreen extends StatelessWidget {
       provider.id,
     );
 
-    final String wantsToLearn =
-    wantedSkillTitles.isEmpty
-        ? 'Open to learning'
-        : wantedSkillTitles.first;
+    final String learningInterest =
+    _buildLearningInterestText(
+      wantedSkillTitles,
+    );
+
+    final String providerLevel =
+    offeredRelationship
+        ?.level
+        .trim()
+        .isNotEmpty ==
+        true
+        ? offeredRelationship!.level.trim()
+        : skill.level.trim().isEmpty
+        ? 'Level not listed'
+        : skill.level.trim();
+
+    final bool hasReviews =
+        provider.reviewCount > 0;
 
     return Container(
       width:
@@ -871,13 +1022,14 @@ class SkillDetailsScreen extends StatelessWidget {
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               _buildProviderAvatar(
                 provider,
-                size:
-                48,
+                size: 48,
               ),
 
               const SizedBox(
@@ -885,7 +1037,8 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
 
               Expanded(
-                child: Column(
+                child:
+                Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
@@ -903,11 +1056,13 @@ class SkillDetailsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     const SizedBox(
                       height: 3,
                     ),
+
                     Text(
-                      '${provider.city} • ${offeredRelationship?.level ?? skill.level}',
+                      '${provider.city} • $providerLevel',
                       maxLines: 1,
                       overflow:
                       TextOverflow.ellipsis,
@@ -928,36 +1083,11 @@ class SkillDetailsScreen extends StatelessWidget {
                 width: 8,
               ),
 
-              Row(
-                mainAxisSize:
-                MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.star_rounded,
-                    size: 16,
-                    color:
-                    AppTheme.accent,
-                  ),
-                  const SizedBox(
-                    width: 3,
-                  ),
-                  Text(
-                    provider.rating
-                        .toStringAsFixed(
-                      1,
-                    ),
-                    style:
-                    AppTextStyles.caption
-                        .copyWith(
-                      color:
-                      _textColor(
-                        context,
-                      ),
-                      fontWeight:
-                      FontWeight.w700,
-                    ),
-                  ),
-                ],
+              _buildProviderRating(
+                context,
+                provider,
+                hasReviews:
+                hasReviews,
               ),
             ],
           ),
@@ -966,69 +1096,24 @@ class SkillDetailsScreen extends StatelessWidget {
             height: 12,
           ),
 
-          Row(
-            children: [
-              Icon(
-                Icons.swap_horiz_rounded,
-                size: 15,
-                color:
-                _primaryColor(
-                  context,
-                ),
-              ),
-              const SizedBox(
-                width: 6,
-              ),
-              Expanded(
-                child: Text(
-                  '${provider.completedSwaps} completed skill swaps',
-                  style:
-                  AppTextStyles.secondary
-                      .copyWith(
-                    color:
-                    _textColor(
-                      context,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          _buildProviderInfoRow(
+            context,
+            icon:
+            Icons.swap_horiz_rounded,
+            text:
+            '${provider.completedSwaps} completed skill swap${provider.completedSwaps == 1 ? '' : 's'}',
           ),
 
           const SizedBox(
             height: 7,
           ),
 
-          Row(
-            children: [
-              Icon(
-                Icons.school_outlined,
-                size: 15,
-                color:
-                _primaryColor(
-                  context,
-                ),
-              ),
-              const SizedBox(
-                width: 6,
-              ),
-              Expanded(
-                child: Text(
-                  'Wants to learn: $wantsToLearn',
-                  maxLines: 2,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  AppTextStyles.secondary
-                      .copyWith(
-                    color:
-                    _textColor(
-                      context,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          _buildProviderInfoRow(
+            context,
+            icon:
+            Icons.school_outlined,
+            text:
+            learningInterest,
           ),
 
           const SizedBox(
@@ -1038,11 +1123,13 @@ class SkillDetailsScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: SizedBox(
+                child:
+                SizedBox(
                   height: 40,
                   child:
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed:
+                        () {
                       _openProfile(
                         context,
                         provider,
@@ -1063,11 +1150,13 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
 
               Expanded(
-                child: SizedBox(
+                child:
+                SizedBox(
                   height: 40,
                   child:
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed:
+                        () {
                       _openSwapRequest(
                         context,
                         provider,
@@ -1089,6 +1178,195 @@ class SkillDetailsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildProviderRating(
+      BuildContext context,
+      User provider, {
+        required bool hasReviews,
+      }) {
+    if (!hasReviews) {
+      return Container(
+        padding:
+        const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 5,
+        ),
+        decoration:
+        BoxDecoration(
+          color:
+          _softPrimaryColor(
+            context,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+        ),
+        child:
+        Row(
+          mainAxisSize:
+          MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.star_border_rounded,
+              size: 15,
+              color:
+              _mutedColor(
+                context,
+              ),
+            ),
+            const SizedBox(
+              width: 3,
+            ),
+            Text(
+              'No reviews',
+              style:
+              AppTextStyles.caption
+                  .copyWith(
+                color:
+                _mutedColor(
+                  context,
+                ),
+                fontWeight:
+                FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 5,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _softPrimaryColor(
+          context,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          14,
+        ),
+      ),
+      child:
+      Row(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.star_rounded,
+            size: 15,
+            color:
+            AppTheme.accent,
+          ),
+          const SizedBox(
+            width: 3,
+          ),
+          Text(
+            provider.rating
+                .toStringAsFixed(
+              1,
+            ),
+            style:
+            AppTextStyles.caption
+                .copyWith(
+              color:
+              _textColor(
+                context,
+              ),
+              fontWeight:
+              FontWeight.w700,
+            ),
+          ),
+          const SizedBox(
+            width: 3,
+          ),
+          Text(
+            '(${provider.reviewCount})',
+            style:
+            AppTextStyles.caption
+                .copyWith(
+              color:
+              _mutedColor(
+                context,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProviderInfoRow(
+      BuildContext context, {
+        required IconData icon,
+        required String text,
+      }) {
+    return Row(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 15,
+          color:
+          _primaryColor(
+            context,
+          ),
+        ),
+
+        const SizedBox(
+          width: 6,
+        ),
+
+        Expanded(
+          child:
+          Text(
+            text,
+            maxLines: 2,
+            overflow:
+            TextOverflow.ellipsis,
+            style:
+            AppTextStyles.secondary
+                .copyWith(
+              color:
+              _textColor(
+                context,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _buildLearningInterestText(
+      List<String> wantedSkillTitles,
+      ) {
+    if (wantedSkillTitles.isEmpty) {
+      return 'No learning interests listed';
+    }
+
+    if (wantedSkillTitles.length == 1) {
+      return 'Wants to learn: ${wantedSkillTitles.first}';
+    }
+
+    final int remaining =
+        wantedSkillTitles.length - 1;
+
+    return 'Wants to learn: '
+        '${wantedSkillTitles.first} '
+        '+ $remaining more';
+  }
+
+  // ============================================================
+  // PROVIDER AVATAR
+  // ============================================================
+
   Widget _buildProviderAvatar(
       User provider, {
         required double size,
@@ -1104,7 +1382,8 @@ class SkillDetailsScreen extends StatelessWidget {
             );
 
     return ClipOval(
-      child: SizedBox(
+      child:
+      SizedBox(
         width:
         size,
         height:
@@ -1121,7 +1400,8 @@ class SkillDetailsScreen extends StatelessWidget {
           size,
           fit:
           BoxFit.cover,
-          errorBuilder: (
+          errorBuilder:
+              (
               BuildContext context,
               Object error,
               StackTrace? stackTrace,
@@ -1146,6 +1426,14 @@ class SkillDetailsScreen extends StatelessWidget {
       User provider, {
         required double size,
       }) {
+    final String initials =
+    provider.initials
+        .trim()
+        .isEmpty
+        ? '?'
+        : provider.initials
+        .trim();
+
     return Container(
       width:
       size,
@@ -1155,8 +1443,9 @@ class SkillDetailsScreen extends StatelessWidget {
       AppTheme.accent,
       alignment:
       Alignment.center,
-      child: Text(
-        provider.initials,
+      child:
+      Text(
+        initials,
         style:
         TextStyle(
           fontSize:
@@ -1185,28 +1474,65 @@ class SkillDetailsScreen extends StatelessWidget {
   }
 
   // ============================================================
-  // WANTED SKILL TITLES
+  // WANTED SKILLS
   // ============================================================
 
   List<String> _getWantedSkillTitles(
       String userId,
       ) {
-    return _repository
-        .getWantedSkillsForUser(
+    final Set<String> seenTitles =
+    <String>{};
+
+    final List<String> titles =
+    <String>[];
+
+    for (final UserSkill relationship
+    in _repository.getWantedSkillsForUser(
       userId,
-    )
-        .map(
-          (
-          UserSkill relationship,
-          ) =>
-      _repository
-          .findSkillById(
+    )) {
+      final Skill? wantedSkill =
+      _repository.findSkillById(
         relationship.skillId,
-      )
-          ?.title,
-    )
-        .whereType<String>()
-        .toList();
+      );
+
+      if (wantedSkill == null) {
+        continue;
+      }
+
+      final String title =
+      wantedSkill.title.trim();
+
+      if (title.isEmpty) {
+        continue;
+      }
+
+      final String normalized =
+      title.toLowerCase();
+
+      if (!seenTitles.add(
+        normalized,
+      )) {
+        continue;
+      }
+
+      titles.add(
+        title,
+      );
+    }
+
+    titles.sort(
+          (
+          String first,
+          String second,
+          ) =>
+          first
+              .toLowerCase()
+              .compareTo(
+            second.toLowerCase(),
+          ),
+    );
+
+    return titles;
   }
 
   // ============================================================
@@ -1233,11 +1559,53 @@ class SkillDetailsScreen extends StatelessWidget {
       BuildContext context,
       User provider,
       ) async {
+    final String? currentUserId =
+    _currentUserIdOrNull();
+
+    if (currentUserId == null) {
+      _showMessage(
+        context,
+        'Current user identity is unavailable.',
+      );
+      return;
+    }
+
+    if (provider.id ==
+        currentUserId) {
+      _showMessage(
+        context,
+        'You cannot request a skill swap with yourself.',
+      );
+      return;
+    }
+
+    final bool stillOffersSkill =
+    _repository
+        .getOfferedSkillsForUser(
+      provider.id,
+    )
+        .any(
+          (
+          UserSkill relationship,
+          ) =>
+      relationship.skillId ==
+          skill.id,
+    );
+
+    if (!stillOffersSkill) {
+      _showMessage(
+        context,
+        '${provider.name} no longer offers this skill.',
+      );
+      return;
+    }
+
     final bool? requestCreated =
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (
+        builder:
+            (
             BuildContext routeContext,
             ) =>
             CreateSwapRequestScreen(
@@ -1263,20 +1631,10 @@ class SkillDetailsScreen extends StatelessWidget {
 
     if (requestCreated ==
         true) {
-      ScaffoldMessenger.of(
+      _showMessage(
         context,
-      )
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content:
-            Text(
-              'Your request to ${provider.name} is now Pending.',
-            ),
-            behavior:
-            SnackBarBehavior.floating,
-          ),
-        );
+        'Your request to ${provider.name} is now Pending.',
+      );
     }
   }
 
@@ -1312,7 +1670,8 @@ class SkillDetailsScreen extends StatelessWidget {
           ),
         ),
       ),
-      child: Column(
+      child:
+      Column(
         children: [
           Icon(
             Icons
@@ -1323,11 +1682,13 @@ class SkillDetailsScreen extends StatelessWidget {
               context,
             ),
           ),
+
           const SizedBox(
             height: 8,
           ),
+
           Text(
-            'No providers available',
+            'No other providers listed',
             style:
             AppTextStyles.cardTitle
                 .copyWith(
@@ -1337,11 +1698,13 @@ class SkillDetailsScreen extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(
             height: 5,
           ),
+
           Text(
-            'No one is currently offering this skill.',
+            'No other learner is currently listed as offering this skill.',
             textAlign:
             TextAlign.center,
             style:
@@ -1356,5 +1719,33 @@ class SkillDetailsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
+  void _showMessage(
+      BuildContext context,
+      String message,
+      ) {
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
+        ),
+      );
   }
 }

@@ -383,7 +383,8 @@ class _SmartMatchesScreenState
         itemCount:
         _matches.length +
             1,
-        separatorBuilder: (
+        separatorBuilder:
+            (
             _,
             int index,
             ) {
@@ -399,7 +400,8 @@ class _SmartMatchesScreenState
             12,
           );
         },
-        itemBuilder: (
+        itemBuilder:
+            (
             BuildContext context,
             int index,
             ) {
@@ -469,7 +471,7 @@ class _SmartMatchesScreenState
                 ),
 
                 Text(
-                  'Ranked using your skill relationships, availability, mode, language, location, and local trust signals.',
+                  'Ranked using skill compatibility, availability, session mode, language, location, completed swaps, and reviewed ratings.',
                   style:
                   AppTextStyles.bodyMuted
                       .copyWith(
@@ -537,7 +539,8 @@ class _SmartMatchesScreenState
           size,
           fit:
           BoxFit.cover,
-          errorBuilder: (
+          errorBuilder:
+              (
               BuildContext context,
               Object error,
               StackTrace? stackTrace,
@@ -824,10 +827,12 @@ class _SmartMatchesScreenState
                     color:
                     _primaryColor,
                   ),
+
                   const SizedBox(
                     width:
                     5,
                   ),
+
                   Text(
                     'Two-way match',
                     style:
@@ -1166,7 +1171,8 @@ class _SmartMatchesScreenState
       await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (
+          builder:
+              (
               BuildContext routeContext,
               ) =>
               CreateSwapRequestScreen(
@@ -1192,8 +1198,6 @@ class _SmartMatchesScreenState
         return;
       }
 
-      // Unlock the screen immediately after coming back
-      // from CreateSwapRequestScreen.
       setState(() {
         _openingSwapUserId = null;
       });
@@ -1204,7 +1208,6 @@ class _SmartMatchesScreenState
         );
       }
 
-      // Refresh only after the UI has been unlocked.
       await _loadMatches(
         showLoading:
         false,
@@ -1214,7 +1217,8 @@ class _SmartMatchesScreenState
         return;
       }
 
-      if (_openingSwapUserId != null) {
+      if (_openingSwapUserId !=
+          null) {
         setState(() {
           _openingSwapUserId = null;
         });
@@ -1225,7 +1229,8 @@ class _SmartMatchesScreenState
       );
     } finally {
       if (mounted &&
-          _openingSwapUserId != null) {
+          _openingSwapUserId !=
+              null) {
         setState(() {
           _openingSwapUserId = null;
         });

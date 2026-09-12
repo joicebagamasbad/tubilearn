@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../model/repositories/explore_repository.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
+import '../services/current_user_service.dart';
 import '../theme/app_theme.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -20,6 +21,9 @@ class _ExploreScreenState
   final ExploreRepository _repository =
       ExploreRepository.instance;
 
+  final CurrentUserService _currentUserService =
+      CurrentUserService.instance;
+
   final TextEditingController _searchController =
   TextEditingController();
 
@@ -32,19 +36,23 @@ class _ExploreScreenState
 
   bool _isRefreshing = false;
 
-  final List<String> _modeOptions =
-  const <String>[
+  static const List<String> _modeOptions =
+  <String>[
     'Any',
     'Online',
     'In-person',
   ];
 
-  final List<String> _sortOptions =
-  const <String>[
+  static const List<String> _sortOptions =
+  <String>[
     'A-Z',
     'Most Providers',
     'Top Provider Rating',
   ];
+
+  // ============================================================
+  // THEME
+  // ============================================================
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -93,6 +101,70 @@ class _ExploreScreenState
       );
 
   // ============================================================
+  // CURRENT USER
+  // ============================================================
+
+  String? get _currentUserId {
+    try {
+      final String userId =
+      _currentUserService
+          .requireUserId()
+          .trim();
+
+      if (userId.isEmpty) {
+        return null;
+      }
+
+      return userId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<User> _otherProvidersForSkill(
+      Skill skill,
+      ) {
+    final String? currentUserId =
+        _currentUserId;
+
+    final Set<String> seenUserIds =
+    <String>{};
+
+    final List<User> providers =
+    <User>[];
+
+    for (final User provider
+    in _repository.getProvidersForSkill(
+      skill.id,
+    )) {
+      final String providerId =
+      provider.id.trim();
+
+      if (providerId.isEmpty) {
+        continue;
+      }
+
+      if (currentUserId != null &&
+          providerId ==
+              currentUserId) {
+        continue;
+      }
+
+      if (!seenUserIds.add(
+        providerId,
+      )) {
+        continue;
+      }
+
+      providers.add(
+        provider,
+      );
+    }
+
+    return providers;
+  }
+
+  // ============================================================
   // FILTER OPTIONS
   // ============================================================
 
@@ -138,13 +210,10 @@ class _ExploreScreenState
 
     for (final Skill skill
     in _repository.skills) {
-      final List<User> providers =
-      _repository.getProvidersForSkill(
-        skill.id,
-      );
-
       for (final User provider
-      in providers) {
+      in _otherProvidersForSkill(
+        skill,
+      )) {
         final String city =
         provider.city.trim();
 
@@ -179,19 +248,23 @@ class _ExploreScreenState
   int get _activeFilterCount {
     int count = 0;
 
-    if (_selectedCategory != 'All') {
+    if (_selectedCategory !=
+        'All') {
       count++;
     }
 
-    if (_selectedMode != 'Any') {
+    if (_selectedMode !=
+        'Any') {
       count++;
     }
 
-    if (_selectedCity != 'Any') {
+    if (_selectedCity !=
+        'Any') {
       count++;
     }
 
-    if (_sortOption != 'A-Z') {
+    if (_sortOption !=
+        'A-Z') {
       count++;
     }
 
@@ -218,13 +291,13 @@ class _ExploreScreenState
           Skill skill,
           ) {
         final List<User> providers =
-        _repository
-            .getProvidersForSkill(
-          skill.id,
+        _otherProvidersForSkill(
+          skill,
         );
 
         final bool matchesCategory =
-            _selectedCategory == 'All' ||
+            _selectedCategory ==
+                'All' ||
                 skill.category.trim() ==
                     _selectedCategory;
 
@@ -253,7 +326,8 @@ class _ExploreScreenState
         );
 
         final bool matchesCity =
-            _selectedCity == 'Any' ||
+            _selectedCity ==
+                'Any' ||
                 providers.any(
                       (
                       User provider,
@@ -339,7 +413,8 @@ class _ExploreScreenState
     required Skill skill,
     required List<User> providers,
   }) {
-    if (_selectedMode == 'Any') {
+    if (_selectedMode ==
+        'Any') {
       return true;
     }
 
@@ -386,13 +461,15 @@ class _ExploreScreenState
       return true;
     }
 
-    if (selectedMode == 'Online') {
+    if (selectedMode ==
+        'Online') {
       return value.contains(
         'online',
       );
     }
 
-    if (selectedMode == 'In-person') {
+    if (selectedMode ==
+        'In-person') {
       return value.contains(
         'in-person',
       ) ||
@@ -407,6 +484,10 @@ class _ExploreScreenState
     return false;
   }
 
+  // ============================================================
+  // SORTING
+  // ============================================================
+
   void _sortSkills(
       List<Skill> skills,
       ) {
@@ -418,15 +499,13 @@ class _ExploreScreenState
               Skill second,
               ) {
             final int firstCount =
-                _repository
-                    .getProvidersForSkill(
-                  first.id,
+                _otherProvidersForSkill(
+                  first,
                 ).length;
 
             final int secondCount =
-                _repository
-                    .getProvidersForSkill(
-                  second.id,
+                _otherProvidersForSkill(
+                  second,
                 ).length;
 
             final int providerComparison =
@@ -434,7 +513,8 @@ class _ExploreScreenState
               firstCount,
             );
 
-            if (providerComparison != 0) {
+            if (providerComparison !=
+                0) {
               return providerComparison;
             }
 
@@ -446,8 +526,7 @@ class _ExploreScreenState
             );
           },
         );
-
-        break;
+        return;
 
       case 'Top Provider Rating':
         skills.sort(
@@ -470,8 +549,23 @@ class _ExploreScreenState
               firstRating,
             );
 
-            if (ratingComparison != 0) {
+            if (ratingComparison !=
+                0) {
               return ratingComparison;
+            }
+
+            final int providerComparison =
+            _otherProvidersForSkill(
+              second,
+            ).length.compareTo(
+              _otherProvidersForSkill(
+                first,
+              ).length,
+            );
+
+            if (providerComparison !=
+                0) {
+              return providerComparison;
             }
 
             return first.title
@@ -482,8 +576,7 @@ class _ExploreScreenState
             );
           },
         );
-
-        break;
+        return;
 
       case 'A-Z':
       default:
@@ -505,15 +598,17 @@ class _ExploreScreenState
   double _highestProviderRating(
       Skill skill,
       ) {
-    final List<User> providers =
-    _repository.getProvidersForSkill(
-      skill.id,
-    );
-
     double highest = 0;
 
     for (final User provider
-    in providers) {
+    in _otherProvidersForSkill(
+      skill,
+    )) {
+      if (provider.reviewCount <=
+          0) {
+        continue;
+      }
+
       if (provider.rating >
           highest) {
         highest =
@@ -628,12 +723,11 @@ class _ExploreScreenState
       backgroundColor:
       Theme.of(context)
           .scaffoldBackgroundColor,
-      body:
-      SafeArea(
-        child:
-        Column(
+      body: SafeArea(
+        child: Column(
           children: [
             _buildTopBar(),
+
             Expanded(
               child:
               RefreshIndicator(
@@ -694,9 +788,14 @@ class _ExploreScreenState
 
                       _buildFilterSummary(),
 
-                      const SizedBox(
-                        height: 18,
-                      ),
+                      if (_hasActiveFilters)
+                        const SizedBox(
+                          height: 18,
+                        )
+                      else
+                        const SizedBox(
+                          height: 4,
+                        ),
 
                       Row(
                         children: [
@@ -712,6 +811,7 @@ class _ExploreScreenState
                               ),
                             ),
                           ),
+
                           Text(
                             '${skills.length} skill${skills.length == 1 ? '' : 's'}',
                             style:
@@ -734,17 +834,18 @@ class _ExploreScreenState
                         ...skills.map(
                               (
                               Skill skill,
-                              ) =>
-                              Padding(
-                                padding:
-                                const EdgeInsets.only(
-                                  bottom: 12,
-                                ),
-                                child:
-                                _buildSkillCard(
-                                  skill,
-                                ),
+                              ) {
+                            return Padding(
+                              padding:
+                              const EdgeInsets.only(
+                                bottom: 12,
                               ),
+                              child:
+                              _buildSkillCard(
+                                skill,
+                              ),
+                            );
+                          },
                         ),
                     ],
                   ),
@@ -763,8 +864,7 @@ class _ExploreScreenState
 
   Widget _buildTopBar() {
     return Container(
-      height:
-      62,
+      height: 62,
       padding:
       const EdgeInsets.symmetric(
         horizontal: 10,
@@ -788,14 +888,16 @@ class _ExploreScreenState
           IconButton(
             tooltip:
             'Back',
-            onPressed: () {
+            onPressed:
+                () {
               Navigator.pop(
                 context,
               );
             },
             icon:
             Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons
+                  .arrow_back_ios_new_rounded,
               size: 18,
               color:
               _primaryColor,
@@ -832,8 +934,7 @@ class _ExploreScreenState
               height: 18,
               child:
               CircularProgressIndicator(
-                strokeWidth:
-                2,
+                strokeWidth: 2,
                 color:
                 _primaryColor,
               ),
@@ -896,11 +997,13 @@ class _ExploreScreenState
                     _textColor,
                   ),
                 ),
+
                 const SizedBox(
                   height: 5,
                 ),
+
                 Text(
-                  'Find practical skills and people willing to exchange knowledge with you.',
+                  'Find practical skills and other learners offering them.',
                   style:
                   AppTextStyles.secondary
                       .copyWith(
@@ -911,9 +1014,11 @@ class _ExploreScreenState
               ],
             ),
           ),
+
           const SizedBox(
             width: 8,
           ),
+
           Image.asset(
             'assets/images/mascot/tubi_studying.png',
             width: 82,
@@ -927,7 +1032,7 @@ class _ExploreScreenState
   }
 
   // ============================================================
-  // SEARCH + FILTER
+  // SEARCH
   // ============================================================
 
   Widget _buildSearchAndFilter() {
@@ -937,9 +1042,11 @@ class _ExploreScreenState
           child:
           _buildSearchBar(),
         ),
+
         const SizedBox(
           width: 10,
         ),
+
         _buildFilterButton(),
       ],
     );
@@ -947,8 +1054,7 @@ class _ExploreScreenState
 
   Widget _buildSearchBar() {
     return Container(
-      height:
-      50,
+      height: 50,
       decoration:
       BoxDecoration(
         color:
@@ -1006,7 +1112,8 @@ class _ExploreScreenState
               ? IconButton(
             tooltip:
             'Clear search',
-            onPressed: () {
+            onPressed:
+                () {
               _searchController
                   .clear();
 
@@ -1086,12 +1193,11 @@ class _ExploreScreenState
             ),
           ),
         ),
+
         if (count > 0)
           Positioned(
-            right:
-            -5,
-            top:
-            -5,
+            right: -5,
+            top: -5,
             child:
             Container(
               width: 20,
@@ -1107,10 +1213,10 @@ class _ExploreScreenState
                 border:
                 Border.all(
                   color:
-                  Theme.of(context)
-                      .scaffoldBackgroundColor,
-                  width:
-                  2,
+                  Theme.of(
+                    context,
+                  ).scaffoldBackgroundColor,
+                  width: 2,
                 ),
               ),
               child:
@@ -1118,8 +1224,7 @@ class _ExploreScreenState
                 '$count',
                 style:
                 TextStyle(
-                  fontSize:
-                  9,
+                  fontSize: 9,
                   fontWeight:
                   FontWeight.w800,
                   color:
@@ -1209,10 +1314,8 @@ class _ExploreScreenState
                       Center(
                         child:
                         Container(
-                          width:
-                          42,
-                          height:
-                          4,
+                          width: 42,
+                          height: 4,
                           decoration:
                           BoxDecoration(
                             color:
@@ -1243,8 +1346,10 @@ class _ExploreScreenState
                               ),
                             ),
                           ),
+
                           TextButton(
-                            onPressed: () {
+                            onPressed:
+                                () {
                               setSheetState(() {
                                 temporaryMode =
                                 'Any';
@@ -1283,10 +1388,8 @@ class _ExploreScreenState
                       ),
 
                       Wrap(
-                        spacing:
-                        8,
-                        runSpacing:
-                        8,
+                        spacing: 8,
+                        runSpacing: 8,
                         children:
                         _modeOptions.map(
                               (
@@ -1325,8 +1428,7 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize:
-                                12,
+                                fontSize: 12,
                                 fontWeight:
                                 FontWeight.w700,
                                 color:
@@ -1400,14 +1502,14 @@ class _ExploreScreenState
                             _surfaceColor,
                             icon:
                             Icon(
-                              Icons.keyboard_arrow_down_rounded,
+                              Icons
+                                  .keyboard_arrow_down_rounded,
                               color:
                               _mutedColor,
                             ),
                             style:
                             TextStyle(
-                              fontSize:
-                              13,
+                              fontSize: 13,
                               color:
                               _textColor,
                             ),
@@ -1415,23 +1517,25 @@ class _ExploreScreenState
                             cities.map(
                                   (
                                   String city,
-                                  ) =>
-                                  DropdownMenuItem<String>(
-                                    value:
+                                  ) {
+                                return DropdownMenuItem<String>(
+                                  value:
+                                  city,
+                                  child:
+                                  Text(
                                     city,
-                                    child:
-                                    Text(
-                                      city,
-                                      overflow:
-                                      TextOverflow.ellipsis,
-                                    ),
+                                    overflow:
+                                    TextOverflow.ellipsis,
                                   ),
+                                );
+                              },
                             ).toList(),
                             onChanged:
                                 (
                                 String? value,
                                 ) {
-                              if (value == null) {
+                              if (value ==
+                                  null) {
                                 return;
                               }
 
@@ -1465,10 +1569,8 @@ class _ExploreScreenState
                       ),
 
                       Wrap(
-                        spacing:
-                        8,
-                        runSpacing:
-                        8,
+                        spacing: 8,
+                        runSpacing: 8,
                         children:
                         _sortOptions.map(
                               (
@@ -1507,8 +1609,7 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize:
-                                12,
+                                fontSize: 12,
                                 fontWeight:
                                 FontWeight.w700,
                                 color:
@@ -1534,14 +1635,13 @@ class _ExploreScreenState
                         double.infinity,
                         child:
                         ElevatedButton.icon(
-                          onPressed: () {
+                          onPressed:
+                              () {
                             setState(() {
                               _selectedMode =
                                   temporaryMode;
-
                               _selectedCity =
                                   temporaryCity;
-
                               _sortOption =
                                   temporarySort;
                             });
@@ -1553,8 +1653,7 @@ class _ExploreScreenState
                           icon:
                           const Icon(
                             Icons.check_rounded,
-                            size:
-                            18,
+                            size: 18,
                           ),
                           label:
                           const Text(
@@ -1581,19 +1680,22 @@ class _ExploreScreenState
     final List<String> labels =
     <String>[];
 
-    if (_selectedMode != 'Any') {
+    if (_selectedMode !=
+        'Any') {
       labels.add(
         _selectedMode,
       );
     }
 
-    if (_selectedCity != 'Any') {
+    if (_selectedCity !=
+        'Any') {
       labels.add(
         _selectedCity,
       );
     }
 
-    if (_sortOption != 'A-Z') {
+    if (_sortOption !=
+        'A-Z') {
       labels.add(
         _sortOption,
       );
@@ -1608,10 +1710,8 @@ class _ExploreScreenState
       double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        13,
-        vertical:
-        10,
+        horizontal: 13,
+        vertical: 10,
       ),
       decoration:
       BoxDecoration(
@@ -1632,23 +1732,22 @@ class _ExploreScreenState
         children: [
           Icon(
             Icons.tune_rounded,
-            size:
-            16,
+            size: 16,
             color:
             _primaryColor,
           ),
+
           const SizedBox(
-            width:
-            8,
+            width: 8,
           ),
+
           Expanded(
             child:
             Text(
               labels.join(
                 ' • ',
               ),
-              maxLines:
-              2,
+              maxLines: 2,
               overflow:
               TextOverflow.ellipsis,
               style:
@@ -1661,6 +1760,7 @@ class _ExploreScreenState
               ),
             ),
           ),
+
           TextButton(
             onPressed:
             _resetFilters,
@@ -1683,8 +1783,7 @@ class _ExploreScreenState
         _categories;
 
     return SizedBox(
-      height:
-      38,
+      height: 38,
       child:
       ListView.separated(
         scrollDirection:
@@ -1699,8 +1798,7 @@ class _ExploreScreenState
             int index,
             ) {
           return const SizedBox(
-            width:
-            8,
+            width: 8,
           );
         },
         itemBuilder:
@@ -1720,7 +1818,8 @@ class _ExploreScreenState
             BorderRadius.circular(
               20,
             ),
-            onTap: () {
+            onTap:
+                () {
               setState(() {
                 _selectedCategory =
                     category;
@@ -1730,13 +1829,11 @@ class _ExploreScreenState
             AnimatedContainer(
               duration:
               const Duration(
-                milliseconds:
-                180,
+                milliseconds: 180,
               ),
               padding:
               const EdgeInsets.symmetric(
-                horizontal:
-                15,
+                horizontal: 15,
               ),
               alignment:
               Alignment.center,
@@ -1793,8 +1890,8 @@ class _ExploreScreenState
       Skill skill,
       ) {
     final List<User> providers =
-    _repository.getProvidersForSkill(
-      skill.id,
+    _otherProvidersForSkill(
+      skill,
     );
 
     final int providerCount =
@@ -1805,12 +1902,28 @@ class _ExploreScreenState
       skill,
     );
 
+    final String providerLabel;
+
+    if (providerCount ==
+        0) {
+      providerLabel =
+      'No other providers';
+    } else if (providerCount ==
+        1) {
+      providerLabel =
+      '1 provider';
+    } else {
+      providerLabel =
+      '$providerCount providers';
+    }
+
     return InkWell(
       borderRadius:
       BorderRadius.circular(
         16,
       ),
-      onTap: () {
+      onTap:
+          () {
         Navigator.pushNamed(
           context,
           '/skill-details',
@@ -1862,10 +1975,8 @@ class _ExploreScreenState
         Row(
           children: [
             Container(
-              width:
-              58,
-              height:
-              58,
+              width: 58,
+              height: 58,
               decoration:
               BoxDecoration(
                 color:
@@ -1885,8 +1996,7 @@ class _ExploreScreenState
                 skill.icon,
                 color:
                 _primaryColor,
-                size:
-                28,
+                size: 28,
               ),
             ),
 
@@ -1916,8 +2026,7 @@ class _ExploreScreenState
 
                   Text(
                     '${skill.category} • ${skill.mode}',
-                    maxLines:
-                    1,
+                    maxLines: 1,
                     overflow:
                     TextOverflow.ellipsis,
                     style:
@@ -1933,20 +2042,16 @@ class _ExploreScreenState
                   ),
 
                   Wrap(
-                    spacing:
-                    9,
-                    runSpacing:
-                    6,
+                    spacing: 9,
+                    runSpacing: 6,
                     crossAxisAlignment:
                     WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding:
                         const EdgeInsets.symmetric(
-                          horizontal:
-                          8,
-                          vertical:
-                          4,
+                          horizontal: 8,
+                          vertical: 4,
                         ),
                         decoration:
                         BoxDecoration(
@@ -1977,17 +2082,17 @@ class _ExploreScreenState
                         children: [
                           Icon(
                             Icons.people_outline_rounded,
-                            size:
-                            13,
+                            size: 13,
                             color:
                             _mutedColor,
                           ),
+
                           const SizedBox(
-                            width:
-                            4,
+                            width: 4,
                           ),
+
                           Text(
-                            '$providerCount provider${providerCount == 1 ? '' : 's'}',
+                            providerLabel,
                             style:
                             AppTextStyles.caption
                                 .copyWith(
@@ -1998,22 +2103,23 @@ class _ExploreScreenState
                         ],
                       ),
 
-                      if (highestRating > 0)
+                      if (highestRating >
+                          0)
                         Row(
                           mainAxisSize:
                           MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.star_rounded,
-                              size:
-                              13,
+                              size: 13,
                               color:
                               AppTheme.accent,
                             ),
+
                             const SizedBox(
-                              width:
-                              3,
+                              width: 3,
                             ),
+
                             Text(
                               highestRating
                                   .toStringAsFixed(
@@ -2035,14 +2141,12 @@ class _ExploreScreenState
             ),
 
             const SizedBox(
-              width:
-              8,
+              width: 8,
             ),
 
             Icon(
               Icons.arrow_forward_ios_rounded,
-              size:
-              14,
+              size: 14,
               color:
               _mutedColor,
             ),
@@ -2060,12 +2164,18 @@ class _ExploreScreenState
     String message =
         'No skills match your current search and filters.';
 
-    if (_searchQuery.trim().isNotEmpty &&
-        _activeFilterCount == 0) {
+    if (_searchQuery
+        .trim()
+        .isNotEmpty &&
+        _activeFilterCount ==
+            0) {
       message =
       'We couldn\'t find anything for "$_searchQuery".';
-    } else if (_searchQuery.trim().isEmpty &&
-        _activeFilterCount == 0) {
+    } else if (_searchQuery
+        .trim()
+        .isEmpty &&
+        _activeFilterCount ==
+            0) {
       message =
       'No skills are available right now.';
     }
@@ -2075,25 +2185,20 @@ class _ExploreScreenState
       double.infinity,
       padding:
       const EdgeInsets.symmetric(
-        vertical:
-        30,
-        horizontal:
-        20,
+        vertical: 30,
+        horizontal: 20,
       ),
       child:
       Column(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
-            width:
-            90,
-            height:
-            90,
+            width: 90,
+            height: 90,
           ),
 
           const SizedBox(
-            height:
-            12,
+            height: 12,
           ),
 
           Text(
@@ -2107,8 +2212,7 @@ class _ExploreScreenState
           ),
 
           const SizedBox(
-            height:
-            5,
+            height: 5,
           ),
 
           Text(
@@ -2125,17 +2229,16 @@ class _ExploreScreenState
 
           if (_hasActiveFilters) ...[
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
+
             TextButton.icon(
               onPressed:
               _resetFilters,
               icon:
               const Icon(
                 Icons.refresh_rounded,
-                size:
-                18,
+                size: 18,
               ),
               label:
               const Text(
@@ -2166,20 +2269,19 @@ class _ExploreScreenState
       return;
     }
 
-    final ScaffoldMessengerState messenger =
     ScaffoldMessenger.of(
       context,
-    );
-
-    messenger.hideCurrentSnackBar();
-
-    messenger.showSnackBar(
-      SnackBar(
-        content:
-        Text(
-          message,
+    )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content:
+          Text(
+            message,
+          ),
+          behavior:
+          SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
   }
 }

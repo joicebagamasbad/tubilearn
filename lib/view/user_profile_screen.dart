@@ -665,11 +665,16 @@ class _UserProfileScreenState
       ', ',
     );
 
+    final String ratingSummary =
+    user.reviewCount > 0
+        ? '${user.rating.toStringAsFixed(1)} '
+        '(${user.reviewCount} reviews)'
+        : 'No reviews yet';
+
     final String summary =
         '${user.name}\n'
         '${user.city}\n'
-        'Rating: ${user.rating.toStringAsFixed(1)} '
-        '(${user.reviewCount} reviews)\n'
+        'Rating: $ratingSummary\n'
         'Completed swaps: ${user.completedSwaps}\n'
         'Skills offered: $offered\n'
         'Wants to learn: $wanted\n'
@@ -774,43 +779,60 @@ class _UserProfileScreenState
 
               Row(
                 children: [
-                  const Icon(
-                    Icons.star_rounded,
+                  Icon(
+                    user.reviewCount > 0
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     size:
                     17,
                     color:
-                    AppTheme.accent,
+                    user.reviewCount > 0
+                        ? AppTheme.accent
+                        : _mutedColor,
                   ),
                   const SizedBox(
                     width:
-                    3,
+                    4,
                   ),
-                  Text(
-                    user.rating.toStringAsFixed(
-                      1,
+                  if (user.reviewCount > 0) ...[
+                    Text(
+                      user.rating.toStringAsFixed(
+                        1,
+                      ),
+                      style:
+                      AppTextStyles.secondary
+                          .copyWith(
+                        color:
+                        _textColor,
+                        fontWeight:
+                        FontWeight.w700,
+                      ),
                     ),
-                    style:
-                    AppTextStyles.secondary
-                        .copyWith(
-                      color:
-                      _textColor,
-                      fontWeight:
-                      FontWeight.w700,
+                    const SizedBox(
+                      width:
+                      5,
                     ),
-                  ),
-                  const SizedBox(
-                    width:
-                    5,
-                  ),
-                  Text(
-                    '(${user.reviewCount} reviews)',
-                    style:
-                    AppTextStyles.caption
-                        .copyWith(
-                      color:
-                      _mutedColor,
+                    Text(
+                      '(${user.reviewCount} reviews)',
+                      style:
+                      AppTextStyles.caption
+                          .copyWith(
+                        color:
+                        _mutedColor,
+                      ),
                     ),
-                  ),
+                  ] else
+                    Text(
+                      'No reviews yet',
+                      style:
+                      AppTextStyles.caption
+                          .copyWith(
+                        color:
+                        _mutedColor,
+                        fontWeight:
+                        FontWeight.w600,
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -974,8 +996,8 @@ class _UserProfileScreenState
         ),
         Expanded(
           child: _statBox(
-            '${user.responseRate}%',
-            'Response rate',
+            '${_getOfferedSkills().length}',
+            'Skills offered',
           ),
         ),
         const SizedBox(
@@ -1279,7 +1301,7 @@ class _UserProfileScreenState
         CrossAxisAlignment.start,
         children: [
           Text(
-            'Profile & trust',
+            'Profile & activity',
             style:
             AppTextStyles.cardTitle
                 .copyWith(
@@ -1293,15 +1315,6 @@ class _UserProfileScreenState
             height:
             10,
           ),
-          if (user.emailVerified)
-            _trustRow(
-              'Email verified',
-            ),
-          if (user.emailVerified)
-            const SizedBox(
-              height:
-              7,
-            ),
           if (user.profileCompleted)
             _trustRow(
               'Profile completed',
