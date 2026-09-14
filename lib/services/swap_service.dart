@@ -58,6 +58,8 @@ class SwapService {
     hours: 1,
   );
 
+  static const int _maxActiveRequestsPerUser = 5;
+
   Future<void> _scheduleConfirmationQueue =
   Future<void>.value();
 
@@ -669,6 +671,11 @@ class SwapService {
       skillToLearnId,
       skillToOfferId:
       skillToOfferId,
+    );
+
+    _ensureActiveRequestCapacity(
+      requesterUserId: requesterUserId,
+      providerUserId: providerUserId,
     );
 
     final DateTime now =
@@ -2269,6 +2276,61 @@ class SwapService {
         'Message must be 300 characters or less.',
       );
     }
+  }
+
+  // ============================================================
+  // ACTIVE REQUEST CAPACITY
+  // ============================================================
+
+  void _ensureActiveRequestCapacity({
+    required String requesterUserId,
+    required String providerUserId,
+  }) {
+    final int requesterActive =
+    _activeRequestCountForUser(
+      requesterUserId,
+    );
+
+    if (requesterActive >=
+        _maxActiveRequestsPerUser) {
+      throw const SwapServiceException(
+        'You already have 5 active swap requests. Complete or cancel one before creating another.',
+      );
+    }
+
+    final int providerActive =
+    _activeRequestCountForUser(
+      providerUserId,
+    );
+
+    if (providerActive >=
+        _maxActiveRequestsPerUser) {
+      throw const SwapServiceException(
+        'This user already has 5 active swap requests. Please try again later.',
+      );
+    }
+  }
+
+  int _activeRequestCountForUser(
+      String userId,
+      ) {
+    final String cleanUserId =
+    userId.trim();
+
+    if (cleanUserId.isEmpty) {
+      return 0;
+    }
+
+    return _requests
+        .where(
+          (SwapRequest request) =>
+      request.status.isActive &&
+          request.hasParticipantIdentity &&
+          request.involvesUser(
+            cleanUserId,
+          ),
+    )
+        .length;
   }
 
   // ============================================================

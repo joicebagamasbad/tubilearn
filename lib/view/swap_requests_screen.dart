@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -24,7 +25,8 @@ class SwapRequestsScreen extends StatefulWidget {
 }
 
 class _SwapRequestsScreenState
-    extends State<SwapRequestsScreen> {
+    extends State<SwapRequestsScreen>
+    with WidgetsBindingObserver {
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
@@ -42,6 +44,8 @@ class _SwapRequestsScreenState
   bool _isLoading = true;
 
   String? _loadError;
+
+  Timer? _sessionBoundaryTimer;
 
   final Set<String> _processingRequestIds =
   <String>{};
@@ -106,7 +110,38 @@ class _SwapRequestsScreenState
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(
+      this,
+    );
+
     _loadRequests();
+  }
+
+  @override
+  void dispose() {
+    _sessionBoundaryTimer?.cancel();
+
+    WidgetsBinding.instance.removeObserver(
+      this,
+    );
+
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    if (state !=
+        AppLifecycleState.resumed) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+
+    _scheduleSessionBoundaryRefresh();
   }
 
   // ============================================================
@@ -136,6 +171,8 @@ class _SwapRequestsScreenState
         _isLoading = false;
         _loadError = null;
       });
+
+      _scheduleSessionBoundaryRefresh();
     } on SwapServiceException catch (error) {
       if (!mounted) {
         return;
@@ -199,6 +236,74 @@ class _SwapRequestsScreenState
       ..addAll(
         loaded,
       );
+  }
+
+  // ============================================================
+  // SESSION TIME REFRESH
+  // ============================================================
+
+  void _scheduleSessionBoundaryRefresh() {
+    _sessionBoundaryTimer?.cancel();
+    _sessionBoundaryTimer = null;
+
+    if (!mounted ||
+        _isLoading ||
+        _loadError != null) {
+      return;
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    DateTime? nextBoundary;
+
+    for (final SwapRequest request
+    in _swapService.requests) {
+      if (request.status !=
+          SwapRequestStatus.scheduled ||
+          !request.hasStableIdentity ||
+          !request.involvesUser(
+            _currentUserId,
+          ) ||
+          !request.proposedAt.isAfter(
+            now,
+          )) {
+        continue;
+      }
+
+      if (nextBoundary == null ||
+          request.proposedAt.isBefore(
+            nextBoundary,
+          )) {
+        nextBoundary =
+            request.proposedAt;
+      }
+    }
+
+    if (nextBoundary == null) {
+      return;
+    }
+
+    final Duration delay =
+        nextBoundary.difference(
+          now,
+        ) +
+            const Duration(
+              milliseconds: 250,
+            );
+
+    _sessionBoundaryTimer = Timer(
+      delay,
+          () {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {});
+
+        _scheduleSessionBoundaryRefresh();
+      },
+    );
   }
 
   // ============================================================
@@ -1198,7 +1303,6 @@ class _SwapRequestsScreenState
     user
         ?.profileImagePath
         ?.trim();
-
     final bool hasImage =
         path != null &&
             path.isNotEmpty &&
@@ -3597,7 +3701,6 @@ class _SwapRequestsScreenState
         cleanRequestId,
       );
     });
-
     try {
       await action();
 
@@ -3606,6 +3709,8 @@ class _SwapRequestsScreenState
       }
 
       setState(() {});
+
+      _scheduleSessionBoundaryRefresh();
 
       _showMessage(
         successMessage,

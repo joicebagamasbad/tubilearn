@@ -12,30 +12,37 @@ import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 import 'video_call_screen.dart';
 
-class DashboardVideoSessionShell
-    extends StatefulWidget {
+class DashboardVideoSessionShell extends StatefulWidget {
   const DashboardVideoSessionShell({
     super.key,
   });
 
   @override
-  State<DashboardVideoSessionShell>
-  createState() =>
+  State<DashboardVideoSessionShell> createState() =>
       _DashboardVideoSessionShellState();
 }
 
 class _DashboardVideoSessionShellState
     extends State<DashboardVideoSessionShell>
     with WidgetsBindingObserver {
-  final SwapService _swapService =
-      SwapService.instance;
+  static const Duration _joinLeadTime = Duration(
+    minutes: 15,
+  );
 
-  final CurrentUserService
-  _currentUserService =
+  static const Duration _joinGracePeriod = Duration(
+    hours: 2,
+  );
+
+  static const Duration _refreshInterval = Duration(
+    seconds: 15,
+  );
+
+  final SwapService _swapService = SwapService.instance;
+
+  final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
-  final ExploreRepository
-  _exploreRepository =
+  final ExploreRepository _exploreRepository =
       ExploreRepository.instance;
 
   Timer? _refreshTimer;
@@ -51,9 +58,7 @@ class _DashboardVideoSessionShellState
     );
 
     _refreshTimer = Timer.periodic(
-      const Duration(
-        seconds: 2,
-      ),
+      _refreshInterval,
           (_) {
         if (!mounted) {
           return;
@@ -79,8 +84,7 @@ class _DashboardVideoSessionShellState
   void didChangeAppLifecycleState(
       AppLifecycleState state,
       ) {
-    if (state ==
-        AppLifecycleState.resumed &&
+    if (state == AppLifecycleState.resumed &&
         mounted) {
       setState(() {});
     }
@@ -90,8 +94,56 @@ class _DashboardVideoSessionShellState
     return _currentUserService.userId.trim();
   }
 
-  SwapRequest?
-  get _scheduledOnlineSession {
+  DateTime _joinOpensAt(
+      SwapRequest session,
+      ) {
+    return session.proposedAt.subtract(
+      _joinLeadTime,
+    );
+  }
+
+  DateTime _joinClosesAt(
+      SwapRequest session,
+      ) {
+    return session.proposedAt.add(
+      _joinGracePeriod,
+    );
+  }
+
+  bool _isJoinWindowOpen(
+      SwapRequest session,
+      DateTime referenceTime,
+      ) {
+    final DateTime opensAt =
+    _joinOpensAt(
+      session,
+    );
+
+    final DateTime closesAt =
+    _joinClosesAt(
+      session,
+    );
+
+    return !referenceTime.isBefore(
+      opensAt,
+    ) &&
+        !referenceTime.isAfter(
+          closesAt,
+        );
+  }
+
+  bool _isJoinWindowExpired(
+      SwapRequest session,
+      DateTime referenceTime,
+      ) {
+    return referenceTime.isAfter(
+      _joinClosesAt(
+        session,
+      ),
+    );
+  }
+
+  SwapRequest? get _scheduledOnlineSession {
     final String currentUserId =
         _currentUserId;
 
@@ -99,19 +151,32 @@ class _DashboardVideoSessionShellState
       return null;
     }
 
+    final DateTime now =
+    DateTime.now();
+
     final List<SwapRequest> sessions =
     _swapService.requests
         .where(
           (
           SwapRequest request,
           ) {
-        return request.isScheduledFor(
-          currentUserId,
-        ) &&
-            request.mode
-                .trim()
-                .toLowerCase() ==
-                'online';
+        final bool isScheduledOnline =
+            request.isScheduledFor(
+              currentUserId,
+            ) &&
+                request.mode
+                    .trim()
+                    .toLowerCase() ==
+                    'online';
+
+        if (!isScheduledOnline) {
+          return false;
+        }
+
+        return !_isJoinWindowExpired(
+          request,
+          now,
+        );
       },
     )
         .toList();
@@ -120,27 +185,28 @@ class _DashboardVideoSessionShellState
       return null;
     }
 
-    final DateTime now =
-    DateTime.now();
-
     sessions.sort(
           (
           SwapRequest first,
           SwapRequest second,
           ) {
-        final bool firstStarted =
-        !now.isBefore(
-          first.proposedAt,
+        final bool firstJoinable =
+        _isJoinWindowOpen(
+          first,
+          now,
         );
 
-        final bool secondStarted =
-        !now.isBefore(
-          second.proposedAt,
+        final bool secondJoinable =
+        _isJoinWindowOpen(
+          second,
+          now,
         );
 
-        if (firstStarted !=
-            secondStarted) {
-          return firstStarted ? -1 : 1;
+        if (firstJoinable !=
+            secondJoinable) {
+          return firstJoinable
+              ? -1
+              : 1;
         }
 
         return first.proposedAt.compareTo(
@@ -200,10 +266,147 @@ class _DashboardVideoSessionShellState
     return 'Swap partner';
   }
 
+  String _formatSessionTime(
+      DateTime dateTime,
+      ) {
+    const List<String> months =
+    <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    final int hour =
+        dateTime.hour;
+
+    final int displayHour =
+    hour == 0
+        ? 12
+        : hour > 12
+        ? hour - 12
+        : hour;
+
+    final String minute =
+    dateTime.minute
+        .toString()
+        .padLeft(
+      2,
+      '0',
+    );
+
+    final String period =
+    hour >= 12
+        ? 'PM'
+        : 'AM';
+
+    final String month =
+    months[
+    dateTime.month -
+        1];
+
+    return '$month ${dateTime.day} • '
+        '$displayHour:$minute $period';
+  }
+
+  String _joinAvailabilityText(
+      SwapRequest session,
+      DateTime referenceTime,
+      ) {
+    final DateTime opensAt =
+    _joinOpensAt(
+      session,
+    );
+
+    final Duration remaining =
+    opensAt.difference(
+      referenceTime,
+    );
+
+    if (remaining.inDays >= 1) {
+      final int days =
+          remaining.inDays;
+
+      return days == 1
+          ? 'Opens in 1 day'
+          : 'Opens in $days days';
+    }
+
+    if (remaining.inHours >= 1) {
+      final int hours =
+          remaining.inHours;
+
+      return hours == 1
+          ? 'Opens in 1 hour'
+          : 'Opens in $hours hours';
+    }
+
+    final int minutes =
+    remaining.inMinutes.clamp(
+      1,
+      59,
+    );
+
+    return minutes == 1
+        ? 'Opens in 1 minute'
+        : 'Opens in $minutes minutes';
+  }
+
+  void _showJoinUnavailableMessage(
+      SwapRequest session,
+      ) {
+    final DateTime now =
+    DateTime.now();
+
+    final bool tooEarly =
+    now.isBefore(
+      _joinOpensAt(
+        session,
+      ),
+    );
+
+    final String message =
+    tooEarly
+        ? 'Video session opens 15 minutes before the scheduled time.'
+        : 'The video join window for this session has ended.';
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+        ),
+      ),
+    );
+  }
+
   Future<void> _joinVideoSession(
       SwapRequest request,
       ) async {
     if (_openingCall) {
+      return;
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    if (!_isJoinWindowOpen(
+      request,
+      now,
+    )) {
+      _showJoinUnavailableMessage(
+        request,
+      );
+
       return;
     }
 
@@ -290,29 +493,35 @@ class _DashboardVideoSessionShellState
   Widget _buildVideoSessionCard(
       SwapRequest session,
       ) {
+    final ThemeData theme =
+    Theme.of(
+      context,
+    );
+
     final Color primaryColor =
-        Theme.of(
-          context,
-        ).colorScheme.primary;
+        theme.colorScheme.primary;
 
     final Color surfaceColor =
-        Theme.of(
-          context,
-        ).colorScheme.surface;
+        theme.colorScheme.surface;
 
     final Color textColor =
-        Theme.of(
-          context,
-        ).colorScheme.onSurface;
+        theme.colorScheme.onSurface;
 
     final Color mutedColor =
-        Theme.of(
-          context,
-        ).colorScheme.onSurfaceVariant;
+        theme.colorScheme.onSurfaceVariant;
 
     final String partnerName =
     _partnerName(
       session,
+    );
+
+    final DateTime now =
+    DateTime.now();
+
+    final bool canJoin =
+    _isJoinWindowOpen(
+      session,
+      now,
     );
 
     return Material(
@@ -371,8 +580,7 @@ class _DashboardVideoSessionShellState
                 ),
               ),
               child: Icon(
-                Icons
-                    .videocam_rounded,
+                Icons.videocam_rounded,
                 color:
                 primaryColor,
               ),
@@ -383,8 +591,7 @@ class _DashboardVideoSessionShellState
             Expanded(
               child: Column(
                 crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+                CrossAxisAlignment.start,
                 mainAxisSize:
                 MainAxisSize.min,
                 children: <Widget>[
@@ -392,12 +599,9 @@ class _DashboardVideoSessionShellState
                     'Online session',
                     maxLines: 1,
                     overflow:
-                    TextOverflow
-                        .ellipsis,
+                    TextOverflow.ellipsis,
                     style:
-                    AppTextStyles
-                        .cardTitle
-                        .copyWith(
+                    AppTextStyles.cardTitle.copyWith(
                       color:
                       textColor,
                       fontSize:
@@ -411,14 +615,31 @@ class _DashboardVideoSessionShellState
                     partnerName,
                     maxLines: 1,
                     overflow:
-                    TextOverflow
-                        .ellipsis,
+                    TextOverflow.ellipsis,
                     style:
-                    AppTextStyles
-                        .caption
-                        .copyWith(
+                    AppTextStyles.caption.copyWith(
                       color:
                       mutedColor,
+                    ),
+                  ),
+                  const SizedBox(
+                    height: 2,
+                  ),
+                  Text(
+                    _formatSessionTime(
+                      session.proposedAt,
+                    ),
+                    maxLines: 1,
+                    overflow:
+                    TextOverflow.ellipsis,
+                    style:
+                    AppTextStyles.caption.copyWith(
+                      color:
+                      primaryColor,
+                      fontSize:
+                      10,
+                      fontWeight:
+                      FontWeight.w700,
                     ),
                   ),
                 ],
@@ -427,63 +648,109 @@ class _DashboardVideoSessionShellState
             const SizedBox(
               width: 10,
             ),
-            FilledButton.icon(
-              onPressed:
-              _openingCall
-                  ? null
-                  : () {
-                _joinVideoSession(
-                  session,
-                );
-              },
-              style:
-              FilledButton.styleFrom(
-                backgroundColor:
-                primaryColor,
-                foregroundColor:
-                Colors.white,
-                padding:
-                const EdgeInsets
-                    .symmetric(
-                  horizontal:
-                  12,
-                  vertical:
-                  10,
-                ),
-              ),
-              icon:
-              _openingCall
-                  ? const SizedBox(
-                width:
-                15,
-                height:
-                15,
-                child:
-                CircularProgressIndicator(
-                  strokeWidth:
-                  2,
-                  color:
+            if (canJoin)
+              FilledButton.icon(
+                onPressed:
+                _openingCall
+                    ? null
+                    : () {
+                  _joinVideoSession(
+                    session,
+                  );
+                },
+                style:
+                FilledButton.styleFrom(
+                  backgroundColor:
+                  primaryColor,
+                  foregroundColor:
                   Colors.white,
+                  padding:
+                  const EdgeInsets.symmetric(
+                    horizontal:
+                    12,
+                    vertical:
+                    10,
+                  ),
+                ),
+                icon:
+                _openingCall
+                    ? const SizedBox(
+                  width:
+                  15,
+                  height:
+                  15,
+                  child:
+                  CircularProgressIndicator(
+                    strokeWidth:
+                    2,
+                    color:
+                    Colors.white,
+                  ),
+                )
+                    : const Icon(
+                  Icons.video_call_rounded,
+                  size:
+                  18,
+                ),
+                label:
+                const Text(
+                  'JOIN VIDEO',
+                  style:
+                  TextStyle(
+                    fontSize:
+                    10,
+                    fontWeight:
+                    FontWeight.w800,
+                  ),
                 ),
               )
-                  : const Icon(
-                Icons
-                    .video_call_rounded,
-                size:
-                18,
-              ),
-              label:
-              const Text(
-                'JOIN VIDEO',
-                style:
-                TextStyle(
-                  fontSize:
+            else
+              Container(
+                constraints:
+                const BoxConstraints(
+                  maxWidth:
+                  98,
+                ),
+                padding:
+                const EdgeInsets.symmetric(
+                  horizontal:
                   10,
-                  fontWeight:
-                  FontWeight.w800,
+                  vertical:
+                  8,
+                ),
+                decoration:
+                BoxDecoration(
+                  color:
+                  primaryColor.withValues(
+                    alpha:
+                    0.10,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(
+                    12,
+                  ),
+                ),
+                child:
+                Text(
+                  _joinAvailabilityText(
+                    session,
+                    now,
+                  ),
+                  textAlign:
+                  TextAlign.center,
+                  style:
+                  TextStyle(
+                    color:
+                    primaryColor,
+                    fontSize:
+                    9,
+                    height:
+                    1.2,
+                    fontWeight:
+                    FontWeight.w800,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
