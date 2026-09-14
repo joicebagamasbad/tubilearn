@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../model/repositories/explore_repository.dart';
+import '../controller/explore_controller.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
-import '../services/current_user_service.dart';
 import '../theme/app_theme.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -16,13 +15,9 @@ class ExploreScreen extends StatefulWidget {
       _ExploreScreenState();
 }
 
-class _ExploreScreenState
-    extends State<ExploreScreen> {
-  final ExploreRepository _repository =
-      ExploreRepository.instance;
-
-  final CurrentUserService _currentUserService =
-      CurrentUserService.instance;
+class _ExploreScreenState extends State<ExploreScreen> {
+  final ExploreController _controller =
+  ExploreController();
 
   final TextEditingController _searchController =
   TextEditingController();
@@ -34,7 +29,18 @@ class _ExploreScreenState
   String _selectedCity = 'Any';
   String _sortOption = 'A-Z';
 
+  List<String> _categories = const <String>[
+    'All',
+  ];
+
+  List<String> _cities = const <String>[
+    'Any',
+  ];
+
+  bool _isLoading = true;
   bool _isRefreshing = false;
+
+  String? _loadError;
 
   static const List<String> _modeOptions =
   <String>[
@@ -49,6 +55,24 @@ class _ExploreScreenState
     'Most Providers',
     'Top Provider Rating',
   ];
+
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _loadExplore();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+
+    super.dispose();
+  }
 
   // ============================================================
   // THEME
@@ -101,170 +125,86 @@ class _ExploreScreenState
       );
 
   // ============================================================
-  // CURRENT USER
+  // LOAD
   // ============================================================
 
-  String? get _currentUserId {
+  Future<void> _loadExplore() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
     try {
-      final String userId =
-      _currentUserService
-          .requireUserId()
-          .trim();
+      final ExploreSnapshot snapshot =
+      await _controller.loadExplore();
 
-      if (userId.isEmpty) {
-        return null;
+      if (!mounted) {
+        return;
       }
 
-      return userId;
-    } catch (_) {
-      return null;
-    }
-  }
+      setState(() {
+        _categories = snapshot.categories;
+        _cities = snapshot.cities;
+        _isLoading = false;
 
-  List<User> _otherProvidersForSkill(
-      Skill skill,
-      ) {
-    final String? currentUserId =
-        _currentUserId;
-
-    final Set<String> seenUserIds =
-    <String>{};
-
-    final List<User> providers =
-    <User>[];
-
-    for (final User provider
-    in _repository.getProvidersForSkill(
-      skill.id,
-    )) {
-      final String providerId =
-      provider.id.trim();
-
-      if (providerId.isEmpty) {
-        continue;
-      }
-
-      if (currentUserId != null &&
-          providerId ==
-              currentUserId) {
-        continue;
-      }
-
-      if (!seenUserIds.add(
-        providerId,
-      )) {
-        continue;
-      }
-
-      providers.add(
-        provider,
-      );
-    }
-
-    return providers;
-  }
-
-  // ============================================================
-  // FILTER OPTIONS
-  // ============================================================
-
-  List<String> get _categories {
-    final Set<String> categories =
-    <String>{};
-
-    for (final Skill skill
-    in _repository.skills) {
-      final String category =
-      skill.category.trim();
-
-      if (category.isNotEmpty) {
-        categories.add(
-          category,
-        );
-      }
-    }
-
-    final List<String> sorted =
-    categories.toList()
-      ..sort(
-            (
-            String first,
-            String second,
-            ) =>
-            first
-                .toLowerCase()
-                .compareTo(
-              second.toLowerCase(),
-            ),
-      );
-
-    return <String>[
-      'All',
-      ...sorted,
-    ];
-  }
-
-  List<String> get _cities {
-    final Set<String> cities =
-    <String>{};
-
-    for (final Skill skill
-    in _repository.skills) {
-      for (final User provider
-      in _otherProvidersForSkill(
-        skill,
-      )) {
-        final String city =
-        provider.city.trim();
-
-        if (city.isNotEmpty) {
-          cities.add(
-            city,
-          );
+        if (!_categories.contains(
+          _selectedCategory,
+        )) {
+          _selectedCategory = 'All';
         }
+
+        if (!_cities.contains(
+          _selectedCity,
+        )) {
+          _selectedCity = 'Any';
+        }
+      });
+    } on ExploreControllerException catch (error) {
+      if (!mounted) {
+        return;
       }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError =
+        'Explore could not be loaded. Please try again.';
+      });
     }
-
-    final List<String> sorted =
-    cities.toList()
-      ..sort(
-            (
-            String first,
-            String second,
-            ) =>
-            first
-                .toLowerCase()
-                .compareTo(
-              second.toLowerCase(),
-            ),
-      );
-
-    return <String>[
-      'Any',
-      ...sorted,
-    ];
   }
+
+  // ============================================================
+  // FILTER STATE
+  // ============================================================
 
   int get _activeFilterCount {
     int count = 0;
 
-    if (_selectedCategory !=
-        'All') {
+    if (_selectedCategory != 'All') {
       count++;
     }
 
-    if (_selectedMode !=
-        'Any') {
+    if (_selectedMode != 'Any') {
       count++;
     }
 
-    if (_selectedCity !=
-        'Any') {
+    if (_selectedCity != 'Any') {
       count++;
     }
 
-    if (_sortOption !=
-        'A-Z') {
+    if (_sortOption != 'A-Z') {
       count++;
     }
 
@@ -276,343 +216,51 @@ class _ExploreScreenState
           _activeFilterCount > 0;
 
   // ============================================================
-  // FILTERING
+  // FILTERED SKILLS
   // ============================================================
 
-  List<Skill> get _filteredSkills {
-    final String query =
-    _searchQuery
-        .trim()
-        .toLowerCase();
-
-    final List<Skill> results =
-    _repository.skills.where(
-          (
-          Skill skill,
-          ) {
-        final List<User> providers =
-        _otherProvidersForSkill(
-          skill,
-        );
-
-        final bool matchesCategory =
-            _selectedCategory ==
-                'All' ||
-                skill.category.trim() ==
-                    _selectedCategory;
-
-        final bool matchesSearch =
-            query.isEmpty ||
-                _skillMatchesSearch(
-                  skill,
-                  query,
-                ) ||
-                providers.any(
-                      (
-                      User provider,
-                      ) =>
-                      _providerMatchesSearch(
-                        provider,
-                        query,
-                      ),
-                );
-
-        final bool matchesMode =
-        _matchesModeFilter(
-          skill:
-          skill,
-          providers:
-          providers,
-        );
-
-        final bool matchesCity =
-            _selectedCity ==
-                'Any' ||
-                providers.any(
-                      (
-                      User provider,
-                      ) =>
-                  provider.city
-                      .trim()
-                      .toLowerCase() ==
-                      _selectedCity
-                          .trim()
-                          .toLowerCase(),
-                );
-
-        return matchesCategory &&
-            matchesSearch &&
-            matchesMode &&
-            matchesCity;
-      },
-    ).toList();
-
-    _sortSkills(
-      results,
-    );
-
-    return results;
-  }
-
-  bool _skillMatchesSearch(
-      Skill skill,
-      String query,
-      ) {
-    final List<String> searchable =
-    <String>[
-      skill.title,
-      skill.category,
-      skill.level,
-      skill.description,
-      skill.mode,
-      skill.language,
-      skill.prerequisite,
-      ...skill.learnings,
-    ];
-
-    return searchable.any(
-          (
-          String value,
-          ) =>
-          value
-              .toLowerCase()
-              .contains(
-            query,
-          ),
-    );
-  }
-
-  bool _providerMatchesSearch(
-      User provider,
-      String query,
-      ) {
-    final List<String> searchable =
-    <String>[
-      provider.name,
-      provider.city,
-      provider.bio,
-      provider.availability,
-      provider.language,
-      provider.preferredMode,
-      provider.teachingStyle,
-    ];
-
-    return searchable.any(
-          (
-          String value,
-          ) =>
-          value
-              .toLowerCase()
-              .contains(
-            query,
-          ),
-    );
-  }
-
-  bool _matchesModeFilter({
-    required Skill skill,
-    required List<User> providers,
-  }) {
-    if (_selectedMode ==
-        'Any') {
-      return true;
-    }
-
-    if (!skill.supportsSessionMode(
-      _selectedMode,
-    )) {
-      return false;
-    }
-
-    if (providers.isEmpty) {
-      return true;
-    }
-
-    return providers.any(
-          (
-          User provider,
-          ) =>
-          _providerSupportsMode(
-            provider,
-            _selectedMode,
-          ),
-    );
-  }
-
-  bool _providerSupportsMode(
-      User provider,
-      String selectedMode,
-      ) {
-    final String value =
-    provider.preferredMode
-        .trim()
-        .toLowerCase();
-
-    if (value.isEmpty) {
-      return true;
-    }
-
-    if (value.contains(
-      'both',
-    ) ||
-        value.contains(
-          'either',
-        )) {
-      return true;
-    }
-
-    if (selectedMode ==
-        'Online') {
-      return value.contains(
-        'online',
+  List<Skill> _filteredSkills() {
+    try {
+      return _controller.filterSkills(
+        searchQuery: _searchQuery,
+        selectedCategory: _selectedCategory,
+        selectedMode: _selectedMode,
+        selectedCity: _selectedCity,
+        sortOption: _sortOption,
       );
-    }
-
-    if (selectedMode ==
-        'In-person') {
-      return value.contains(
-        'in-person',
-      ) ||
-          value.contains(
-            'in person',
-          ) ||
-          value.contains(
-            'meetup',
-          );
-    }
-
-    return false;
-  }
-
-  // ============================================================
-  // SORTING
-  // ============================================================
-
-  void _sortSkills(
-      List<Skill> skills,
-      ) {
-    switch (_sortOption) {
-      case 'Most Providers':
-        skills.sort(
-              (
-              Skill first,
-              Skill second,
-              ) {
-            final int firstCount =
-                _otherProvidersForSkill(
-                  first,
-                ).length;
-
-            final int secondCount =
-                _otherProvidersForSkill(
-                  second,
-                ).length;
-
-            final int providerComparison =
-            secondCount.compareTo(
-              firstCount,
-            );
-
-            if (providerComparison !=
-                0) {
-              return providerComparison;
-            }
-
-            return first.title
-                .toLowerCase()
-                .compareTo(
-              second.title
-                  .toLowerCase(),
-            );
-          },
-        );
-        return;
-
-      case 'Top Provider Rating':
-        skills.sort(
-              (
-              Skill first,
-              Skill second,
-              ) {
-            final double firstRating =
-            _highestProviderRating(
-              first,
-            );
-
-            final double secondRating =
-            _highestProviderRating(
-              second,
-            );
-
-            final int ratingComparison =
-            secondRating.compareTo(
-              firstRating,
-            );
-
-            if (ratingComparison !=
-                0) {
-              return ratingComparison;
-            }
-
-            final int providerComparison =
-            _otherProvidersForSkill(
-              second,
-            ).length.compareTo(
-              _otherProvidersForSkill(
-                first,
-              ).length,
-            );
-
-            if (providerComparison !=
-                0) {
-              return providerComparison;
-            }
-
-            return first.title
-                .toLowerCase()
-                .compareTo(
-              second.title
-                  .toLowerCase(),
-            );
-          },
-        );
-        return;
-
-      case 'A-Z':
-      default:
-        skills.sort(
-              (
-              Skill first,
-              Skill second,
-              ) =>
-              first.title
-                  .toLowerCase()
-                  .compareTo(
-                second.title
-                    .toLowerCase(),
-              ),
-        );
+    } on ExploreControllerException {
+      return <Skill>[];
     }
   }
 
-  double _highestProviderRating(
+  // ============================================================
+  // PROVIDERS
+  // ============================================================
+
+  List<User> _providersForSkill(
       Skill skill,
+      ) {
+    try {
+      return _controller.providersForSkill(
+        skill,
+      );
+    } on ExploreControllerException {
+      return <User>[];
+    }
+  }
+
+  double _highestRatingFromProviders(
+      List<User> providers,
       ) {
     double highest = 0;
 
-    for (final User provider
-    in _otherProvidersForSkill(
-      skill,
-    )) {
-      if (provider.reviewCount <=
-          0) {
+    for (final User provider in providers) {
+      if (provider.reviewCount <= 0) {
         continue;
       }
 
-      if (provider.rating >
-          highest) {
-        highest =
-            provider.rating;
+      if (provider.rating > highest) {
+        highest = provider.rating;
       }
     }
 
@@ -633,34 +281,31 @@ class _ExploreScreenState
     });
 
     try {
-      await _repository.refresh();
+      final ExploreSnapshot snapshot =
+      await _controller.refreshExplore();
 
       if (!mounted) {
         return;
       }
 
-      final List<String> categories =
-          _categories;
-
-      final List<String> cities =
-          _cities;
-
       setState(() {
-        if (!categories.contains(
+        _categories = snapshot.categories;
+        _cities = snapshot.cities;
+        _loadError = null;
+
+        if (!_categories.contains(
           _selectedCategory,
         )) {
-          _selectedCategory =
-          'All';
+          _selectedCategory = 'All';
         }
 
-        if (!cities.contains(
+        if (!_cities.contains(
           _selectedCity,
         )) {
-          _selectedCity =
-          'Any';
+          _selectedCity = 'Any';
         }
       });
-    } on ExploreRepositoryException catch (error) {
+    } on ExploreControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -686,7 +331,7 @@ class _ExploreScreenState
   }
 
   // ============================================================
-  // RESET
+  // RESET FILTERS
   // ============================================================
 
   void _resetFilters() {
@@ -701,13 +346,6 @@ class _ExploreScreenState
     });
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-
-    super.dispose();
-  }
-
   // ============================================================
   // BUILD
   // ============================================================
@@ -716,9 +354,6 @@ class _ExploreScreenState
   Widget build(
       BuildContext context,
       ) {
-    final List<Skill> skills =
-        _filteredSkills;
-
     return Scaffold(
       backgroundColor:
       Theme.of(context)
@@ -730,128 +365,136 @@ class _ExploreScreenState
 
             Expanded(
               child:
-              RefreshIndicator(
-                onRefresh:
-                _refreshExplore,
-                color:
-                _primaryColor,
-                child:
-                SingleChildScrollView(
-                  physics:
-                  const AlwaysScrollableScrollPhysics(
-                    parent:
-                    BouncingScrollPhysics(),
-                  ),
-                  padding:
-                  const EdgeInsets.fromLTRB(
-                    20,
-                    18,
-                    20,
-                    30,
-                  ),
-                  child:
-                  Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      _buildTubiIntro(),
+              _isLoading
+                  ? _buildLoadingState()
+                  : _loadError != null
+                  ? _buildLoadError()
+                  : _buildExploreContent(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                      const SizedBox(
-                        height: 18,
-                      ),
+  // ============================================================
+  // EXPLORE CONTENT
+  // ============================================================
 
-                      _buildSearchAndFilter(),
+  Widget _buildExploreContent() {
+    final List<Skill> skills =
+    _filteredSkills();
 
-                      const SizedBox(
-                        height: 22,
-                      ),
+    return RefreshIndicator(
+      onRefresh: _refreshExplore,
+      color: _primaryColor,
+      child: SingleChildScrollView(
+        physics:
+        const AlwaysScrollableScrollPhysics(
+          parent:
+          BouncingScrollPhysics(),
+        ),
+        padding:
+        const EdgeInsets.fromLTRB(
+          20,
+          18,
+          20,
+          30,
+        ),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            _buildTubiIntro(),
 
-                      Text(
-                        'Browse Categories',
-                        style:
-                        AppTextStyles.cardTitle
-                            .copyWith(
-                          color:
-                          _textColor,
-                        ),
-                      ),
+            const SizedBox(
+              height: 18,
+            ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+            _buildSearchAndFilter(),
 
-                      _buildCategories(),
+            const SizedBox(
+              height: 22,
+            ),
 
-                      const SizedBox(
-                        height: 22,
-                      ),
-
-                      _buildFilterSummary(),
-
-                      if (_hasActiveFilters)
-                        const SizedBox(
-                          height: 18,
-                        )
-                      else
-                        const SizedBox(
-                          height: 4,
-                        ),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child:
-                            Text(
-                              'Skills For You',
-                              style:
-                              AppTextStyles.cardTitle
-                                  .copyWith(
-                                color:
-                                _textColor,
-                              ),
-                            ),
-                          ),
-
-                          Text(
-                            '${skills.length} skill${skills.length == 1 ? '' : 's'}',
-                            style:
-                            AppTextStyles.caption
-                                .copyWith(
-                              color:
-                              _mutedColor,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      if (skills.isEmpty)
-                        _buildNoResults()
-                      else
-                        ...skills.map(
-                              (
-                              Skill skill,
-                              ) {
-                            return Padding(
-                              padding:
-                              const EdgeInsets.only(
-                                bottom: 12,
-                              ),
-                              child:
-                              _buildSkillCard(
-                                skill,
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
+            Text(
+              'Browse Categories',
+              style:
+              AppTextStyles.cardTitle
+                  .copyWith(
+                color: _textColor,
               ),
             ),
+
+            const SizedBox(
+              height: 12,
+            ),
+
+            _buildCategories(),
+
+            const SizedBox(
+              height: 22,
+            ),
+
+            _buildFilterSummary(),
+
+            if (_hasActiveFilters)
+              const SizedBox(
+                height: 18,
+              )
+            else
+              const SizedBox(
+                height: 4,
+              ),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Skills For You',
+                    style:
+                    AppTextStyles
+                        .cardTitle
+                        .copyWith(
+                      color: _textColor,
+                    ),
+                  ),
+                ),
+
+                Text(
+                  '${skills.length} skill${skills.length == 1 ? '' : 's'}',
+                  style:
+                  AppTextStyles.caption
+                      .copyWith(
+                    color: _mutedColor,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(
+              height: 12,
+            ),
+
+            if (skills.isEmpty)
+              _buildNoResults()
+            else
+              ...skills.map(
+                    (
+                    Skill skill,
+                    ) {
+                  return Padding(
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    child:
+                    _buildSkillCard(
+                      skill,
+                    ),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -869,62 +512,49 @@ class _ExploreScreenState
       const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
-        border:
-        Border(
-          bottom:
-          BorderSide(
-            color:
-            _borderColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
+        border: Border(
+          bottom: BorderSide(
+            color: _borderColor,
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           IconButton(
-            tooltip:
-            'Back',
-            onPressed:
-                () {
+            tooltip: 'Back',
+            onPressed: () {
               Navigator.pop(
                 context,
               );
             },
-            icon:
-            Icon(
+            icon: Icon(
               Icons
                   .arrow_back_ios_new_rounded,
               size: 18,
-              color:
-              _primaryColor,
+              color: _primaryColor,
             ),
           ),
 
           Expanded(
-            child:
-            Center(
-              child:
-              Text(
+            child: Center(
+              child: Text(
                 'Explore',
                 style:
                 AppTextStyles.cardTitle
                     .copyWith(
-                  color:
-                  _textColor,
+                  color: _textColor,
                 ),
               ),
             ),
           ),
 
           IconButton(
-            tooltip:
-            'Refresh',
+            tooltip: 'Refresh',
             onPressed:
-            _isRefreshing
+            _isRefreshing ||
+                _isLoading
                 ? null
                 : _refreshExplore,
             icon:
@@ -940,9 +570,99 @@ class _ExploreScreenState
               ),
             )
                 : Icon(
-              Icons.refresh_rounded,
+              Icons
+                  .refresh_rounded,
               color:
               _primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // LOADING
+  // ============================================================
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: CircularProgressIndicator(
+        color: _primaryColor,
+      ),
+    );
+  }
+
+  // ============================================================
+  // LOAD ERROR
+  // ============================================================
+
+  Widget _buildLoadError() {
+    return RefreshIndicator(
+      onRefresh: _loadExplore,
+      color: _primaryColor,
+      child: ListView(
+        physics:
+        const AlwaysScrollableScrollPhysics(),
+        padding:
+        const EdgeInsets.symmetric(
+          horizontal: 28,
+          vertical: 60,
+        ),
+        children: [
+          Image.asset(
+            'assets/images/mascot/tubi_thinking.png',
+            width: 100,
+            height: 100,
+          ),
+
+          const SizedBox(
+            height: 16,
+          ),
+
+          Text(
+            'Could not load Explore',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.cardTitle
+                .copyWith(
+              color: _textColor,
+            ),
+          ),
+
+          const SizedBox(
+            height: 8,
+          ),
+
+          Text(
+            _loadError ??
+                'Please try again.',
+            textAlign:
+            TextAlign.center,
+            style:
+            AppTextStyles.secondary
+                .copyWith(
+              color: _mutedColor,
+            ),
+          ),
+
+          const SizedBox(
+            height: 18,
+          ),
+
+          Center(
+            child: OutlinedButton.icon(
+              onPressed:
+              _loadExplore,
+              icon:
+              const Icon(
+                Icons.refresh_rounded,
+              ),
+              label:
+              const Text(
+                'TRY AGAIN',
+              ),
             ),
           ),
         ],
@@ -956,8 +676,7 @@ class _ExploreScreenState
 
   Widget _buildTubiIntro() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.fromLTRB(
         16,
@@ -965,36 +684,32 @@ class _ExploreScreenState
         10,
         14,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _softPrimaryColor,
+      decoration: BoxDecoration(
+        color: _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
-        border:
-        Border.all(
+        border: Border.all(
           color:
           _softPrimaryBorderColor,
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
               children: [
                 Text(
                   'Discover something new',
                   style:
-                  AppTextStyles.cardTitle
+                  AppTextStyles
+                      .cardTitle
                       .copyWith(
-                    color:
-                    _textColor,
+                    color: _textColor,
                   ),
                 ),
 
@@ -1005,7 +720,8 @@ class _ExploreScreenState
                 Text(
                   'Find practical skills and other learners offering them.',
                   style:
-                  AppTextStyles.secondary
+                  AppTextStyles
+                      .secondary
                       .copyWith(
                     color:
                     _mutedColor,
@@ -1023,8 +739,7 @@ class _ExploreScreenState
             'assets/images/mascot/tubi_studying.png',
             width: 82,
             height: 82,
-            fit:
-            BoxFit.contain,
+            fit: BoxFit.contain,
           ),
         ],
       ),
@@ -1039,8 +754,7 @@ class _ExploreScreenState
     return Row(
       children: [
         Expanded(
-          child:
-          _buildSearchBar(),
+          child: _buildSearchBar(),
         ),
 
         const SizedBox(
@@ -1055,28 +769,22 @@ class _ExploreScreenState
   Widget _buildSearchBar() {
     return Container(
       height: 50,
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           13,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
-      child:
-      TextField(
+      child: TextField(
         controller:
         _searchController,
         textInputAction:
         TextInputAction.search,
-        onChanged:
-            (
+        onChanged: (
             String value,
             ) {
           setState(() {
@@ -1087,24 +795,21 @@ class _ExploreScreenState
         style:
         AppTextStyles.input
             .copyWith(
-          color:
-          _textColor,
+          color: _textColor,
         ),
         decoration:
         InputDecoration(
           hintText:
           'Search skills or people',
           hintStyle:
-          AppTextStyles.inputHint
+          AppTextStyles
+              .inputHint
               .copyWith(
-            color:
-            _mutedColor,
+            color: _mutedColor,
           ),
-          prefixIcon:
-          Icon(
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color:
-            _mutedColor,
+            color: _mutedColor,
             size: 20,
           ),
           suffixIcon:
@@ -1122,12 +827,13 @@ class _ExploreScreenState
                 '';
               });
             },
-            icon:
-            Icon(
-              Icons.close_rounded,
+            icon: Icon(
+              Icons
+                  .close_rounded,
               color:
               _mutedColor,
-              size: 18,
+              size:
+              18,
             ),
           )
               : null,
@@ -1137,8 +843,7 @@ class _ExploreScreenState
           InputBorder.none,
           focusedBorder:
           InputBorder.none,
-          filled:
-          false,
+          filled: false,
         ),
       ),
     );
@@ -1155,12 +860,12 @@ class _ExploreScreenState
         SizedBox(
           width: 50,
           height: 50,
-          child:
-          OutlinedButton(
+          child: OutlinedButton(
             onPressed:
             _openFilters,
             style:
-            OutlinedButton.styleFrom(
+            OutlinedButton
+                .styleFrom(
               padding:
               EdgeInsets.zero,
               side:
@@ -1177,13 +882,13 @@ class _ExploreScreenState
               shape:
               RoundedRectangleBorder(
                 borderRadius:
-                BorderRadius.circular(
+                BorderRadius
+                    .circular(
                   13,
                 ),
               ),
             ),
-            child:
-            Icon(
+            child: Icon(
               Icons.tune_rounded,
               size: 21,
               color:
@@ -1198,8 +903,7 @@ class _ExploreScreenState
           Positioned(
             right: -5,
             top: -5,
-            child:
-            Container(
+            child: Container(
               width: 20,
               height: 20,
               alignment:
@@ -1219,20 +923,21 @@ class _ExploreScreenState
                   width: 2,
                 ),
               ),
-              child:
-              Text(
+              child: Text(
                 '$count',
                 style:
                 TextStyle(
                   fontSize: 9,
                   fontWeight:
-                  FontWeight.w800,
+                  FontWeight
+                      .w800,
                   color:
                   _isDarkMode
                       ? const Color(
                     0xFF092E31,
                   )
-                      : Colors.white,
+                      : Colors
+                      .white,
                 ),
               ),
             ),
@@ -1259,27 +964,22 @@ class _ExploreScreenState
         _cities;
 
     await showModalBottomSheet<void>(
-      context:
-      context,
+      context: context,
       isScrollControlled:
       true,
       backgroundColor:
       Colors.transparent,
-      builder:
-          (
+      builder: (
           BuildContext sheetContext,
           ) {
         return StatefulBuilder(
-          builder:
-              (
+          builder: (
               BuildContext context,
               StateSetter setSheetState,
               ) {
             return SafeArea(
-              top:
-              false,
-              child:
-              Container(
+              top: false,
+              child: Container(
                 padding:
                 EdgeInsets.fromLTRB(
                   20,
@@ -1295,7 +995,8 @@ class _ExploreScreenState
                   color:
                   _surfaceColor,
                   borderRadius:
-                  const BorderRadius.vertical(
+                  const BorderRadius
+                      .vertical(
                     top:
                     Radius.circular(
                       26,
@@ -1304,12 +1005,12 @@ class _ExploreScreenState
                 ),
                 child:
                 SingleChildScrollView(
-                  child:
-                  Column(
+                  child: Column(
                     mainAxisSize:
                     MainAxisSize.min,
                     crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    CrossAxisAlignment
+                        .start,
                     children: [
                       Center(
                         child:
@@ -1321,7 +1022,8 @@ class _ExploreScreenState
                             color:
                             _borderColor,
                             borderRadius:
-                            BorderRadius.circular(
+                            BorderRadius
+                                .circular(
                               20,
                             ),
                           ),
@@ -1335,11 +1037,11 @@ class _ExploreScreenState
                       Row(
                         children: [
                           Expanded(
-                            child:
-                            Text(
+                            child: Text(
                               'Explore Filters',
                               style:
-                              AppTextStyles.cardTitle
+                              AppTextStyles
+                                  .cardTitle
                                   .copyWith(
                                 color:
                                 _textColor,
@@ -1350,14 +1052,15 @@ class _ExploreScreenState
                           TextButton(
                             onPressed:
                                 () {
-                              setSheetState(() {
-                                temporaryMode =
-                                'Any';
-                                temporaryCity =
-                                'Any';
-                                temporarySort =
-                                'A-Z';
-                              });
+                              setSheetState(
+                                      () {
+                                    temporaryMode =
+                                    'Any';
+                                    temporaryCity =
+                                    'Any';
+                                    temporarySort =
+                                    'A-Z';
+                                  });
                             },
                             child:
                             const Text(
@@ -1374,12 +1077,14 @@ class _ExploreScreenState
                       Text(
                         'Session mode',
                         style:
-                        AppTextStyles.caption
+                        AppTextStyles
+                            .caption
                             .copyWith(
                           color:
                           _textColor,
                           fontWeight:
-                          FontWeight.w700,
+                          FontWeight
+                              .w700,
                         ),
                       ),
 
@@ -1395,7 +1100,8 @@ class _ExploreScreenState
                               (
                               String mode,
                               ) {
-                            final bool selected =
+                            final bool
+                            selected =
                                 temporaryMode ==
                                     mode;
 
@@ -1410,10 +1116,11 @@ class _ExploreScreenState
                               false,
                               onSelected:
                                   (_) {
-                                setSheetState(() {
-                                  temporaryMode =
-                                      mode;
-                                });
+                                setSheetState(
+                                        () {
+                                      temporaryMode =
+                                          mode;
+                                    });
                               },
                               selectedColor:
                               _primaryColor,
@@ -1428,9 +1135,11 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize: 12,
+                                fontSize:
+                                12,
                                 fontWeight:
-                                FontWeight.w700,
+                                FontWeight
+                                    .w700,
                                 color:
                                 selected
                                     ? (_isDarkMode
@@ -1452,12 +1161,14 @@ class _ExploreScreenState
                       Text(
                         'Provider city',
                         style:
-                        AppTextStyles.caption
+                        AppTextStyles
+                            .caption
                             .copyWith(
                           color:
                           _textColor,
                           fontWeight:
-                          FontWeight.w700,
+                          FontWeight
+                              .w700,
                         ),
                       ),
 
@@ -1469,15 +1180,18 @@ class _ExploreScreenState
                         width:
                         double.infinity,
                         padding:
-                        const EdgeInsets.symmetric(
-                          horizontal: 13,
+                        const EdgeInsets
+                            .symmetric(
+                          horizontal:
+                          13,
                         ),
                         decoration:
                         BoxDecoration(
                           color:
                           _surfaceVariantColor,
                           borderRadius:
-                          BorderRadius.circular(
+                          BorderRadius
+                              .circular(
                             13,
                           ),
                           border:
@@ -1489,7 +1203,8 @@ class _ExploreScreenState
                         child:
                         DropdownButtonHideUnderline(
                           child:
-                          DropdownButton<String>(
+                          DropdownButton<
+                              String>(
                             value:
                             cities.contains(
                               temporaryCity,
@@ -1509,7 +1224,8 @@ class _ExploreScreenState
                             ),
                             style:
                             TextStyle(
-                              fontSize: 13,
+                              fontSize:
+                              13,
                               color:
                               _textColor,
                             ),
@@ -1518,14 +1234,16 @@ class _ExploreScreenState
                                   (
                                   String city,
                                   ) {
-                                return DropdownMenuItem<String>(
+                                return DropdownMenuItem<
+                                    String>(
                                   value:
                                   city,
                                   child:
                                   Text(
                                     city,
                                     overflow:
-                                    TextOverflow.ellipsis,
+                                    TextOverflow
+                                        .ellipsis,
                                   ),
                                 );
                               },
@@ -1539,10 +1257,11 @@ class _ExploreScreenState
                                 return;
                               }
 
-                              setSheetState(() {
-                                temporaryCity =
-                                    value;
-                              });
+                              setSheetState(
+                                      () {
+                                    temporaryCity =
+                                        value;
+                                  });
                             },
                           ),
                         ),
@@ -1555,12 +1274,14 @@ class _ExploreScreenState
                       Text(
                         'Sort results',
                         style:
-                        AppTextStyles.caption
+                        AppTextStyles
+                            .caption
                             .copyWith(
                           color:
                           _textColor,
                           fontWeight:
-                          FontWeight.w700,
+                          FontWeight
+                              .w700,
                         ),
                       ),
 
@@ -1576,7 +1297,8 @@ class _ExploreScreenState
                               (
                               String option,
                               ) {
-                            final bool selected =
+                            final bool
+                            selected =
                                 temporarySort ==
                                     option;
 
@@ -1591,10 +1313,11 @@ class _ExploreScreenState
                               false,
                               onSelected:
                                   (_) {
-                                setSheetState(() {
-                                  temporarySort =
-                                      option;
-                                });
+                                setSheetState(
+                                        () {
+                                      temporarySort =
+                                          option;
+                                    });
                               },
                               selectedColor:
                               _primaryColor,
@@ -1609,9 +1332,11 @@ class _ExploreScreenState
                               ),
                               labelStyle:
                               TextStyle(
-                                fontSize: 12,
+                                fontSize:
+                                12,
                                 fontWeight:
-                                FontWeight.w700,
+                                FontWeight
+                                    .w700,
                                 color:
                                 selected
                                     ? (_isDarkMode
@@ -1634,7 +1359,8 @@ class _ExploreScreenState
                         width:
                         double.infinity,
                         child:
-                        ElevatedButton.icon(
+                        ElevatedButton
+                            .icon(
                           onPressed:
                               () {
                             setState(() {
@@ -1652,7 +1378,8 @@ class _ExploreScreenState
                           },
                           icon:
                           const Icon(
-                            Icons.check_rounded,
+                            Icons
+                                .check_rounded,
                             size: 18,
                           ),
                           label:
@@ -1680,22 +1407,19 @@ class _ExploreScreenState
     final List<String> labels =
     <String>[];
 
-    if (_selectedMode !=
-        'Any') {
+    if (_selectedMode != 'Any') {
       labels.add(
         _selectedMode,
       );
     }
 
-    if (_selectedCity !=
-        'Any') {
+    if (_selectedCity != 'Any') {
       labels.add(
         _selectedCity,
       );
     }
 
-    if (_sortOption !=
-        'A-Z') {
+    if (_sortOption != 'A-Z') {
       labels.add(
         _sortOption,
       );
@@ -1706,35 +1430,29 @@ class _ExploreScreenState
     }
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.symmetric(
         horizontal: 13,
         vertical: 10,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _softPrimaryColor,
+      decoration: BoxDecoration(
+        color: _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           14,
         ),
-        border:
-        Border.all(
+        border: Border.all(
           color:
           _softPrimaryBorderColor,
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           Icon(
             Icons.tune_rounded,
             size: 16,
-            color:
-            _primaryColor,
+            color: _primaryColor,
           ),
 
           const SizedBox(
@@ -1742,8 +1460,7 @@ class _ExploreScreenState
           ),
 
           Expanded(
-            child:
-            Text(
+            child: Text(
               labels.join(
                 ' • ',
               ),
@@ -1753,8 +1470,7 @@ class _ExploreScreenState
               style:
               AppTextStyles.caption
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
                 fontWeight:
                 FontWeight.w600,
               ),
@@ -1779,21 +1495,16 @@ class _ExploreScreenState
   // ============================================================
 
   Widget _buildCategories() {
-    final List<String> categories =
-        _categories;
-
     return SizedBox(
       height: 38,
-      child:
-      ListView.separated(
+      child: ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
         const BouncingScrollPhysics(),
         itemCount:
-        categories.length,
-        separatorBuilder:
-            (
+        _categories.length,
+        separatorBuilder: (
             BuildContext context,
             int index,
             ) {
@@ -1801,13 +1512,12 @@ class _ExploreScreenState
             width: 8,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
           final String category =
-          categories[index];
+          _categories[index];
 
           final bool selected =
               _selectedCategory ==
@@ -1818,8 +1528,7 @@ class _ExploreScreenState
             BorderRadius.circular(
               20,
             ),
-            onTap:
-                () {
+            onTap: () {
               setState(() {
                 _selectedCategory =
                     category;
@@ -1832,7 +1541,8 @@ class _ExploreScreenState
                 milliseconds: 180,
               ),
               padding:
-              const EdgeInsets.symmetric(
+              const EdgeInsets
+                  .symmetric(
                 horizontal: 15,
               ),
               alignment:
@@ -1844,7 +1554,8 @@ class _ExploreScreenState
                     ? _primaryColor
                     : _surfaceColor,
                 borderRadius:
-                BorderRadius.circular(
+                BorderRadius
+                    .circular(
                   20,
                 ),
                 border:
@@ -1855,8 +1566,7 @@ class _ExploreScreenState
                       : _borderColor,
                 ),
               ),
-              child:
-              Text(
+              child: Text(
                 category,
                 style:
                 AppTextStyles.caption
@@ -1871,8 +1581,10 @@ class _ExploreScreenState
                       : _textColor,
                   fontWeight:
                   selected
-                      ? FontWeight.w700
-                      : FontWeight.w500,
+                      ? FontWeight
+                      .w700
+                      : FontWeight
+                      .w500,
                 ),
               ),
             ),
@@ -1890,7 +1602,7 @@ class _ExploreScreenState
       Skill skill,
       ) {
     final List<User> providers =
-    _otherProvidersForSkill(
+    _providersForSkill(
       skill,
     );
 
@@ -1898,18 +1610,16 @@ class _ExploreScreenState
         providers.length;
 
     final double highestRating =
-    _highestProviderRating(
-      skill,
+    _highestRatingFromProviders(
+      providers,
     );
 
     final String providerLabel;
 
-    if (providerCount ==
-        0) {
+    if (providerCount == 0) {
       providerLabel =
       'No other providers';
-    } else if (providerCount ==
-        1) {
+    } else if (providerCount == 1) {
       providerLabel =
       '1 provider';
     } else {
@@ -1922,47 +1632,39 @@ class _ExploreScreenState
       BorderRadius.circular(
         16,
       ),
-      onTap:
-          () {
+      onTap: () {
         Navigator.pushNamed(
           context,
           '/skill-details',
-          arguments:
-          skill,
+          arguments: skill,
         );
       },
-      child:
-      Container(
-        width:
-        double.infinity,
+      child: Container(
+        width: double.infinity,
         padding:
         const EdgeInsets.all(
           14,
         ),
-        decoration:
-        BoxDecoration(
-          color:
-          _surfaceColor,
+        decoration: BoxDecoration(
+          color: _surfaceColor,
           borderRadius:
           BorderRadius.circular(
             16,
           ),
-          border:
-          Border.all(
-            color:
-            _borderColor,
+          border: Border.all(
+            color: _borderColor,
           ),
           boxShadow: [
             BoxShadow(
               color:
-              Colors.black.withValues(
+              Colors.black
+                  .withValues(
                 alpha:
                 _isDarkMode
                     ? 0.12
                     : 0.025,
               ),
-              blurRadius:
-              10,
+              blurRadius: 10,
               offset:
               const Offset(
                 0,
@@ -1971,8 +1673,7 @@ class _ExploreScreenState
             ),
           ],
         ),
-        child:
-        Row(
+        child: Row(
           children: [
             Container(
               width: 58,
@@ -1982,7 +1683,8 @@ class _ExploreScreenState
                 color:
                 _softPrimaryColor,
                 borderRadius:
-                BorderRadius.circular(
+                BorderRadius
+                    .circular(
                   15,
                 ),
                 border:
@@ -1991,8 +1693,7 @@ class _ExploreScreenState
                   _softPrimaryBorderColor,
                 ),
               ),
-              child:
-              Icon(
+              child: Icon(
                 skill.icon,
                 color:
                 _primaryColor,
@@ -2005,15 +1706,16 @@ class _ExploreScreenState
             ),
 
             Expanded(
-              child:
-              Column(
+              child: Column(
                 crossAxisAlignment:
-                CrossAxisAlignment.start,
+                CrossAxisAlignment
+                    .start,
                 children: [
                   Text(
                     skill.title,
                     style:
-                    AppTextStyles.cardTitle
+                    AppTextStyles
+                        .cardTitle
                         .copyWith(
                       color:
                       _textColor,
@@ -2028,9 +1730,11 @@ class _ExploreScreenState
                     '${skill.category} • ${skill.mode}',
                     maxLines: 1,
                     overflow:
-                    TextOverflow.ellipsis,
+                    TextOverflow
+                        .ellipsis,
                     style:
-                    AppTextStyles.caption
+                    AppTextStyles
+                        .caption
                         .copyWith(
                       color:
                       _mutedColor,
@@ -2045,11 +1749,13 @@ class _ExploreScreenState
                     spacing: 9,
                     runSpacing: 6,
                     crossAxisAlignment:
-                    WrapCrossAlignment.center,
+                    WrapCrossAlignment
+                        .center,
                     children: [
                       Container(
                         padding:
-                        const EdgeInsets.symmetric(
+                        const EdgeInsets
+                            .symmetric(
                           horizontal: 8,
                           vertical: 4,
                         ),
@@ -2058,30 +1764,34 @@ class _ExploreScreenState
                           color:
                           _softPrimaryColor,
                           borderRadius:
-                          BorderRadius.circular(
+                          BorderRadius
+                              .circular(
                             12,
                           ),
                         ),
-                        child:
-                        Text(
+                        child: Text(
                           skill.level,
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _primaryColor,
                             fontWeight:
-                            FontWeight.w600,
+                            FontWeight
+                                .w600,
                           ),
                         ),
                       ),
 
                       Row(
                         mainAxisSize:
-                        MainAxisSize.min,
+                        MainAxisSize
+                            .min,
                         children: [
                           Icon(
-                            Icons.people_outline_rounded,
+                            Icons
+                                .people_outline_rounded,
                             size: 13,
                             color:
                             _mutedColor,
@@ -2094,7 +1804,8 @@ class _ExploreScreenState
                           Text(
                             providerLabel,
                             style:
-                            AppTextStyles.caption
+                            AppTextStyles
+                                .caption
                                 .copyWith(
                               color:
                               _mutedColor,
@@ -2107,13 +1818,16 @@ class _ExploreScreenState
                           0)
                         Row(
                           mainAxisSize:
-                          MainAxisSize.min,
+                          MainAxisSize
+                              .min,
                           children: [
                             const Icon(
-                              Icons.star_rounded,
+                              Icons
+                                  .star_rounded,
                               size: 13,
                               color:
-                              AppTheme.accent,
+                              AppTheme
+                                  .accent,
                             ),
 
                             const SizedBox(
@@ -2126,7 +1840,8 @@ class _ExploreScreenState
                                 1,
                               ),
                               style:
-                              AppTextStyles.caption
+                              AppTextStyles
+                                  .caption
                                   .copyWith(
                                 color:
                                 _mutedColor,
@@ -2145,10 +1860,10 @@ class _ExploreScreenState
             ),
 
             Icon(
-              Icons.arrow_forward_ios_rounded,
+              Icons
+                  .arrow_forward_ios_rounded,
               size: 14,
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ],
         ),
@@ -2167,29 +1882,25 @@ class _ExploreScreenState
     if (_searchQuery
         .trim()
         .isNotEmpty &&
-        _activeFilterCount ==
-            0) {
+        _activeFilterCount == 0) {
       message =
       'We couldn\'t find anything for "$_searchQuery".';
     } else if (_searchQuery
         .trim()
         .isEmpty &&
-        _activeFilterCount ==
-            0) {
+        _activeFilterCount == 0) {
       message =
       'No skills are available right now.';
     }
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.symmetric(
         vertical: 30,
         horizontal: 20,
       ),
-      child:
-      Column(
+      child: Column(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
@@ -2206,8 +1917,7 @@ class _ExploreScreenState
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
 
@@ -2222,8 +1932,7 @@ class _ExploreScreenState
             style:
             AppTextStyles.secondary
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
 
@@ -2275,8 +1984,7 @@ class _ExploreScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content:
-          Text(
+          content: Text(
             message,
           ),
           behavior:

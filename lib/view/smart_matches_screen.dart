@@ -2,10 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../model/repositories/explore_repository.dart';
+import '../controller/explore_controller.dart';
 import '../model/skill_match.dart';
 import '../model/user.dart';
-import '../services/current_user_service.dart';
 import '../theme/app_theme.dart';
 import 'create_swap_request_screen.dart';
 
@@ -21,24 +20,24 @@ class SmartMatchesScreen extends StatefulWidget {
 
 class _SmartMatchesScreenState
     extends State<SmartMatchesScreen> {
-  final ExploreRepository _repository =
-      ExploreRepository.instance;
-
-  final CurrentUserService _currentUserService =
-      CurrentUserService.instance;
+  final ExploreController _controller =
+  ExploreController();
 
   bool _isLoading = true;
   bool _isRefreshing = false;
 
   String? _errorMessage;
   String? _openingSwapUserId;
-  String? _currentUserId;
 
   bool _hasOfferedSkills = false;
   bool _hasWantedSkills = false;
 
   List<SkillMatch> _matches =
   <SkillMatch>[];
+
+  // ============================================================
+  // THEME
+  // ============================================================
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -87,6 +86,10 @@ class _SmartMatchesScreenState
   bool get _hasPendingAction =>
       _openingSwapUserId != null;
 
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
@@ -115,80 +118,31 @@ class _SmartMatchesScreenState
     }
 
     try {
-      await _repository.refresh();
-
-      final String currentUserId =
-      _currentUserService.requireUserId();
-
-      final List<SkillMatch> rawMatches =
-      _repository.getSmartMatchesForUser(
-        currentUserId,
-      );
-
-      final List<SkillMatch> safeMatches =
-      _sanitizeMatches(
-        rawMatches,
-        currentUserId:
-        currentUserId,
-      );
-
-      final bool hasOfferedSkills =
-          _repository
-              .getOfferedSkillsForUser(
-            currentUserId,
-          )
-              .isNotEmpty;
-
-      final bool hasWantedSkills =
-          _repository
-              .getWantedSkillsForUser(
-            currentUserId,
-          )
-              .isNotEmpty;
+      final SmartMatchesSnapshot snapshot =
+      showLoading
+          ? await _controller
+          .loadSmartMatches()
+          : await _controller
+          .refreshSmartMatches();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _currentUserId =
-            currentUserId;
-
         _matches =
-            safeMatches;
+            snapshot.matches;
 
         _hasOfferedSkills =
-            hasOfferedSkills;
+            snapshot.hasOfferedSkills;
 
         _hasWantedSkills =
-            hasWantedSkills;
+            snapshot.hasWantedSkills;
 
-        _isLoading =
-        false;
-
-        _errorMessage =
-        null;
-      });
-    } on CurrentUserServiceException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      if (!showLoading &&
-          _matches.isNotEmpty) {
-        _showMessage(
-          error.message,
-        );
-
-        return;
-      }
-
-      setState(() {
         _isLoading = false;
-        _errorMessage =
-            error.message;
+        _errorMessage = null;
       });
-    } on ExploreRepositoryException catch (error) {
+    } on ExploreControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -237,51 +191,7 @@ class _SmartMatchesScreenState
     }
 
     await _loadMatches(
-      showLoading:
-      false,
-    );
-  }
-
-  List<SkillMatch> _sanitizeMatches(
-      List<SkillMatch> matches, {
-        required String currentUserId,
-      }) {
-    final String cleanCurrentUserId =
-    currentUserId.trim();
-
-    final Set<String> seenUserIds =
-    <String>{};
-
-    final List<SkillMatch> result =
-    <SkillMatch>[];
-
-    for (final SkillMatch match
-    in matches) {
-      final String candidateUserId =
-      match.user.id.trim();
-
-      if (candidateUserId.isEmpty) {
-        continue;
-      }
-
-      if (candidateUserId ==
-          cleanCurrentUserId) {
-        continue;
-      }
-
-      if (!seenUserIds.add(
-        candidateUserId,
-      )) {
-        continue;
-      }
-
-      result.add(
-        match,
-      );
-    }
-
-    return List<SkillMatch>.unmodifiable(
-      result,
+      showLoading: false,
     );
   }
 
@@ -300,19 +210,15 @@ class _SmartMatchesScreenState
         backgroundColor:
         Theme.of(context)
             .scaffoldBackgroundColor,
-        appBar:
-        AppBar(
+        appBar: AppBar(
           backgroundColor:
           Theme.of(context)
               .scaffoldBackgroundColor,
           surfaceTintColor:
           Colors.transparent,
-          elevation:
-          0,
-          leading:
-          IconButton(
-            tooltip:
-            'Back',
+          elevation: 0,
+          leading: IconButton(
+            tooltip: 'Back',
             onPressed:
             _hasPendingAction
                 ? null
@@ -321,33 +227,28 @@ class _SmartMatchesScreenState
                 context,
               );
             },
-            icon:
-            Icon(
+            icon: Icon(
               Icons
                   .arrow_back_ios_new_rounded,
-              size:
-              20,
+              size: 20,
               color:
               _hasPendingAction
                   ? _mutedColor
                   : _textColor,
             ),
           ),
-          title:
-          Text(
+          title: Text(
             'Smart Matches',
             style:
-            AppTextStyles.sectionTitle
+            AppTextStyles
+                .sectionTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
         ),
-        body:
-        SafeArea(
-          child:
-          _buildBody(),
+        body: SafeArea(
+          child: _buildBody(),
         ),
       ),
     );
@@ -369,8 +270,7 @@ class _SmartMatchesScreenState
     return RefreshIndicator(
       onRefresh:
       _refreshMatches,
-      child:
-      ListView.separated(
+      child: ListView.separated(
         physics:
         const AlwaysScrollableScrollPhysics(),
         padding:
@@ -381,27 +281,22 @@ class _SmartMatchesScreenState
           28,
         ),
         itemCount:
-        _matches.length +
-            1,
-        separatorBuilder:
-            (
+        _matches.length + 1,
+        separatorBuilder: (
             _,
             int index,
             ) {
           if (index == 0) {
             return const SizedBox(
-              height:
-              16,
+              height: 16,
             );
           }
 
           return const SizedBox(
-            height:
-            12,
+            height: 12,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
@@ -410,10 +305,8 @@ class _SmartMatchesScreenState
           }
 
           return _buildMatchCard(
-            _matches[
-            index - 1],
-            rank:
-            index,
+            _matches[index - 1],
+            rank: index,
           );
         },
       ),
@@ -426,54 +319,48 @@ class _SmartMatchesScreenState
 
   Widget _buildHeaderCard() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
               children: [
                 Text(
                   '${_matches.length} match${_matches.length == 1 ? '' : 'es'} found',
                   style:
-                  AppTextStyles.cardTitle
+                  AppTextStyles
+                      .cardTitle
                       .copyWith(
-                    color:
-                    _textColor,
+                    color: _textColor,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  5,
+                  height: 5,
                 ),
 
                 Text(
                   'Ranked using skill compatibility, availability, session mode, language, location, completed swaps, and reviewed ratings.',
                   style:
-                  AppTextStyles.bodyMuted
+                  AppTextStyles
+                      .bodyMuted
                       .copyWith(
                     color:
                     _mutedColor,
@@ -484,18 +371,14 @@ class _SmartMatchesScreenState
           ),
 
           const SizedBox(
-            width:
-            12,
+            width: 12,
           ),
 
           Image.asset(
             'assets/images/mascot/tubi_happy.png',
-            width:
-            68,
-            height:
-            68,
-            fit:
-            BoxFit.contain,
+            width: 68,
+            height: 68,
+            fit: BoxFit.contain,
           ),
         ],
       ),
@@ -521,43 +404,35 @@ class _SmartMatchesScreenState
             );
 
     return ClipOval(
-      child:
-      SizedBox(
-        width:
-        size,
-        height:
-        size,
+      child: SizedBox(
+        width: size,
+        height: size,
         child:
         hasImage
             ? Image.file(
           File(
             path,
           ),
-          width:
-          size,
-          height:
-          size,
-          fit:
-          BoxFit.cover,
-          errorBuilder:
-              (
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (
               BuildContext context,
               Object error,
-              StackTrace? stackTrace,
+              StackTrace?
+              stackTrace,
               ) {
             return _buildInitialAvatar(
               initials:
               user.initials,
-              size:
-              size,
+              size: size,
             );
           },
         )
             : _buildInitialAvatar(
           initials:
           user.initials,
-          size:
-          size,
+          size: size,
         ),
       ),
     );
@@ -568,29 +443,23 @@ class _SmartMatchesScreenState
     required double size,
   }) {
     return Container(
-      width:
-      size,
-      height:
-      size,
-      color:
-      AppTheme.accent,
+      width: size,
+      height: size,
+      color: AppTheme.accent,
       alignment:
       Alignment.center,
-      child:
-      Text(
+      child: Text(
         initials.trim().isEmpty
             ? '?'
             : initials,
-        style:
-        TextStyle(
+        style: TextStyle(
           fontSize:
           size >= 48
               ? 12
               : 11,
           fontWeight:
           FontWeight.w800,
-          color:
-          Colors.white,
+          color: Colors.white,
         ),
       ),
     );
@@ -624,32 +493,25 @@ class _SmartMatchesScreenState
             user.id;
 
     final bool canRequestSwap =
-        match.skillToLearn !=
-            null;
+        match.skillToLearn != null;
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceColor,
+      decoration: BoxDecoration(
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
-        border:
-        Border.all(
-          color:
-          _borderColor,
+        border: Border.all(
+          color: _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -657,33 +519,31 @@ class _SmartMatchesScreenState
             children: [
               _buildUserAvatar(
                 user,
-                size:
-                48,
+                size: 48,
               ),
 
               const SizedBox(
-                width:
-                12,
+                width: 12,
               ),
 
               Expanded(
-                child:
-                Column(
+                child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child:
-                          Text(
+                          child: Text(
                             user.name,
-                            maxLines:
-                            1,
+                            maxLines: 1,
                             overflow:
-                            TextOverflow.ellipsis,
+                            TextOverflow
+                                .ellipsis,
                             style:
-                            AppTextStyles.cardTitle
+                            AppTextStyles
+                                .cardTitle
                                 .copyWith(
                               color:
                               _textColor,
@@ -692,27 +552,27 @@ class _SmartMatchesScreenState
                         ),
 
                         const SizedBox(
-                          width:
-                          8,
+                          width: 8,
                         ),
 
                         Text(
                           '#$rank',
                           style:
-                          AppTextStyles.caption
+                          AppTextStyles
+                              .caption
                               .copyWith(
                             color:
                             _mutedColor,
                             fontWeight:
-                            FontWeight.w700,
+                            FontWeight
+                                .w700,
                           ),
                         ),
                       ],
                     ),
 
                     const SizedBox(
-                      height:
-                      3,
+                      height: 3,
                     ),
 
                     Row(
@@ -720,27 +580,25 @@ class _SmartMatchesScreenState
                         Icon(
                           Icons
                               .location_on_outlined,
-                          size:
-                          13,
+                          size: 13,
                           color:
                           _mutedColor,
                         ),
 
                         const SizedBox(
-                          width:
-                          4,
+                          width: 4,
                         ),
 
                         Expanded(
-                          child:
-                          Text(
+                          child: Text(
                             user.city,
-                            maxLines:
-                            1,
+                            maxLines: 1,
                             overflow:
-                            TextOverflow.ellipsis,
+                            TextOverflow
+                                .ellipsis,
                             style:
-                            AppTextStyles.caption
+                            AppTextStyles
+                                .caption
                                 .copyWith(
                               color:
                               _mutedColor,
@@ -754,37 +612,37 @@ class _SmartMatchesScreenState
               ),
 
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
 
               Container(
                 padding:
-                const EdgeInsets.symmetric(
-                  horizontal:
-                  10,
-                  vertical:
-                  6,
+                const EdgeInsets
+                    .symmetric(
+                  horizontal: 10,
+                  vertical: 6,
                 ),
                 decoration:
                 BoxDecoration(
                   color:
                   _softPrimaryColor,
                   borderRadius:
-                  BorderRadius.circular(
+                  BorderRadius
+                      .circular(
                     20,
                   ),
                 ),
-                child:
-                Text(
+                child: Text(
                   '${match.score}%',
                   style:
-                  AppTextStyles.caption
+                  AppTextStyles
+                      .caption
                       .copyWith(
                     color:
                     _primaryColor,
                     fontWeight:
-                    FontWeight.w800,
+                    FontWeight
+                        .w800,
                   ),
                 ),
               ),
@@ -793,55 +651,53 @@ class _SmartMatchesScreenState
 
           if (match.isTwoWayMatch) ...[
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
 
             Container(
               padding:
-              const EdgeInsets.symmetric(
-                horizontal:
-                10,
-                vertical:
-                6,
+              const EdgeInsets
+                  .symmetric(
+                horizontal: 10,
+                vertical: 6,
               ),
               decoration:
               BoxDecoration(
                 color:
                 _softPrimaryColor,
                 borderRadius:
-                BorderRadius.circular(
+                BorderRadius
+                    .circular(
                   20,
                 ),
               ),
-              child:
-              Row(
+              child: Row(
                 mainAxisSize:
                 MainAxisSize.min,
                 children: [
                   Icon(
                     Icons
                         .swap_horiz_rounded,
-                    size:
-                    14,
+                    size: 14,
                     color:
                     _primaryColor,
                   ),
 
                   const SizedBox(
-                    width:
-                    5,
+                    width: 5,
                   ),
 
                   Text(
                     'Two-way match',
                     style:
-                    AppTextStyles.caption
+                    AppTextStyles
+                        .caption
                         .copyWith(
                       color:
                       _primaryColor,
                       fontWeight:
-                      FontWeight.w700,
+                      FontWeight
+                          .w700,
                     ),
                   ),
                 ],
@@ -850,13 +706,11 @@ class _SmartMatchesScreenState
           ],
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           Container(
-            width:
-            double.infinity,
+            width: double.infinity,
             padding:
             const EdgeInsets.all(
               12,
@@ -869,38 +723,38 @@ class _SmartMatchesScreenState
               BorderRadius.circular(
                 14,
               ),
-              border:
-              Border.all(
+              border: Border.all(
                 color:
                 _borderColor,
               ),
             ),
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
               children: [
                 Text(
                   match.headline,
                   style:
-                  AppTextStyles.secondary
+                  AppTextStyles
+                      .secondary
                       .copyWith(
-                    color:
-                    _textColor,
+                    color: _textColor,
                     fontWeight:
-                    FontWeight.w700,
+                    FontWeight
+                        .w700,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  6,
+                  height: 6,
                 ),
 
                 Text(
                   match.explanation,
                   style:
-                  AppTextStyles.bodyMuted
+                  AppTextStyles
+                      .bodyMuted
                       .copyWith(
                     color:
                     _mutedColor,
@@ -912,8 +766,7 @@ class _SmartMatchesScreenState
 
           if (match.reasons.isNotEmpty) ...[
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
 
             Text(
@@ -921,23 +774,19 @@ class _SmartMatchesScreenState
               style:
               AppTextStyles.caption
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
                 fontWeight:
                 FontWeight.w700,
               ),
             ),
 
             const SizedBox(
-              height:
-              8,
+              height: 8,
             ),
 
             Wrap(
-              spacing:
-              7,
-              runSpacing:
-              7,
+              spacing: 7,
+              runSpacing: 7,
               children:
               match.reasons
                   .take(
@@ -957,34 +806,32 @@ class _SmartMatchesScreenState
 
           if (!canRequestSwap) ...[
             const SizedBox(
-              height:
-              12,
+              height: 12,
             ),
 
             Row(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
               children: [
                 Icon(
                   Icons
                       .info_outline_rounded,
-                  size:
-                  15,
+                  size: 15,
                   color:
                   _mutedColor,
                 ),
 
                 const SizedBox(
-                  width:
-                  7,
+                  width: 7,
                 ),
 
                 Expanded(
-                  child:
-                  Text(
+                  child: Text(
                     'This person wants a skill you offer, but they do not currently offer one of your learning interests.',
                     style:
-                    AppTextStyles.caption
+                    AppTextStyles
+                        .caption
                         .copyWith(
                       color:
                       _mutedColor,
@@ -996,8 +843,7 @@ class _SmartMatchesScreenState
           ],
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           Row(
@@ -1017,8 +863,7 @@ class _SmartMatchesScreenState
                   const Icon(
                     Icons
                         .person_outline_rounded,
-                    size:
-                    18,
+                    size: 18,
                   ),
                   label:
                   const Text(
@@ -1028,8 +873,7 @@ class _SmartMatchesScreenState
               ),
 
               const SizedBox(
-                width:
-                10,
+                width: 10,
               ),
 
               Expanded(
@@ -1045,7 +889,8 @@ class _SmartMatchesScreenState
                     );
                   },
                   style:
-                  ElevatedButton.styleFrom(
+                  ElevatedButton
+                      .styleFrom(
                     backgroundColor:
                     _primaryColor,
                     foregroundColor:
@@ -1054,16 +899,13 @@ class _SmartMatchesScreenState
                     _surfaceVariantColor,
                     disabledForegroundColor:
                     _mutedColor,
-                    elevation:
-                    0,
+                    elevation: 0,
                   ),
                   icon:
                   isOpeningSwap
                       ? SizedBox(
-                    width:
-                    16,
-                    height:
-                    16,
+                    width: 16,
+                    height: 16,
                     child:
                     CircularProgressIndicator(
                       strokeWidth:
@@ -1075,11 +917,9 @@ class _SmartMatchesScreenState
                       : const Icon(
                     Icons
                         .swap_horiz_rounded,
-                    size:
-                    18,
+                    size: 18,
                   ),
-                  label:
-                  Text(
+                  label: Text(
                     isOpeningSwap
                         ? 'OPENING...'
                         : 'REQUEST SWAP',
@@ -1107,8 +947,7 @@ class _SmartMatchesScreenState
     await Navigator.pushNamed(
       context,
       '/user-profile',
-      arguments:
-      user,
+      arguments: user,
     );
 
     if (!mounted) {
@@ -1116,8 +955,7 @@ class _SmartMatchesScreenState
     }
 
     await _loadMatches(
-      showLoading:
-      false,
+      showLoading: false,
     );
   }
 
@@ -1146,14 +984,7 @@ class _SmartMatchesScreenState
     final String candidateUserId =
     match.user.id.trim();
 
-    final String currentUserId =
-        _currentUserId?.trim() ??
-            '';
-
-    if (candidateUserId.isEmpty ||
-        currentUserId.isEmpty ||
-        candidateUserId ==
-            currentUserId) {
+    if (candidateUserId.isEmpty) {
       _showMessage(
         'This match is no longer available.',
       );
@@ -1171,8 +1002,7 @@ class _SmartMatchesScreenState
       await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder:
-              (
+          builder: (
               BuildContext routeContext,
               ) =>
               CreateSwapRequestScreen(
@@ -1199,7 +1029,8 @@ class _SmartMatchesScreenState
       }
 
       setState(() {
-        _openingSwapUserId = null;
+        _openingSwapUserId =
+        null;
       });
 
       if (requestCreated == true) {
@@ -1209,18 +1040,17 @@ class _SmartMatchesScreenState
       }
 
       await _loadMatches(
-        showLoading:
-        false,
+        showLoading: false,
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      if (_openingSwapUserId !=
-          null) {
+      if (_openingSwapUserId != null) {
         setState(() {
-          _openingSwapUserId = null;
+          _openingSwapUserId =
+          null;
         });
       }
 
@@ -1229,10 +1059,10 @@ class _SmartMatchesScreenState
       );
     } finally {
       if (mounted &&
-          _openingSwapUserId !=
-              null) {
+          _openingSwapUserId != null) {
         setState(() {
-          _openingSwapUserId = null;
+          _openingSwapUserId =
+          null;
         });
       }
     }
@@ -1248,45 +1078,35 @@ class _SmartMatchesScreenState
     return Container(
       padding:
       const EdgeInsets.symmetric(
-        horizontal:
-        9,
-        vertical:
-        6,
+        horizontal: 9,
+        vertical: 6,
       ),
-      decoration:
-      BoxDecoration(
-        color:
-        _softPrimaryColor,
+      decoration: BoxDecoration(
+        color: _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           20,
         ),
-        border:
-        Border.all(
+        border: Border.all(
           color:
           _primaryColor.withValues(
-            alpha:
-            0.18,
+            alpha: 0.18,
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         mainAxisSize:
         MainAxisSize.min,
         children: [
           Icon(
             Icons
                 .check_circle_outline_rounded,
-            size:
-            13,
-            color:
-            _primaryColor,
+            size: 13,
+            color: _primaryColor,
           ),
 
           const SizedBox(
-            width:
-            5,
+            width: 5,
           ),
 
           Text(
@@ -1294,10 +1114,8 @@ class _SmartMatchesScreenState
             style:
             AppTextStyles.caption
                 .copyWith(
-              fontSize:
-              10,
-              color:
-              _textColor,
+              fontSize: 10,
+              color: _textColor,
               fontWeight:
               FontWeight.w600,
             ),
@@ -1313,28 +1131,22 @@ class _SmartMatchesScreenState
 
   Widget _buildLoadingState() {
     return Center(
-      child:
-      Column(
+      child: Column(
         mainAxisSize:
         MainAxisSize.min,
         children: [
           SizedBox(
-            width:
-            30,
-            height:
-            30,
+            width: 30,
+            height: 30,
             child:
             CircularProgressIndicator(
-              strokeWidth:
-              2.5,
-              color:
-              _primaryColor,
+              strokeWidth: 2.5,
+              color: _primaryColor,
             ),
           ),
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           Text(
@@ -1342,8 +1154,7 @@ class _SmartMatchesScreenState
             style:
             AppTextStyles.secondary
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
         ],
@@ -1357,29 +1168,24 @@ class _SmartMatchesScreenState
 
   Widget _buildErrorState() {
     return Center(
-      child:
-      Padding(
+      child: Padding(
         padding:
         const EdgeInsets.all(
           28,
         ),
-        child:
-        Column(
+        child: Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [
             Icon(
               Icons
                   .error_outline_rounded,
-              size:
-              44,
-              color:
-              _mutedColor,
+              size: 44,
+              color: _mutedColor,
             ),
 
             const SizedBox(
-              height:
-              14,
+              height: 14,
             ),
 
             Text(
@@ -1387,14 +1193,12 @@ class _SmartMatchesScreenState
               style:
               AppTextStyles.cardTitle
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
               ),
             ),
 
             const SizedBox(
-              height:
-              7,
+              height: 7,
             ),
 
             Text(
@@ -1411,8 +1215,7 @@ class _SmartMatchesScreenState
             ),
 
             const SizedBox(
-              height:
-              18,
+              height: 18,
             ),
 
             ElevatedButton.icon(
@@ -1425,8 +1228,7 @@ class _SmartMatchesScreenState
               icon:
               const Icon(
                 Icons.refresh_rounded,
-                size:
-                18,
+                size: 18,
               ),
               label:
               const Text(
@@ -1447,8 +1249,7 @@ class _SmartMatchesScreenState
     return RefreshIndicator(
       onRefresh:
       _refreshMatches,
-      child:
-      ListView(
+      child: ListView(
         physics:
         const AlwaysScrollableScrollPhysics(),
         padding:
@@ -1461,17 +1262,13 @@ class _SmartMatchesScreenState
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
-            width:
-            100,
-            height:
-            100,
-            fit:
-            BoxFit.contain,
+            width: 100,
+            height: 100,
+            fit: BoxFit.contain,
           ),
 
           const SizedBox(
-            height:
-            14,
+            height: 14,
           ),
 
           Text(
@@ -1481,14 +1278,12 @@ class _SmartMatchesScreenState
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
 
           const SizedBox(
-            height:
-            7,
+            height: 7,
           ),
 
           Text(
@@ -1498,14 +1293,12 @@ class _SmartMatchesScreenState
             style:
             AppTextStyles.bodyMuted
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
 
           const SizedBox(
-            height:
-            18,
+            height: 18,
           ),
 
           OutlinedButton.icon(
@@ -1559,8 +1352,7 @@ class _SmartMatchesScreenState
     }
 
     await _loadMatches(
-      showLoading:
-      false,
+      showLoading: false,
     );
   }
 
@@ -1581,8 +1373,7 @@ class _SmartMatchesScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content:
-          Text(
+          content: Text(
             message,
           ),
           behavior:
