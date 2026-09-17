@@ -2,10 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../model/repositories/explore_repository.dart';
+import '../controller/edit_profile_controller.dart';
 import '../model/user.dart';
-import '../services/current_user_service.dart';
-import '../services/profile_image_service.dart';
 import '../theme/app_theme.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -23,14 +21,8 @@ class _EditProfileScreenState
   final GlobalKey<FormState> _formKey =
   GlobalKey<FormState>();
 
-  final ExploreRepository _repository =
-      ExploreRepository.instance;
-
-  final CurrentUserService _currentUserService =
-      CurrentUserService.instance;
-
-  final ProfileImageService _profileImageService =
-      ProfileImageService.instance;
+  final EditProfileController _controller =
+  EditProfileController();
 
   final TextEditingController _nameController =
   TextEditingController();
@@ -70,6 +62,10 @@ class _EditProfileScreenState
   String _originalPreferredMode = '';
   String _originalTeachingStyle = '';
 
+  // ============================================================
+  // THEME
+  // ============================================================
+
   Color get _surfaceColor =>
       Theme.of(context).colorScheme.surface;
 
@@ -93,6 +89,10 @@ class _EditProfileScreenState
 
   Color get _primaryColor =>
       Theme.of(context).colorScheme.primary;
+
+  // ============================================================
+  // STATE
+  // ============================================================
 
   bool get _isBusy =>
       _isSaving ||
@@ -120,6 +120,10 @@ class _EditProfileScreenState
             _originalTeachingStyle;
   }
 
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
@@ -138,6 +142,28 @@ class _EditProfileScreenState
     _teachingStyleController.dispose();
 
     super.dispose();
+  }
+
+  // ============================================================
+  // SNAPSHOT
+  // ============================================================
+
+  void _applySnapshot(
+      EditProfileSnapshot snapshot, {
+        bool populateForm = false,
+      }) {
+    _currentUser =
+        snapshot.user;
+
+    if (populateForm) {
+      _populateControllers(
+        snapshot.user,
+      );
+
+      _captureOriginalValues(
+        snapshot.user,
+      );
+    }
   }
 
   // ============================================================
@@ -200,51 +226,23 @@ class _EditProfileScreenState
 
   Future<void> _loadCurrentProfile() async {
     try {
-      await _repository.initialize();
-
-      final String userId =
-      _currentUserService.requireUserId();
-
-      final User? user =
-      _repository.findUserById(
-        userId,
-      );
-
-      if (user == null) {
-        throw const ExploreRepositoryException(
-          'Your profile could not be found.',
-        );
-      }
+      final EditProfileSnapshot snapshot =
+      await _controller.loadProfile();
 
       if (!mounted) {
         return;
       }
 
-      _currentUser =
-          user;
-
-      _populateControllers(
-        user,
-      );
-
-      _captureOriginalValues(
-        user,
+      _applySnapshot(
+        snapshot,
+        populateForm: true,
       );
 
       setState(() {
         _isLoading = false;
         _loadError = null;
       });
-    } on CurrentUserServiceException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-        _loadError = error.message;
-      });
-    } on ExploreRepositoryException catch (error) {
+    } on EditProfileControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -411,8 +409,8 @@ class _EditProfileScreenState
     });
 
     try {
-      final User updatedUser =
-      await _repository.updateCurrentUserProfile(
+      final EditProfileSnapshot snapshot =
+      await _controller.saveProfile(
         name:
         _nameController.text,
         city:
@@ -429,26 +427,20 @@ class _EditProfileScreenState
         _teachingStyleController.text,
       );
 
-      _currentUser =
-          updatedUser;
-
-      _populateControllers(
-        updatedUser,
-      );
-
-      _captureOriginalValues(
-        updatedUser,
-      );
-
       if (!mounted) {
         return;
       }
+
+      _applySnapshot(
+        snapshot,
+        populateForm: true,
+      );
 
       Navigator.pop(
         context,
         true,
       );
-    } on ExploreRepositoryException catch (error) {
+    } on EditProfileControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -603,27 +595,27 @@ class _EditProfileScreenState
     });
 
     try {
-      final User? updatedUser =
-      await _profileImageService
-          .pickAndSaveCurrentUserProfileImage();
+      final EditProfileSnapshot? snapshot =
+      await _controller.pickProfileImage();
 
       if (!mounted) {
         return;
       }
 
-      if (updatedUser == null) {
+      if (snapshot == null) {
         return;
       }
 
       setState(() {
-        _currentUser =
-            updatedUser;
+        _applySnapshot(
+          snapshot,
+        );
       });
 
       _showMessage(
         'Profile photo updated.',
       );
-    } on ProfileImageServiceException catch (error) {
+    } on EditProfileControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -736,23 +728,23 @@ class _EditProfileScreenState
     });
 
     try {
-      final User updatedUser =
-      await _profileImageService
-          .removeCurrentUserProfileImage();
+      final EditProfileSnapshot snapshot =
+      await _controller.removeProfileImage();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _currentUser =
-            updatedUser;
+        _applySnapshot(
+          snapshot,
+        );
       });
 
       _showMessage(
         'Profile photo removed.',
       );
-    } on ProfileImageServiceException catch (error) {
+    } on EditProfileControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -841,7 +833,8 @@ class _EditProfileScreenState
             size,
             height:
             size,
-            child: hasImage
+            child:
+            hasImage
                 ? Image.file(
               File(
                 path,
@@ -896,7 +889,8 @@ class _EditProfileScreenState
                 height:
                 28,
                 child: Center(
-                  child: _isUpdatingProfileImage
+                  child:
+                  _isUpdatingProfileImage
                       ? const SizedBox(
                     width:
                     13,
@@ -1301,8 +1295,7 @@ class _EditProfileScreenState
           _borderColor,
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           _buildProfileAvatar(
             size:
@@ -1315,8 +1308,7 @@ class _EditProfileScreenState
           ),
 
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -1387,8 +1379,7 @@ class _EditProfileScreenState
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           Icon(
             Icons.edit_rounded,
@@ -1404,8 +1395,7 @@ class _EditProfileScreenState
           ),
 
           Expanded(
-            child:
-            Text(
+            child: Text(
               'Tap any field below to edit your information.',
               style:
               AppTextStyles.secondary
@@ -1620,14 +1610,12 @@ class _EditProfileScreenState
 
   Widget _buildErrorState() {
     return Center(
-      child:
-      Padding(
+      child: Padding(
         padding:
         const EdgeInsets.all(
           24,
         ),
-        child:
-        Column(
+        child: Column(
           mainAxisSize:
           MainAxisSize.min,
           children: [
