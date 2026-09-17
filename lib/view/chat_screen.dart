@@ -2,10 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../controller/chat_controller.dart';
 import '../model/conversation.dart';
-import '../model/repositories/explore_repository.dart';
 import '../model/user.dart';
-import '../services/chat_service.dart';
 import '../theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -23,8 +22,8 @@ class _ChatScreenState
   static const Color primary =
       AppTheme.primary;
 
-  final ExploreRepository _repository =
-      ExploreRepository.instance;
+  final ChatController _controller =
+  ChatController();
 
   final TextEditingController
   _searchController =
@@ -34,8 +33,12 @@ class _ChatScreenState
   bool _isSearchVisible = false;
 
   String? _loadError;
+
   String? _openingConversationId;
   String? _archivingConversationId;
+
+  List<ManagedConversation> _conversations =
+  <ManagedConversation>[];
 
   bool get _hasPendingAction =>
       _openingConversationId != null ||
@@ -70,6 +73,10 @@ class _ChatScreenState
           .colorScheme
           .outlineVariant;
 
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
@@ -97,26 +104,30 @@ class _ChatScreenState
     }
 
     try {
-      await _repository.initialize();
-
-      await ChatService.instance.initialize();
+      final ChatListSnapshot snapshot =
+      await _controller
+          .loadConversations();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
+        _conversations =
+            snapshot.conversations;
+
         _isLoading = false;
         _loadError = null;
       });
-    } on ChatServiceException catch (error) {
+    } on ChatControllerException catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
         _isLoading = false;
-        _loadError = error.message;
+        _loadError =
+            error.message;
       });
     } catch (_) {
       if (!mounted) {
@@ -131,71 +142,54 @@ class _ChatScreenState
     }
   }
 
-  // ============================================================
-  // CONVERSATIONS
-  // ============================================================
+  Future<void> _refreshConversations() async {
+    try {
+      final ChatListSnapshot snapshot =
+      await _controller
+          .refreshConversations();
 
-  List<Conversation> _visibleConversations() {
-    final List<Conversation> conversations =
-    <Conversation>[
-      ...ChatService.instance.conversations,
-    ];
+      if (!mounted) {
+        return;
+      }
 
-    conversations.sort(
-          (
-          Conversation first,
-          Conversation second,
-          ) {
-        final DateTime firstTime =
-        first.messages.isEmpty
-            ? DateTime.fromMillisecondsSinceEpoch(
-          0,
-        )
-            : first.messages.last.sentAt;
+      setState(() {
+        _conversations =
+            snapshot.conversations;
 
-        final DateTime secondTime =
-        second.messages.isEmpty
-            ? DateTime.fromMillisecondsSinceEpoch(
-          0,
-        )
-            : second.messages.last.sentAt;
+        _loadError = null;
+      });
+    } on ChatControllerException catch (error) {
+      if (!mounted) {
+        return;
+      }
 
-        return secondTime.compareTo(
-          firstTime,
-        );
-      },
-    );
+      _showSnackBar(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
 
-    final String query =
-    _searchController.text
-        .trim()
-        .toLowerCase();
-
-    if (query.isEmpty) {
-      return conversations;
+      _showSnackBar(
+        'Messages could not be refreshed. Please try again.',
+      );
     }
+  }
 
-    return conversations.where(
-          (
-          Conversation conversation,
-          ) {
-        return conversation.userName
-            .toLowerCase()
-            .contains(query) ||
-            conversation.city
-                .toLowerCase()
-                .contains(query) ||
-            conversation.skillWanted
-                .toLowerCase()
-                .contains(query) ||
-            conversation.skillOffered
-                .toLowerCase()
-                .contains(query) ||
-            conversation.status
-                .toLowerCase()
-                .contains(query);
-      },
-    ).toList();
+  // ============================================================
+  // FILTERED CONVERSATIONS
+  // ============================================================
+
+  List<ManagedConversation>
+  _visibleConversations() {
+    return _controller
+        .filterConversations(
+      conversations:
+      _conversations,
+      query:
+      _searchController.text,
+    );
   }
 
   // ============================================================
@@ -206,7 +200,8 @@ class _ChatScreenState
   Widget build(
       BuildContext context,
       ) {
-    final List<Conversation> conversations =
+    final List<ManagedConversation>
+    conversations =
     _visibleConversations();
 
     return Scaffold(
@@ -233,11 +228,13 @@ class _ChatScreenState
   }
 
   Widget _buildBody(
-      List<Conversation> conversations,
+      List<ManagedConversation>
+      conversations,
       ) {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
+        child:
+        CircularProgressIndicator(
           color: primary,
         ),
       );
@@ -257,34 +254,41 @@ class _ChatScreenState
       return _buildEmptyState();
     }
 
-    return ListView.separated(
-      physics:
-      const BouncingScrollPhysics(),
-      padding:
-      const EdgeInsets.fromLTRB(
-        20,
-        18,
-        20,
-        30,
+    return RefreshIndicator(
+      onRefresh:
+      _refreshConversations,
+      child: ListView.separated(
+        physics:
+        const AlwaysScrollableScrollPhysics(
+          parent:
+          BouncingScrollPhysics(),
+        ),
+        padding:
+        const EdgeInsets.fromLTRB(
+          20,
+          18,
+          20,
+          30,
+        ),
+        itemCount:
+        conversations.length,
+        separatorBuilder: (
+            BuildContext context,
+            int index,
+            ) {
+          return const SizedBox(
+            height: 12,
+          );
+        },
+        itemBuilder: (
+            BuildContext context,
+            int index,
+            ) {
+          return _buildConversationCard(
+            conversations[index],
+          );
+        },
       ),
-      itemCount:
-      conversations.length,
-      separatorBuilder: (
-          BuildContext context,
-          int index,
-          ) {
-        return const SizedBox(
-          height: 12,
-        );
-      },
-      itemBuilder: (
-          BuildContext context,
-          int index,
-          ) {
-        return _buildConversationCard(
-          conversations[index],
-        );
-      },
     );
   }
 
@@ -299,14 +303,11 @@ class _ChatScreenState
       const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration:
-      BoxDecoration(
+      decoration: BoxDecoration(
         color:
         _surfaceColor,
-        border:
-        Border(
-          bottom:
-          BorderSide(
+        border: Border(
+          bottom: BorderSide(
             color:
             _borderColor,
           ),
@@ -342,7 +343,8 @@ class _ChatScreenState
                 TextStyle(
                   fontSize: 15,
                   fontWeight:
-                  FontWeight.w800,
+                  FontWeight
+                      .w800,
                   color:
                   _textColor,
                 ),
@@ -359,11 +361,12 @@ class _ChatScreenState
             _hasPendingAction
                 ? null
                 : _toggleSearch,
-            icon:
-            Icon(
+            icon: Icon(
               _isSearchVisible
-                  ? Icons.close_rounded
-                  : Icons.search_rounded,
+                  ? Icons
+                  .close_rounded
+                  : Icons
+                  .search_rounded,
               size: 20,
               color: primary,
             ),
@@ -391,12 +394,10 @@ class _ChatScreenState
       child: TextField(
         controller:
         _searchController,
-        autofocus:
-        true,
+        autofocus: true,
         textInputAction:
         TextInputAction.search,
-        style:
-        TextStyle(
+        style: TextStyle(
           color:
           _textColor,
           fontSize: 13,
@@ -433,22 +434,25 @@ class _ChatScreenState
               : IconButton(
             tooltip:
             'Clear search',
-            onPressed: () {
+            onPressed:
+                () {
               _searchController
                   .clear();
 
-              setState(() {});
+              setState(
+                    () {},
+              );
             },
             icon:
             Icon(
-              Icons.clear_rounded,
+              Icons
+                  .clear_rounded,
               size: 18,
               color:
               _mutedColor,
             ),
           ),
-          filled:
-          true,
+          filled: true,
           fillColor:
           _surfaceVariantColor,
           contentPadding:
@@ -512,12 +516,17 @@ class _ChatScreenState
   // ============================================================
 
   Widget _buildConversationCard(
-      Conversation conversation,
+      ManagedConversation managed,
       ) {
+    final Conversation conversation =
+        managed.conversation;
+
     final latestMessage =
     conversation.messages.isEmpty
         ? null
-        : conversation.messages.last;
+        : conversation
+        .messages
+        .last;
 
     final bool isOpening =
         _openingConversationId ==
@@ -549,7 +558,7 @@ class _ChatScreenState
           ? null
           : () {
         _showConversationOptions(
-          conversation,
+          managed,
         );
       },
       child: Container(
@@ -573,7 +582,8 @@ class _ChatScreenState
           boxShadow: [
             BoxShadow(
               color:
-              Colors.black.withValues(
+              Colors.black
+                  .withValues(
                 alpha:
                 _isDarkMode
                     ? 0.10
@@ -590,10 +600,11 @@ class _ChatScreenState
         ),
         child: Row(
           crossAxisAlignment:
-          CrossAxisAlignment.start,
+          CrossAxisAlignment
+              .start,
           children: [
             _buildConversationAvatar(
-              conversation,
+              managed,
               size: 52,
             ),
 
@@ -604,7 +615,8 @@ class _ChatScreenState
             Expanded(
               child: Column(
                 crossAxisAlignment:
-                CrossAxisAlignment.start,
+                CrossAxisAlignment
+                    .start,
                 children: [
                   Row(
                     children: [
@@ -614,12 +626,15 @@ class _ChatScreenState
                               .userName,
                           maxLines: 1,
                           overflow:
-                          TextOverflow.ellipsis,
+                          TextOverflow
+                              .ellipsis,
                           style:
                           TextStyle(
-                            fontSize: 13,
+                            fontSize:
+                            13,
                             fontWeight:
-                            FontWeight.w800,
+                            FontWeight
+                                .w800,
                             color:
                             _textColor,
                           ),
@@ -636,8 +651,10 @@ class _ChatScreenState
                           height: 15,
                           child:
                           CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: primary,
+                            strokeWidth:
+                            2,
+                            color:
+                            primary,
                           ),
                         )
                       else if (latestMessage !=
@@ -649,7 +666,8 @@ class _ChatScreenState
                           ),
                           style:
                           TextStyle(
-                            fontSize: 8.5,
+                            fontSize:
+                            8.5,
                             color:
                             _mutedColor,
                           ),
@@ -665,7 +683,8 @@ class _ChatScreenState
                     conversation.city,
                     maxLines: 1,
                     overflow:
-                    TextOverflow.ellipsis,
+                    TextOverflow
+                        .ellipsis,
                     style:
                     TextStyle(
                       fontSize: 8.5,
@@ -684,7 +703,8 @@ class _ChatScreenState
                         Icons
                             .swap_horiz_rounded,
                         size: 14,
-                        color: primary,
+                        color:
+                        primary,
                       ),
 
                       const SizedBox(
@@ -696,13 +716,16 @@ class _ChatScreenState
                           '${conversation.skillWanted} ↔ ${conversation.skillOffered}',
                           maxLines: 1,
                           overflow:
-                          TextOverflow.ellipsis,
+                          TextOverflow
+                              .ellipsis,
                           style:
                           const TextStyle(
                             fontSize: 9,
                             fontWeight:
-                            FontWeight.w600,
-                            color: primary,
+                            FontWeight
+                                .w600,
+                            color:
+                            primary,
                           ),
                         ),
                       ),
@@ -720,13 +743,16 @@ class _ChatScreenState
                           latestMessage ==
                               null
                               ? 'No messages yet'
-                              : latestMessage.text,
+                              : latestMessage
+                              .text,
                           maxLines: 1,
                           overflow:
-                          TextOverflow.ellipsis,
+                          TextOverflow
+                              .ellipsis,
                           style:
                           TextStyle(
-                            fontSize: 10,
+                            fontSize:
+                            10,
                             color:
                             _mutedColor,
                           ),
@@ -740,30 +766,38 @@ class _ChatScreenState
                       Container(
                         padding:
                         const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal:
+                          8,
+                          vertical:
+                          4,
                         ),
                         decoration:
                         BoxDecoration(
                           color:
                           _statusBackground(
-                            conversation.status,
+                            conversation
+                                .status,
                           ),
                           borderRadius:
-                          BorderRadius.circular(
+                          BorderRadius
+                              .circular(
                             12,
                           ),
                         ),
                         child: Text(
-                          conversation.status,
+                          conversation
+                              .status,
                           style:
                           TextStyle(
-                            fontSize: 7.5,
+                            fontSize:
+                            7.5,
                             fontWeight:
-                            FontWeight.w700,
+                            FontWeight
+                                .w700,
                             color:
                             _statusColor(
-                              conversation.status,
+                              conversation
+                                  .status,
                             ),
                           ),
                         ),
@@ -777,25 +811,30 @@ class _ChatScreenState
                         tooltip:
                         'Conversation options',
                         visualDensity:
-                        VisualDensity.compact,
+                        VisualDensity
+                            .compact,
                         constraints:
                         const BoxConstraints(
-                          minWidth: 32,
-                          minHeight: 32,
+                          minWidth:
+                          32,
+                          minHeight:
+                          32,
                         ),
                         padding:
-                        EdgeInsets.zero,
+                        EdgeInsets
+                            .zero,
                         onPressed:
                         _hasPendingAction
                             ? null
                             : () {
                           _showConversationOptions(
-                            conversation,
+                            managed,
                           );
                         },
                         icon:
                         Icon(
-                          Icons.more_vert_rounded,
+                          Icons
+                              .more_vert_rounded,
                           size: 17,
                           color:
                           _mutedColor,
@@ -817,23 +856,14 @@ class _ChatScreenState
   // ============================================================
 
   Widget _buildConversationAvatar(
-      Conversation conversation, {
+      ManagedConversation managed, {
         required double size,
       }) {
-    User? participant;
+    final Conversation conversation =
+        managed.conversation;
 
-    final String? participantUserId =
-    conversation
-        .participantUserId
-        ?.trim();
-
-    if (participantUserId != null &&
-        participantUserId.isNotEmpty) {
-      participant =
-          _repository.findUserById(
-            participantUserId,
-          );
-    }
+    final User? participant =
+        managed.participant;
 
     final String? path =
     participant
@@ -859,26 +889,32 @@ class _ChatScreenState
           ),
           width: size,
           height: size,
-          fit: BoxFit.cover,
+          fit:
+          BoxFit.cover,
           errorBuilder: (
-              BuildContext context,
+              BuildContext
+              context,
               Object error,
-              StackTrace? stackTrace,
+              StackTrace?
+              stackTrace,
               ) {
             return _buildInitialAvatar(
               participant
                   ?.initials ??
                   conversation
                       .initials,
-              size: size,
+              size:
+              size,
             );
           },
         )
             : _buildInitialAvatar(
           participant
               ?.initials ??
-              conversation.initials,
-          size: size,
+              conversation
+                  .initials,
+          size:
+          size,
         ),
       ),
     );
@@ -953,16 +989,36 @@ class _ChatScreenState
       }
 
       try {
-        await _repository.refresh();
-      } catch (_) {
-        // Conversation data can still refresh independently.
-      }
+        final ChatListSnapshot snapshot =
+        await _controller
+            .refreshConversations();
 
-      if (!mounted) {
-        return;
-      }
+        if (!mounted) {
+          return;
+        }
 
-      setState(() {});
+        setState(() {
+          _conversations =
+              snapshot
+                  .conversations;
+        });
+      } on ChatControllerException {
+        if (!mounted) {
+          return;
+        }
+
+        try {
+          final ChatListSnapshot snapshot =
+          _controller
+              .currentChatList();
+
+          setState(() {
+            _conversations =
+                snapshot
+                    .conversations;
+          });
+        } catch (_) {}
+      }
     } catch (_) {
       if (!mounted) {
         return;
@@ -986,14 +1042,18 @@ class _ChatScreenState
   // ============================================================
 
   Future<void> _showConversationOptions(
-      Conversation conversation,
+      ManagedConversation managed,
       ) async {
     if (_hasPendingAction) {
       return;
     }
 
+    final Conversation conversation =
+        managed.conversation;
+
     final String? action =
-    await showModalBottomSheet<String>(
+    await showModalBottomSheet<
+        String>(
       context:
       context,
       backgroundColor:
@@ -1001,7 +1061,8 @@ class _ChatScreenState
       showDragHandle:
       true,
       builder: (
-          BuildContext sheetContext,
+          BuildContext
+          sheetContext,
           ) {
         return SafeArea(
           child: Padding(
@@ -1018,7 +1079,8 @@ class _ChatScreenState
                   const Icon(
                     Icons
                         .chat_bubble_outline_rounded,
-                    color: primary,
+                    color:
+                    primary,
                   ),
                   title:
                   Text(
@@ -1029,7 +1091,8 @@ class _ChatScreenState
                       _textColor,
                     ),
                   ),
-                  onTap: () {
+                  onTap:
+                      () {
                     Navigator.pop(
                       sheetContext,
                       'open',
@@ -1040,7 +1103,8 @@ class _ChatScreenState
                 ListTile(
                   leading:
                   Icon(
-                    Icons.archive_outlined,
+                    Icons
+                        .archive_outlined,
                     color:
                     _mutedColor,
                   ),
@@ -1060,10 +1124,12 @@ class _ChatScreenState
                     TextStyle(
                       color:
                       _mutedColor,
-                      fontSize: 11,
+                      fontSize:
+                      11,
                     ),
                   ),
-                  onTap: () {
+                  onTap:
+                      () {
                     Navigator.pop(
                       sheetContext,
                       'archive',
@@ -1092,7 +1158,7 @@ class _ChatScreenState
 
     if (action == 'archive') {
       await _confirmArchiveConversation(
-        conversation,
+        managed,
       );
     }
   }
@@ -1102,11 +1168,14 @@ class _ChatScreenState
   // ============================================================
 
   Future<void> _confirmArchiveConversation(
-      Conversation conversation,
+      ManagedConversation managed,
       ) async {
     if (_hasPendingAction) {
       return;
     }
+
+    final Conversation conversation =
+        managed.conversation;
 
     final bool? confirmed =
     await showDialog<bool>(
@@ -1115,7 +1184,8 @@ class _ChatScreenState
       barrierDismissible:
       false,
       builder: (
-          BuildContext dialogContext,
+          BuildContext
+          dialogContext,
           ) {
         return AlertDialog(
           backgroundColor:
@@ -1128,7 +1198,8 @@ class _ChatScreenState
               color:
               _textColor,
               fontWeight:
-              FontWeight.w800,
+              FontWeight
+                  .w800,
             ),
           ),
           content:
@@ -1142,7 +1213,8 @@ class _ChatScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   false,
@@ -1160,7 +1232,8 @@ class _ChatScreenState
             ),
 
             TextButton.icon(
-              onPressed: () {
+              onPressed:
+                  () {
                 Navigator.pop(
                   dialogContext,
                   true,
@@ -1168,7 +1241,8 @@ class _ChatScreenState
               },
               icon:
               const Icon(
-                Icons.archive_outlined,
+                Icons
+                    .archive_outlined,
                 size: 18,
               ),
               label:
@@ -1177,7 +1251,8 @@ class _ChatScreenState
                 style:
                 TextStyle(
                   fontWeight:
-                  FontWeight.w700,
+                  FontWeight
+                      .w700,
                 ),
               ),
             ),
@@ -1192,16 +1267,19 @@ class _ChatScreenState
     }
 
     await _archiveConversation(
-      conversation,
+      managed,
     );
   }
 
   Future<void> _archiveConversation(
-      Conversation conversation,
+      ManagedConversation managed,
       ) async {
     if (_hasPendingAction) {
       return;
     }
+
+    final Conversation conversation =
+        managed.conversation;
 
     setState(() {
       _archivingConversationId =
@@ -1209,8 +1287,9 @@ class _ChatScreenState
     });
 
     try {
-      await ChatService.instance
-          .deleteConversation(
+      final ChatListSnapshot snapshot =
+      await _controller
+          .archiveConversation(
         conversation.id,
       );
 
@@ -1218,12 +1297,15 @@ class _ChatScreenState
         return;
       }
 
-      setState(() {});
+      setState(() {
+        _conversations =
+            snapshot.conversations;
+      });
 
       _showSnackBar(
         'Conversation with ${conversation.userName} archived.',
       );
-    } on ChatServiceException catch (error) {
+    } on ChatControllerException catch (error) {
       if (!mounted) {
         return;
       }
@@ -1265,7 +1347,8 @@ class _ChatScreenState
           MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.error_outline_rounded,
+              Icons
+                  .error_outline_rounded,
               size: 48,
               color:
               _mutedColor,
@@ -1281,7 +1364,8 @@ class _ChatScreenState
               TextStyle(
                 fontSize: 17,
                 fontWeight:
-                FontWeight.w800,
+                FontWeight
+                    .w800,
                 color:
                 _textColor,
               ),
@@ -1298,7 +1382,8 @@ class _ChatScreenState
               TextAlign.center,
               style:
               TextStyle(
-                fontSize: 10.5,
+                fontSize:
+                10.5,
                 height: 1.5,
                 color:
                 _mutedColor,
@@ -1324,57 +1409,65 @@ class _ChatScreenState
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
+    return RefreshIndicator(
+      onRefresh:
+      _refreshConversations,
+      child: ListView(
+        physics:
+        const AlwaysScrollableScrollPhysics(),
         padding:
         const EdgeInsets.symmetric(
           horizontal: 36,
         ),
-        child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/mascot/tubi_sleeping.png',
-              width: 120,
-              height: 120,
-              fit: BoxFit.contain,
-            ),
+        children: [
+          const SizedBox(
+            height: 120,
+          ),
 
-            const SizedBox(
-              height: 14,
-            ),
+          Image.asset(
+            'assets/images/mascot/tubi_sleeping.png',
+            width: 120,
+            height: 120,
+            fit:
+            BoxFit.contain,
+          ),
 
-            Text(
-              'No conversations yet',
-              style:
-              TextStyle(
-                fontSize: 17,
-                fontWeight:
-                FontWeight.w800,
-                color:
-                _textColor,
-              ),
-            ),
+          const SizedBox(
+            height: 14,
+          ),
 
-            const SizedBox(
-              height: 6,
+          Text(
+            'No conversations yet',
+            textAlign:
+            TextAlign.center,
+            style:
+            TextStyle(
+              fontSize: 17,
+              fontWeight:
+              FontWeight
+                  .w800,
+              color:
+              _textColor,
             ),
+          ),
 
-            Text(
-              'Find someone with a skill you want to learn and start a conversation.',
-              textAlign:
-              TextAlign.center,
-              style:
-              TextStyle(
-                fontSize: 10.5,
-                height: 1.5,
-                color:
-                _mutedColor,
-              ),
+          const SizedBox(
+            height: 6,
+          ),
+
+          Text(
+            'Find someone with a skill you want to learn and start a conversation.',
+            textAlign:
+            TextAlign.center,
+            style:
+            TextStyle(
+              fontSize: 10.5,
+              height: 1.5,
+              color:
+              _mutedColor,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1391,7 +1484,8 @@ class _ChatScreenState
           MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_off_rounded,
+              Icons
+                  .search_off_rounded,
               size: 48,
               color:
               _mutedColor,
@@ -1407,7 +1501,8 @@ class _ChatScreenState
               TextStyle(
                 fontSize: 17,
                 fontWeight:
-                FontWeight.w800,
+                FontWeight
+                    .w800,
                 color:
                 _textColor,
               ),
@@ -1423,7 +1518,8 @@ class _ChatScreenState
               TextAlign.center,
               style:
               TextStyle(
-                fontSize: 10.5,
+                fontSize:
+                10.5,
                 height: 1.5,
                 color:
                 _mutedColor,
@@ -1457,7 +1553,8 @@ class _ChatScreenState
             message,
           ),
           behavior:
-          SnackBarBehavior.floating,
+          SnackBarBehavior
+              .floating,
         ),
       );
   }
