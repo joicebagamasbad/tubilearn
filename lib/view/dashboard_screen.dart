@@ -3,13 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../model/repositories/explore_repository.dart';
+import '../controller/dashboard_controller.dart';
 import '../model/skill.dart';
 import '../model/skill_match.dart';
 import '../model/swap_request.dart';
 import '../model/user.dart';
-import '../services/current_user_service.dart';
-import '../services/swap_service.dart';
 import '../theme/app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -24,21 +22,25 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
-  final ExploreRepository _repository =
-      ExploreRepository.instance;
-
-  final CurrentUserService _currentUserService =
-      CurrentUserService.instance;
-
-  final SwapService _swapService =
-      SwapService.instance;
+  final DashboardController _controller =
+  DashboardController();
 
   final ScrollController _scrollController =
   ScrollController();
 
   Timer? _sessionBoundaryTimer;
 
+  DashboardSnapshot? _snapshot;
+
+  bool _isLoading = true;
+
+  String? _loadError;
+
   int _selectedNav = 0;
+
+  // ============================================================
+  // THEME
+  // ============================================================
 
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
@@ -96,26 +98,26 @@ class _DashboardScreenState extends State<DashboardScreen>
           ? _surfaceColor
           : Colors.white;
 
-  User? get _currentUser {
-    try {
-      final String userId =
-      _currentUserService.requireUserId();
+  // ============================================================
+  // SNAPSHOT SHORTCUTS
+  // ============================================================
 
-      return _repository.findUserById(
-        userId,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
+  User? get _currentUser =>
+      _snapshot?.currentUser;
 
-  List<Skill> get _featuredSkills {
-    return _repository.skills
-        .take(
-      5,
-    )
-        .toList();
-  }
+  List<Skill> get _featuredSkills =>
+      _snapshot?.featuredSkills ??
+          <Skill>[];
+
+  SkillMatch? get _bestSmartMatch =>
+      _snapshot?.bestSmartMatch;
+
+  DashboardSession? get _prioritySession =>
+      _snapshot?.prioritySession;
+
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
 
   @override
   void initState() {
@@ -125,15 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       this,
     );
 
-    WidgetsBinding.instance.addPostFrameCallback(
-          (_) {
-        if (!mounted) {
-          return;
-        }
-
-        _scheduleSessionBoundaryRefresh();
-      },
-    );
+    _loadDashboard();
   }
 
   @override
@@ -160,85 +154,155 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
+  // LOAD
+  // ============================================================
+
+  Future<void> _loadDashboard() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      final DashboardSnapshot snapshot =
+      await _controller.loadDashboard();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _snapshot = snapshot;
+        _isLoading = false;
+        _loadError = null;
+      });
+
+      _scheduleSessionBoundaryRefresh();
+    } on DashboardControllerException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError =
+        'Dashboard could not be loaded. Please try again.';
+      });
+    }
+  }
+
+  // ============================================================
   // REFRESH
   // ============================================================
 
   Future<void> _refreshDashboardData() async {
     try {
-      await _repository.refresh();
-    } catch (_) {
-      // Keep currently loaded local data.
+      final DashboardSnapshot snapshot =
+      await _controller.refreshDashboard();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _snapshot = snapshot;
+        _loadError = null;
+      });
+    } on DashboardControllerException {
+      if (!mounted) {
+        return;
+      }
+
+      try {
+        final DashboardSnapshot snapshot =
+        _controller.currentSnapshot();
+
+        setState(() {
+          _snapshot = snapshot;
+        });
+      } catch (_) {
+        // Keep current dashboard UI if refresh fails.
+      }
     }
 
     if (!mounted) {
       return;
     }
 
-    setState(() {});
-
     _scheduleSessionBoundaryRefresh();
   }
+
+  // ============================================================
+  // SESSION TIMER
+  // ============================================================
 
   void _scheduleSessionBoundaryRefresh() {
     _sessionBoundaryTimer?.cancel();
     _sessionBoundaryTimer = null;
 
-    final SwapRequest? session =
-    _findPriorityScheduledSession();
+    final DashboardSession? session =
+        _prioritySession;
 
-    if (session == null) {
-      return;
-    }
-
-    final User? currentUser =
-        _currentUser;
-
-    if (currentUser == null) {
-      return;
-    }
-
-    final DateTime now =
-    DateTime.now();
-
-    if (session
-        .isScheduledSessionReadyForCompletionFor(
-      currentUser.id,
-      now,
-    )) {
-      return;
-    }
-
-    final Duration remaining =
-    session.proposedAt.difference(
-      now,
+    final Duration? delay =
+    _controller.sessionBoundaryDelay(
+      session,
     );
 
-    if (remaining <=
-        Duration.zero) {
-      if (mounted) {
-        setState(() {});
-      }
+    if (delay == null) {
+      return;
+    }
 
+    if (delay <= Duration.zero) {
+      _refreshSnapshotFromController();
       return;
     }
 
     _sessionBoundaryTimer =
         Timer(
-          remaining +
-              const Duration(
-                seconds: 1,
-              ),
+          delay,
               () {
             if (!mounted) {
               return;
             }
 
-            setState(() {});
-
-            _scheduleSessionBoundaryRefresh();
+            _refreshSnapshotFromController();
           },
         );
   }
+
+  void _refreshSnapshotFromController() {
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      final DashboardSnapshot snapshot =
+      _controller.currentSnapshot();
+
+      setState(() {
+        _snapshot = snapshot;
+      });
+    } catch (_) {
+      setState(() {});
+    }
+
+    _scheduleSessionBoundaryRefresh();
+  }
+
+  // ============================================================
+  // ROUTE + REFRESH
+  // ============================================================
 
   Future<void> _openRouteAndRefresh(
       String routeName, {
@@ -247,8 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await Navigator.pushNamed(
       context,
       routeName,
-      arguments:
-      arguments,
+      arguments: arguments,
     );
 
     if (!mounted) {
@@ -266,138 +329,225 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget build(
       BuildContext context,
       ) {
-    final SkillMatch? match =
-    _findBestSmartMatch();
-
-    final SwapRequest? session =
-    _findPriorityScheduledSession();
-
-    final bool sessionReady =
-        session != null &&
-            _isSessionReadyForCompletion(
-              session,
-            );
-
     return Scaffold(
       backgroundColor:
       Theme.of(context)
           .scaffoldBackgroundColor,
-      body:
-      SafeArea(
-        child:
-        Column(
+      body: SafeArea(
+        child: _buildBody(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          color: _primaryColor,
+        ),
+      );
+    }
+
+    if (_loadError != null &&
+        _snapshot == null) {
+      return _buildErrorState();
+    }
+
+    final SkillMatch? match =
+        _bestSmartMatch;
+
+    final DashboardSession? session =
+        _prioritySession;
+
+    final bool sessionReady =
+        session?.readyForCompletion ??
+            false;
+
+    return Column(
+      children: [
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh:
+            _refreshDashboardData,
+            child: SingleChildScrollView(
+              controller:
+              _scrollController,
+              physics:
+              const BouncingScrollPhysics(
+                parent:
+                AlwaysScrollableScrollPhysics(),
+              ),
+              padding:
+              const EdgeInsets.fromLTRB(
+                20,
+                18,
+                20,
+                24,
+              ),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  _buildSearchBar(),
+
+                  const SizedBox(
+                    height: 24,
+                  ),
+
+                  _buildSectionHeader(
+                    title:
+                    '✦ Your Smart Match',
+                    action:
+                    'See all',
+                    onAction: () async {
+                      await _openRouteAndRefresh(
+                        '/smart-matches',
+                      );
+                    },
+                  ),
+
+                  const SizedBox(
+                    height: 12,
+                  ),
+
+                  _buildMatchCard(
+                    match,
+                  ),
+
+                  const SizedBox(
+                    height: 28,
+                  ),
+
+                  _buildSectionHeader(
+                    title:
+                    'Featured Skills',
+                    action:
+                    'Explore',
+                    onAction: () async {
+                      await _openRouteAndRefresh(
+                        '/explore',
+                      );
+                    },
+                  ),
+
+                  const SizedBox(
+                    height: 14,
+                  ),
+
+                  _buildFeaturedSkills(),
+
+                  const SizedBox(
+                    height: 28,
+                  ),
+
+                  _buildSectionHeader(
+                    title:
+                    sessionReady
+                        ? 'Session Ready to Complete'
+                        : 'Upcoming Session',
+                    action:
+                    'Requests',
+                    onAction: () async {
+                      await _openRouteAndRefresh(
+                        '/swap-requests',
+                      );
+                    },
+                  ),
+
+                  const SizedBox(
+                    height: 12,
+                  ),
+
+                  _buildScheduledSession(
+                    session,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        _buildBottomNavigation(),
+      ],
+    );
+  }
+
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  Widget _buildErrorState() {
+    return Center(
+      child: SingleChildScrollView(
+        physics:
+        const AlwaysScrollableScrollPhysics(),
+        padding:
+        const EdgeInsets.all(
+          24,
+        ),
+        child: Column(
+          mainAxisSize:
+          MainAxisSize.min,
           children: [
-            Expanded(
-              child:
-              SingleChildScrollView(
-                controller:
-                _scrollController,
-                physics:
-                const BouncingScrollPhysics(),
-                padding:
-                const EdgeInsets.fromLTRB(
-                  20,
-                  18,
-                  20,
-                  24,
-                ),
-                child:
-                Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 44,
+              color: _mutedColor,
+            ),
 
-                    const SizedBox(
-                      height: 20,
-                    ),
+            const SizedBox(
+              height: 12,
+            ),
 
-                    _buildSearchBar(),
-
-                    const SizedBox(
-                      height: 24,
-                    ),
-
-                    Column(
-                      children: [
-                        _buildSectionHeader(
-                          title:
-                          '✦ Your Smart Match',
-                          action:
-                          'See all',
-                          onAction:
-                              () async {
-                            await _openRouteAndRefresh(
-                              '/smart-matches',
-                            );
-                          },
-                        ),
-
-                        const SizedBox(
-                          height: 12,
-                        ),
-
-                        _buildMatchCard(
-                          match,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(
-                      height: 28,
-                    ),
-
-                    _buildSectionHeader(
-                      title:
-                      'Featured Skills',
-                      action:
-                      'Explore',
-                      onAction:
-                          () async {
-                        await _openRouteAndRefresh(
-                          '/explore',
-                        );
-                      },
-                    ),
-
-                    const SizedBox(
-                      height: 14,
-                    ),
-
-                    _buildFeaturedSkills(),
-
-                    const SizedBox(
-                      height: 28,
-                    ),
-
-                    _buildSectionHeader(
-                      title:
-                      sessionReady
-                          ? 'Session Ready to Complete'
-                          : 'Upcoming Session',
-                      action:
-                      'Requests',
-                      onAction:
-                          () async {
-                        await _openRouteAndRefresh(
-                          '/swap-requests',
-                        );
-                      },
-                    ),
-
-                    const SizedBox(
-                      height: 12,
-                    ),
-
-                    _buildScheduledSession(
-                      session,
-                    ),
-                  ],
-                ),
+            Text(
+              'Dashboard unavailable',
+              style:
+              AppTextStyles.cardTitle
+                  .copyWith(
+                color: _textColor,
               ),
             ),
 
-            _buildBottomNavigation(),
+            const SizedBox(
+              height: 6,
+            ),
+
+            Text(
+              _loadError ??
+                  'Dashboard could not be loaded.',
+              textAlign:
+              TextAlign.center,
+              style:
+              AppTextStyles.bodyMuted
+                  .copyWith(
+                color: _mutedColor,
+              ),
+            ),
+
+            const SizedBox(
+              height: 18,
+            ),
+
+            OutlinedButton.icon(
+              onPressed:
+              _loadDashboard,
+              icon:
+              const Icon(
+                Icons.refresh_rounded,
+              ),
+              label:
+              const Text(
+                'TRY AGAIN',
+                style:
+                AppTextStyles.button,
+              ),
+            ),
           ],
         ),
       ),
@@ -405,7 +555,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // PROFILE AVATAR
+  // AVATAR
   // ============================================================
 
   Widget _buildUserAvatar(
@@ -424,36 +574,29 @@ class _DashboardScreenState extends State<DashboardScreen>
             );
 
     return ClipOval(
-      child:
-      SizedBox(
-        width:
-        size,
-        height:
-        size,
+      child: SizedBox(
+        width: size,
+        height: size,
         child:
         hasImage
             ? Image.file(
           File(
             path,
           ),
-          width:
-          size,
-          height:
-          size,
-          fit:
-          BoxFit.cover,
-          errorBuilder:
-              (
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (
               BuildContext context,
               Object error,
-              StackTrace? stackTrace,
+              StackTrace?
+              stackTrace,
               ) {
             return _buildInitialAvatar(
               initials:
               user?.initials ??
                   fallbackInitials,
-              size:
-              size,
+              size: size,
             );
           },
         )
@@ -461,8 +604,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           initials:
           user?.initials ??
               fallbackInitials,
-          size:
-          size,
+          size: size,
         ),
       ),
     );
@@ -473,19 +615,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     required double size,
   }) {
     return Container(
-      width:
-      size,
-      height:
-      size,
-      color:
-      AppTheme.accent,
+      width: size,
+      height: size,
+      color: AppTheme.accent,
       alignment:
       Alignment.center,
-      child:
-      Text(
+      child: Text(
         initials,
-        style:
-        TextStyle(
+        style: TextStyle(
           fontSize:
           size >= 48
               ? 12
@@ -522,9 +659,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final String displayName;
 
     if (currentUser == null ||
-        currentUser.name.trim().isEmpty) {
-      displayName =
-      'there';
+        currentUser.name
+            .trim()
+            .isEmpty) {
+      displayName = 'there';
     } else {
       displayName =
           currentUser.name
@@ -540,8 +678,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Row(
       children: [
         Expanded(
-          child:
-          Column(
+          child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -550,8 +687,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 style:
                 AppTextStyles.pageTitle
                     .copyWith(
-                  color:
-                  _textColor,
+                  color: _textColor,
                 ),
               ),
 
@@ -564,8 +700,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 style:
                 AppTextStyles.secondary
                     .copyWith(
-                  color:
-                  _mutedColor,
+                  color: _mutedColor,
                 ),
               ),
             ],
@@ -573,43 +708,34 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
 
         Container(
-          width:
-          40,
-          height:
-          40,
+          width: 40,
+          height: 40,
           decoration:
           BoxDecoration(
-            color:
-            _surfaceColor,
+            color: _surfaceColor,
             borderRadius:
             BorderRadius.circular(
               12,
             ),
             border:
             Border.all(
-              color:
-              _borderColor,
+              color: _borderColor,
             ),
           ),
-          child:
-          IconButton(
+          child: IconButton(
             tooltip:
             'Swap requests',
             padding:
             EdgeInsets.zero,
-            onPressed:
-                () async {
+            onPressed: () async {
               await _openRouteAndRefresh(
                 '/swap-requests',
               );
             },
-            icon:
-            Icon(
+            icon: Icon(
               Icons.swap_horiz_rounded,
-              size:
-              21,
-              color:
-              _textColor,
+              size: 21,
+              color: _textColor,
             ),
           ),
         ),
@@ -626,8 +752,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           child:
           _buildUserAvatar(
             currentUser,
-            size:
-            42,
+            size: 42,
           ),
         ),
       ],
@@ -665,32 +790,26 @@ class _DashboardScreenState extends State<DashboardScreen>
       BorderRadius.circular(
         14,
       ),
-      onTap:
-          () async {
+      onTap: () async {
         await _openRouteAndRefresh(
           '/explore',
         );
       },
-      child:
-      Container(
-        height:
-        50,
+      child: Container(
+        height: 50,
         decoration:
         BoxDecoration(
-          color:
-          _surfaceColor,
+          color: _surfaceColor,
           borderRadius:
           BorderRadius.circular(
             14,
           ),
           border:
           Border.all(
-            color:
-            _borderColor,
+            color: _borderColor,
           ),
         ),
-        child:
-        Row(
+        child: Row(
           children: [
             const SizedBox(
               width: 14,
@@ -698,10 +817,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
             Icon(
               Icons.search_rounded,
-              color:
-              _mutedColor,
-              size:
-              20,
+              color: _mutedColor,
+              size: 20,
             ),
 
             const SizedBox(
@@ -709,24 +826,20 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
 
             Expanded(
-              child:
-              Text(
+              child: Text(
                 'Search skills or people',
                 style:
                 AppTextStyles.secondary
                     .copyWith(
-                  color:
-                  _mutedColor,
+                  color: _mutedColor,
                 ),
               ),
             ),
 
             Icon(
               Icons.explore_outlined,
-              color:
-              _primaryColor,
-              size:
-              20,
+              color: _primaryColor,
+              size: 20,
             ),
 
             const SizedBox(
@@ -739,7 +852,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // SECTION HEADER
+  // SECTION
   // ============================================================
 
   Widget _buildSectionHeader({
@@ -750,14 +863,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Row(
       children: [
         Expanded(
-          child:
-          Text(
+          child: Text(
             title,
             style:
             AppTextStyles.sectionTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
         ),
@@ -771,21 +882,18 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             onTap:
             onAction,
-            child:
-            Padding(
+            child: Padding(
               padding:
               const EdgeInsets.symmetric(
                 horizontal: 4,
                 vertical: 4,
               ),
-              child:
-              Text(
+              child: Text(
                 action,
                 style:
                 AppTextStyles.caption
                     .copyWith(
-                  color:
-                  _primaryColor,
+                  color: _primaryColor,
                   fontWeight:
                   FontWeight.w700,
                 ),
@@ -800,28 +908,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   // SMART MATCH
   // ============================================================
 
-  SkillMatch? _findBestSmartMatch() {
-    final User? currentUser =
-        _currentUser;
-
-    if (currentUser == null) {
-      return null;
-    }
-
-    final List<SkillMatch> matches =
-    _repository.getSmartMatchesForUser(
-      currentUser.id,
-      limit:
-      1,
-    );
-
-    if (matches.isEmpty) {
-      return null;
-    }
-
-    return matches.first;
-  }
-
   Widget _buildMatchCard(
       SkillMatch? match,
       ) {
@@ -830,28 +916,24 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
       decoration:
       BoxDecoration(
-        color:
-        _surfaceColor,
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
         border:
         Border.all(
-          color:
-          _borderColor,
+          color: _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -859,8 +941,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               _buildUserAvatar(
                 match.user,
-                size:
-                48,
+                size: 48,
                 fallbackInitials:
                 match.user.initials,
               ),
@@ -870,22 +951,19 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child:
-                Column(
+                child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
                     Text(
                       match.user.name,
-                      maxLines:
-                      1,
+                      maxLines: 1,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
                       AppTextStyles.cardTitle
                           .copyWith(
-                        color:
-                        _textColor,
+                        color: _textColor,
                       ),
                     ),
 
@@ -895,17 +973,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                     Text(
                       match.headline,
-                      maxLines:
-                      1,
+                      maxLines: 1,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
                       AppTextStyles.secondary
                           .copyWith(
-                        fontSize:
-                        12,
-                        color:
-                        _mutedColor,
+                        fontSize: 12,
+                        color: _mutedColor,
                       ),
                     ),
                   ],
@@ -931,8 +1006,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     20,
                   ),
                 ),
-                child:
-                Text(
+                child: Text(
                   '${match.score}% Match',
                   style:
                   AppTextStyles.caption
@@ -957,10 +1031,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               Image.asset(
                 'assets/images/mascot/tubi_happy.png',
-                width:
-                52,
-                height:
-                52,
+                width: 52,
+                height: 52,
               ),
 
               const SizedBox(
@@ -968,8 +1040,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child:
-                Text(
+                child: Text(
                   match.explanation,
                   style:
                   AppTextStyles.bodyMuted
@@ -992,8 +1063,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               style:
               AppTextStyles.caption
                   .copyWith(
-                color:
-                _textColor,
+                color: _textColor,
                 fontWeight:
                 FontWeight.w700,
               ),
@@ -1004,10 +1074,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
 
             Wrap(
-              spacing:
-              7,
-              runSpacing:
-              7,
+              spacing: 7,
+              runSpacing: 7,
               children:
               match.reasons
                   .take(
@@ -1032,12 +1100,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           SizedBox(
             width:
             double.infinity,
-            height:
-            44,
-            child:
-            ElevatedButton(
-              onPressed:
-                  () async {
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () async {
                 await _openRouteAndRefresh(
                   '/user-profile',
                   arguments:
@@ -1068,8 +1133,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       decoration:
       BoxDecoration(
-        color:
-        _softPrimaryColor,
+        color: _softPrimaryColor,
         borderRadius:
         BorderRadius.circular(
           20,
@@ -1082,17 +1146,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         mainAxisSize:
         MainAxisSize.min,
         children: [
           Icon(
             Icons.check_circle_outline_rounded,
-            size:
-            13,
-            color:
-            _primaryColor,
+            size: 13,
+            color: _primaryColor,
           ),
 
           const SizedBox(
@@ -1104,10 +1165,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             style:
             AppTextStyles.caption
                 .copyWith(
-              fontSize:
-              10,
-              color:
-              _textColor,
+              fontSize: 10,
+              color: _textColor,
               fontWeight:
               FontWeight.w600,
             ),
@@ -1119,37 +1178,30 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildNoMatchCard() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         16,
       ),
       decoration:
       BoxDecoration(
-        color:
-        _surfaceColor,
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           18,
         ),
         border:
         Border.all(
-          color:
-          _borderColor,
+          color: _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         children: [
           Image.asset(
             'assets/images/mascot/tubi_thinking.png',
-            width:
-            82,
-            height:
-            82,
-            fit:
-            BoxFit.contain,
+            width: 82,
+            height: 82,
+            fit: BoxFit.contain,
           ),
 
           const SizedBox(
@@ -1163,8 +1215,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             style:
             AppTextStyles.cardTitle
                 .copyWith(
-              color:
-              _textColor,
+              color: _textColor,
             ),
           ),
 
@@ -1179,8 +1230,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             style:
             AppTextStyles.bodyMuted
                 .copyWith(
-              color:
-              _mutedColor,
+              color: _mutedColor,
             ),
           ),
 
@@ -1191,12 +1241,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           SizedBox(
             width:
             double.infinity,
-            height:
-            42,
+            height: 42,
             child:
             OutlinedButton.icon(
-              onPressed:
-                  () async {
+              onPressed: () async {
                 await _openRouteAndRefresh(
                   '/my-skills',
                 );
@@ -1204,8 +1252,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               icon:
               const Icon(
                 Icons.add_rounded,
-                size:
-                18,
+                size: 18,
               ),
               label:
               const Text(
@@ -1250,20 +1297,20 @@ class _DashboardScreenState extends State<DashboardScreen>
             _borderColor,
           ),
         ),
-        child:
-        Row(
+        child: Row(
           children: [
             Icon(
               Icons.school_outlined,
               color:
               _primaryColor,
             ),
+
             const SizedBox(
               width: 10,
             ),
+
             Expanded(
-              child:
-              Text(
+              child: Text(
                 'No skills are available right now.',
                 style:
                 AppTextStyles.secondary
@@ -1279,18 +1326,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     return SizedBox(
-      height:
-      138,
-      child:
-      ListView.separated(
+      height: 138,
+      child: ListView.separated(
         scrollDirection:
         Axis.horizontal,
         physics:
         const BouncingScrollPhysics(),
         itemCount:
         skills.length,
-        separatorBuilder:
-            (
+        separatorBuilder: (
             _,
             _,
             ) {
@@ -1298,8 +1342,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             width: 12,
           );
         },
-        itemBuilder:
-            (
+        itemBuilder: (
             BuildContext context,
             int index,
             ) {
@@ -1311,18 +1354,15 @@ class _DashboardScreenState extends State<DashboardScreen>
             BorderRadius.circular(
               17,
             ),
-            onTap:
-                () async {
+            onTap: () async {
               await _openRouteAndRefresh(
                 '/skill-details',
                 arguments:
                 skill,
               );
             },
-            child:
-            Container(
-              width:
-              132,
+            child: Container(
+              width: 132,
               padding:
               const EdgeInsets.all(
                 14,
@@ -1341,16 +1381,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                   _skillCardBorderColor,
                 ),
               ),
-              child:
-              Column(
+              child: Column(
                 mainAxisAlignment:
                 MainAxisAlignment.center,
                 children: [
                   Container(
-                    width:
-                    50,
-                    height:
-                    50,
+                    width: 50,
+                    height: 50,
                     decoration:
                     BoxDecoration(
                       color:
@@ -1365,13 +1402,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                         _borderColor,
                       ),
                     ),
-                    child:
-                    Icon(
+                    child: Icon(
                       skill.icon,
                       color:
                       _primaryColor,
-                      size:
-                      25,
+                      size: 25,
                     ),
                   ),
 
@@ -1381,8 +1416,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                   Text(
                     skill.title,
-                    maxLines:
-                    1,
+                    maxLines: 1,
                     overflow:
                     TextOverflow.ellipsis,
                     textAlign:
@@ -1390,8 +1424,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     style:
                     AppTextStyles.cardTitle
                         .copyWith(
-                      fontSize:
-                      13,
+                      fontSize: 13,
                       color:
                       _textColor,
                     ),
@@ -1406,165 +1439,44 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // SESSION PRIORITY
-  // ============================================================
-
-  SwapRequest? _findPriorityScheduledSession() {
-    final User? currentUser =
-        _currentUser;
-
-    if (currentUser == null) {
-      return null;
-    }
-
-    final DateTime now =
-    DateTime.now();
-
-    final List<SwapRequest> scheduled =
-    _swapService.requests
-        .where(
-          (
-          SwapRequest request,
-          ) =>
-          request.isScheduledFor(
-            currentUser.id,
-          ),
-    )
-        .toList();
-
-    if (scheduled.isEmpty) {
-      return null;
-    }
-
-    final List<SwapRequest> ready =
-    scheduled
-        .where(
-          (
-          SwapRequest request,
-          ) =>
-          request
-              .isScheduledSessionReadyForCompletionFor(
-            currentUser.id,
-            now,
-          ),
-    )
-        .toList();
-
-    if (ready.isNotEmpty) {
-      ready.sort(
-            (
-            SwapRequest first,
-            SwapRequest second,
-            ) =>
-            first.proposedAt.compareTo(
-              second.proposedAt,
-            ),
-      );
-
-      return ready.first;
-    }
-
-    final List<SwapRequest> upcoming =
-    scheduled
-        .where(
-          (
-          SwapRequest request,
-          ) =>
-          request
-              .isUpcomingScheduledSessionFor(
-            currentUser.id,
-            now,
-          ),
-    )
-        .toList();
-
-    if (upcoming.isEmpty) {
-      return null;
-    }
-
-    upcoming.sort(
-          (
-          SwapRequest first,
-          SwapRequest second,
-          ) =>
-          first.proposedAt.compareTo(
-            second.proposedAt,
-          ),
-    );
-
-    return upcoming.first;
-  }
-
-  bool _isSessionReadyForCompletion(
-      SwapRequest request,
-      ) {
-    final User? currentUser =
-        _currentUser;
-
-    if (currentUser == null) {
-      return false;
-    }
-
-    return request
-        .isScheduledSessionReadyForCompletionFor(
-      currentUser.id,
-      DateTime.now(),
-    );
-  }
-
-  // ============================================================
   // SESSION CARD
   // ============================================================
 
   Widget _buildScheduledSession(
-      SwapRequest? request,
+      DashboardSession? session,
       ) {
-    if (request == null) {
+    if (session == null) {
       return _buildNoScheduledSession();
     }
 
-    final User? currentUser =
-        _currentUser;
+    final SwapRequest request =
+        session.request;
 
     final User? otherUser =
-    _findOtherUser(
-      request,
-      currentUser,
-    );
+        session.otherUser;
 
     final String displayName =
-        otherUser?.name ??
-            _fallbackOtherUserName(
-              request,
-              currentUser,
-            );
+        session.displayName;
 
     final String initials =
-        otherUser?.initials ??
-            _fallbackOtherUserInitials(
-              request,
-              currentUser,
-            );
-
-    final String skillText =
-        '${request.skillToLearn} ↔ ${request.skillToOffer}';
+        session.initials;
 
     final bool ready =
-    _isSessionReadyForCompletion(
-      request,
-    );
+        session.readyForCompletion;
+
+    final String skillText =
+        '${request.skillToLearn} ↔ '
+        '${request.skillToOffer}';
 
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
       const EdgeInsets.all(
         14,
       ),
       decoration:
       BoxDecoration(
-        color:
-        _surfaceColor,
+        color: _surfaceColor,
         borderRadius:
         BorderRadius.circular(
           16,
@@ -1573,21 +1485,20 @@ class _DashboardScreenState extends State<DashboardScreen>
         Border.all(
           color:
           ready
-              ? _primaryColor.withValues(
+              ? _primaryColor
+              .withValues(
             alpha: 0.55,
           )
               : _borderColor,
         ),
       ),
-      child:
-      Column(
+      child: Column(
         children: [
           Row(
             children: [
               _buildUserAvatar(
                 otherUser,
-                size:
-                46,
+                size: 46,
                 fallbackInitials:
                 initials,
               ),
@@ -1597,15 +1508,13 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child:
-                Column(
+                child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
                     Text(
                       displayName,
-                      maxLines:
-                      1,
+                      maxLines: 1,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
@@ -1622,15 +1531,13 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                     Text(
                       skillText,
-                      maxLines:
-                      1,
+                      maxLines: 1,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
                       AppTextStyles.secondary
                           .copyWith(
-                        fontSize:
-                        12,
+                        fontSize: 12,
                         color:
                         _mutedColor,
                       ),
@@ -1642,8 +1549,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                     Text(
                       '${_formatSessionDate(request.proposedAt)} • ${request.mode}',
-                      maxLines:
-                      2,
+                      maxLines: 2,
                       overflow:
                       TextOverflow.ellipsis,
                       style:
@@ -1662,15 +1568,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               SizedBox(
-                height:
-                38,
-                child:
-                ElevatedButton(
-                  onPressed:
-                      () {
+                height: 38,
+                child: ElevatedButton(
+                  onPressed: () {
                     _showSessionDetails(
-                      request,
-                      displayName,
+                      session,
                     );
                   },
                   style:
@@ -1688,14 +1590,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                       horizontal: 12,
                     ),
                   ),
-                  child:
-                  Text(
+                  child: Text(
                     'SESSION INFO',
                     style:
                     AppTextStyles.button
                         .copyWith(
-                      fontSize:
-                      9.5,
+                      fontSize: 9.5,
                     ),
                   ),
                 ),
@@ -1724,15 +1624,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                   11,
                 ),
               ),
-              child:
-              Row(
+              child: Row(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
                   Icon(
                     Icons.task_alt_rounded,
-                    size:
-                    18,
+                    size: 18,
                     color:
                     _primaryColor,
                   ),
@@ -1742,14 +1640,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
 
                   Expanded(
-                    child:
-                    Text(
+                    child: Text(
                       'The scheduled start time has been reached. Open the request when you are ready to mark this swap as completed.',
                       style:
                       AppTextStyles.secondary
                           .copyWith(
-                        fontSize:
-                        11.5,
+                        fontSize: 11.5,
                         color:
                         _textColor,
                         fontWeight:
@@ -1770,8 +1666,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               double.infinity,
               child:
               OutlinedButton.icon(
-                onPressed:
-                    () async {
+                onPressed: () async {
                   await _openRouteAndRefresh(
                     '/swap-requests',
                   );
@@ -1779,8 +1674,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 icon:
                 const Icon(
                   Icons.open_in_new_rounded,
-                  size:
-                  17,
+                  size: 17,
                 ),
                 label:
                 const Text(
@@ -1816,14 +1710,11 @@ class _DashboardScreenState extends State<DashboardScreen>
           _borderColor,
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children: [
           Container(
-            width:
-            48,
-            height:
-            48,
+            width: 48,
+            height: 48,
             decoration:
             BoxDecoration(
               color:
@@ -1833,13 +1724,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                 14,
               ),
             ),
-            child:
-            Icon(
+            child: Icon(
               Icons.event_available_outlined,
               color:
               _primaryColor,
-              size:
-              24,
+              size: 24,
             ),
           ),
 
@@ -1848,8 +1737,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
 
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
@@ -1872,8 +1760,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   style:
                   AppTextStyles.secondary
                       .copyWith(
-                    fontSize:
-                    11.5,
+                    fontSize: 11.5,
                     color:
                     _mutedColor,
                   ),
@@ -1887,12 +1774,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
 
           SizedBox(
-            height:
-            38,
+            height: 38,
             child:
             OutlinedButton(
-              onPressed:
-                  () async {
+              onPressed: () async {
                 await _openRouteAndRefresh(
                   '/swap-requests',
                 );
@@ -1904,14 +1789,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                   horizontal: 12,
                 ),
               ),
-              child:
-              Text(
+              child: Text(
                 'VIEW',
                 style:
                 AppTextStyles.button
                     .copyWith(
-                  fontSize:
-                  10,
+                  fontSize: 10,
                   color:
                   _primaryColor,
                 ),
@@ -1924,117 +1807,46 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // SESSION PARTICIPANT
-  // ============================================================
-
-  User? _findOtherUser(
-      SwapRequest request,
-      User? currentUser,
-      ) {
-    if (currentUser == null ||
-        !request.hasStableIdentity) {
-      return null;
-    }
-
-    final String? otherUserId;
-
-    if (request.isRequester(
-      currentUser.id,
-    )) {
-      otherUserId =
-          request.providerUserId;
-    } else if (request.isProvider(
-      currentUser.id,
-    )) {
-      otherUserId =
-          request.requesterUserId;
-    } else {
-      return null;
-    }
-
-    if (otherUserId == null ||
-        otherUserId.trim().isEmpty) {
-      return null;
-    }
-
-    return _repository.findUserById(
-      otherUserId,
-    );
-  }
-
-  String _fallbackOtherUserName(
-      SwapRequest request,
-      User? currentUser,
-      ) {
-    if (currentUser != null &&
-        request.isRequester(
-          currentUser.id,
-        ) &&
-        request.providerName
-            .trim()
-            .isNotEmpty) {
-      return request.providerName.trim();
-    }
-
-    return 'Swap partner';
-  }
-
-  String _fallbackOtherUserInitials(
-      SwapRequest request,
-      User? currentUser,
-      ) {
-    if (currentUser != null &&
-        request.isRequester(
-          currentUser.id,
-        ) &&
-        request.providerInitials
-            .trim()
-            .isNotEmpty) {
-      return request.providerInitials.trim();
-    }
-
-    return '?';
-  }
-
-  // ============================================================
   // SESSION DETAILS
   // ============================================================
 
   void _showSessionDetails(
-      SwapRequest request,
-      String displayName,
+      DashboardSession session,
       ) {
+    final SwapRequest request =
+        session.request;
+
+    final String displayName =
+        session.displayName;
+
     final String meetingDetails =
     request.meetingDetails
         ?.trim()
         .isNotEmpty ==
         true
-        ? request.meetingDetails!.trim()
+        ? request.meetingDetails!
+        .trim()
         : 'No meeting details provided.';
 
     final bool ready =
-    _isSessionReadyForCompletion(
+    _controller
+        .isSessionReadyForCompletion(
       request,
     );
 
     showDialog<void>(
-      context:
-      context,
-      builder:
-          (
+      context: context,
+      builder: (
           BuildContext dialogContext,
           ) {
         return AlertDialog(
           backgroundColor:
           _surfaceColor,
-          title:
-          Row(
+          title: Row(
             children: [
               Container(
-                width:
-                38,
-                height:
-                38,
+                width: 38,
+                height: 38,
                 decoration:
                 BoxDecoration(
                   color:
@@ -2044,16 +1856,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                     11,
                   ),
                 ),
-                child:
-                Icon(
+                child: Icon(
                   request.mode ==
                       'Online'
-                      ? Icons.videocam_outlined
-                      : Icons.place_outlined,
+                      ? Icons
+                      .videocam_outlined
+                      : Icons
+                      .place_outlined,
                   color:
                   _primaryColor,
-                  size:
-                  20,
+                  size: 20,
                 ),
               ),
 
@@ -2062,8 +1874,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               Expanded(
-                child:
-                Text(
+                child: Text(
                   'Session with $displayName',
                   style:
                   AppTextStyles.cardTitle
@@ -2077,8 +1888,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           content:
           SingleChildScrollView(
-            child:
-            Column(
+            child: Column(
               mainAxisSize:
               MainAxisSize.min,
               crossAxisAlignment:
@@ -2101,30 +1911,28 @@ class _DashboardScreenState extends State<DashboardScreen>
                         10,
                       ),
                     ),
-                    child:
-                    Row(
+                    child: Row(
                       crossAxisAlignment:
                       CrossAxisAlignment.start,
                       children: [
                         Icon(
                           Icons.task_alt_rounded,
-                          size:
-                          18,
+                          size: 18,
                           color:
                           _primaryColor,
                         ),
+
                         const SizedBox(
                           width: 8,
                         ),
+
                         Expanded(
-                          child:
-                          Text(
+                          child: Text(
                             'This scheduled session has reached its start time and can now be completed from Swap Requests.',
                             style:
                             AppTextStyles.secondary
                                 .copyWith(
-                              fontSize:
-                              11.5,
+                              fontSize: 11.5,
                               color:
                               _textColor,
                             ),
@@ -2158,8 +1966,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                   icon:
                   request.mode ==
                       'Online'
-                      ? Icons.language_rounded
-                      : Icons.location_on_outlined,
+                      ? Icons
+                      .language_rounded
+                      : Icons
+                      .location_on_outlined,
                   label:
                   'Mode',
                   value:
@@ -2199,14 +2009,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           actions: [
             TextButton(
-              onPressed:
-                  () {
+              onPressed: () {
                 Navigator.of(
                   dialogContext,
                 ).pop();
               },
-              child:
-              Text(
+              child: Text(
                 'CLOSE',
                 style:
                 AppTextStyles.button
@@ -2218,8 +2026,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
 
             FilledButton(
-              onPressed:
-                  () async {
+              onPressed: () async {
                 Navigator.of(
                   dialogContext,
                 ).pop();
@@ -2228,8 +2035,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   '/swap-requests',
                 );
               },
-              child:
-              Text(
+              child: Text(
                 ready
                     ? 'OPEN REQUEST'
                     : 'VIEW REQUEST',
@@ -2254,8 +2060,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       children: [
         Icon(
           icon,
-          size:
-          18,
+          size: 18,
           color:
           _primaryColor,
         ),
@@ -2265,8 +2070,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
 
         Expanded(
-          child:
-          Column(
+          child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
@@ -2305,7 +2109,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // DATE
+  // DATE FORMAT
   // ============================================================
 
   String _formatSessionDate(
@@ -2338,11 +2142,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     final String dayLabel;
 
     if (difference == 0) {
-      dayLabel =
-      'Today';
+      dayLabel = 'Today';
     } else if (difference == 1) {
-      dayLabel =
-      'Tomorrow';
+      dayLabel = 'Tomorrow';
     } else {
       const List<String> months =
       <String>[
@@ -2392,7 +2194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ============================================================
-  // NAVIGATION
+  // HOME SCROLL
   // ============================================================
 
   Future<void> _scrollToHome() async {
@@ -2465,8 +2267,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
 
     return Container(
-      height:
-      76,
+      height: 76,
       decoration:
       BoxDecoration(
         color:
@@ -2483,8 +2284,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
       ),
-      child:
-      Row(
+      child: Row(
         children:
         List<Widget>.generate(
           items.length,
@@ -2496,10 +2296,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     index;
 
             return Expanded(
-              child:
-              InkWell(
-                onTap:
-                    () async {
+              child: InkWell(
+                onTap: () async {
                   if (index == 0) {
                     await _scrollToHome();
                     return;
@@ -2530,40 +2328,39 @@ class _DashboardScreenState extends State<DashboardScreen>
                     await _openProfile();
                   }
                 },
-                child:
-                Column(
+                child: Column(
                   mainAxisAlignment:
                   MainAxisAlignment.center,
                   children: [
                     AnimatedContainer(
                       duration:
                       const Duration(
-                        milliseconds: 180,
+                        milliseconds:
+                        180,
                       ),
-                      width:
-                      36,
-                      height:
-                      29,
+                      width: 36,
+                      height: 29,
                       decoration:
                       BoxDecoration(
                         color:
                         selected
                             ? _softPrimaryColor
-                            : Colors.transparent,
+                            : Colors
+                            .transparent,
                         borderRadius:
                         BorderRadius.circular(
                           12,
                         ),
                       ),
-                      child:
-                      Icon(
+                      child: Icon(
                         selected
-                            ? items[index]['selected']
+                            ? items[index]
+                        ['selected']
                         as IconData
-                            : items[index]['icon']
+                            : items[index]
+                        ['icon']
                         as IconData,
-                        size:
-                        20,
+                        size: 20,
                         color:
                         selected
                             ? _primaryColor
@@ -2576,7 +2373,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
 
                     Text(
-                      items[index]['label']
+                      items[index]
+                      ['label']
                       as String,
                       style:
                       AppTextStyles.navLabel
@@ -2587,8 +2385,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                             : _mutedColor,
                         fontWeight:
                         selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                            ? FontWeight
+                            .w700
+                            : FontWeight
+                            .w600,
                       ),
                     ),
                   ],
