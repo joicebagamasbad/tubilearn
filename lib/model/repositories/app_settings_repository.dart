@@ -1,8 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../app_settings.dart';
 import '../database/app_database.dart';
 
-class AppSettingsRepositoryException implements Exception {
+class AppSettingsRepositoryException
+    implements Exception {
   final String message;
 
   const AppSettingsRepositoryException(
@@ -11,47 +13,6 @@ class AppSettingsRepositoryException implements Exception {
 
   @override
   String toString() => message;
-}
-
-enum AppThemePreference {
-  system,
-  light,
-  dark,
-}
-
-enum AppLanguagePreference {
-  english,
-  filipino,
-}
-
-class AppSettings {
-  final bool notificationsEnabled;
-  final AppLanguagePreference language;
-  final AppThemePreference theme;
-
-  const AppSettings({
-    required this.notificationsEnabled,
-    required this.language,
-    required this.theme,
-  });
-
-  AppSettings copyWith({
-    bool? notificationsEnabled,
-    AppLanguagePreference? language,
-    AppThemePreference? theme,
-  }) {
-    return AppSettings(
-      notificationsEnabled:
-      notificationsEnabled ??
-          this.notificationsEnabled,
-      language:
-      language ??
-          this.language,
-      theme:
-      theme ??
-          this.theme,
-    );
-  }
 }
 
 class AppSettingsRepository {
@@ -78,6 +39,10 @@ class AppSettingsRepository {
     theme:
     AppThemePreference.system,
   );
+
+  // ============================================================
+  // LOAD
+  // ============================================================
 
   Future<AppSettings> loadSettings() async {
     try {
@@ -152,6 +117,10 @@ class AppSettingsRepository {
     }
   }
 
+  // ============================================================
+  // SAVE NOTIFICATIONS
+  // ============================================================
+
   Future<AppSettings> setNotificationsEnabled(
       bool enabled,
       ) async {
@@ -167,6 +136,10 @@ class AppSettingsRepository {
     return loadSettings();
   }
 
+  // ============================================================
+  // SAVE LANGUAGE
+  // ============================================================
+
   Future<AppSettings> setLanguage(
       AppLanguagePreference language,
       ) async {
@@ -180,6 +153,10 @@ class AppSettingsRepository {
     return loadSettings();
   }
 
+  // ============================================================
+  // SAVE THEME
+  // ============================================================
+
   Future<AppSettings> setTheme(
       AppThemePreference theme,
       ) async {
@@ -192,6 +169,10 @@ class AppSettingsRepository {
 
     return loadSettings();
   }
+
+  // ============================================================
+  // SAVE SETTING
+  // ============================================================
 
   Future<void> _saveSetting({
     required String key,
@@ -239,6 +220,10 @@ class AppSettingsRepository {
     }
   }
 
+  // ============================================================
+  // TABLE
+  // ============================================================
+
   Future<void> _ensureSettingsTable(
       Database db,
       ) async {
@@ -251,6 +236,10 @@ class AppSettingsRepository {
       ''',
     );
   }
+
+  // ============================================================
+  // PARSING
+  // ============================================================
 
   bool _parseBoolean(
       String? value, {

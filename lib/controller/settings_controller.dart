@@ -1,7 +1,8 @@
-import '../model/repositories/app_settings_repository.dart';
+import '../model/app_settings.dart';
 import '../services/app_settings_service.dart';
 
-class SettingsControllerException implements Exception {
+class SettingsControllerException
+    implements Exception {
   final String message;
 
   const SettingsControllerException(
@@ -18,7 +19,9 @@ class SettingsControllerException implements Exception {
 
 class SettingsSnapshot {
   final bool notificationsEnabled;
+
   final AppLanguagePreference language;
+
   final AppThemePreference theme;
 
   const SettingsSnapshot({
@@ -45,7 +48,8 @@ class SettingsController {
   // LOAD
   // ============================================================
 
-  Future<SettingsSnapshot> loadSettings() async {
+  Future<SettingsSnapshot>
+  loadSettings() async {
     try {
       await _settingsService.initialize();
 

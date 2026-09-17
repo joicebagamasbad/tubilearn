@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller/settings_controller.dart';
-import '../model/repositories/app_settings_repository.dart';
+import '../model/app_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -135,7 +135,8 @@ class _SettingsScreenState
 
     try {
       final SettingsSnapshot snapshot =
-      await _controller.loadSettings();
+      await _controller
+          .loadSettings();
 
       if (!mounted) {
         return;
@@ -149,7 +150,9 @@ class _SettingsScreenState
         _isLoading = false;
         _errorMessage = null;
       });
-    } on SettingsControllerException catch (error) {
+    } on SettingsControllerException catch (
+    error
+    ) {
       if (!mounted) {
         return;
       }
@@ -184,7 +187,8 @@ class _SettingsScreenState
     }
 
     setState(() {
-      _isSavingNotifications = true;
+      _isSavingNotifications =
+      true;
     });
 
     try {
@@ -212,7 +216,9 @@ class _SettingsScreenState
             ? 'Notification preference saved as On.'
             : 'Notification preference saved as Off.',
       );
-    } on SettingsControllerException catch (error) {
+    } on SettingsControllerException catch (
+    error
+    ) {
       if (!mounted) {
         return;
       }
@@ -294,8 +300,7 @@ class _SettingsScreenState
               mainAxisSize:
               MainAxisSize.min,
               crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
+              CrossAxisAlignment.start,
               children:
               <Widget>[
                 Text(
@@ -305,16 +310,14 @@ class _SettingsScreenState
                     fontSize:
                     20,
                     fontWeight:
-                    FontWeight
-                        .w800,
+                    FontWeight.w800,
                     color:
                     _textColor,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  8,
+                  height: 8,
                 ),
 
                 Text(
@@ -331,8 +334,7 @@ class _SettingsScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  16,
+                  height: 16,
                 ),
 
                 RadioGroup<
@@ -370,8 +372,7 @@ class _SettingsScreenState
                             color:
                             _textColor,
                             fontWeight:
-                            FontWeight
-                                .w600,
+                            FontWeight.w600,
                           ),
                         ),
                         subtitle:
@@ -400,8 +401,7 @@ class _SettingsScreenState
                             color:
                             _textColor,
                             fontWeight:
-                            FontWeight
-                                .w600,
+                            FontWeight.w600,
                           ),
                         ),
                         subtitle:
@@ -422,8 +422,7 @@ class _SettingsScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  8,
+                  height: 8,
                 ),
 
                 _buildInfoNotice(
@@ -447,12 +446,14 @@ class _SettingsScreenState
     }
 
     setState(() {
-      _isSavingLanguage = true;
+      _isSavingLanguage =
+      true;
     });
 
     try {
       final SettingsSnapshot snapshot =
-      await _controller.setLanguage(
+      await _controller
+          .setLanguage(
         selected,
       );
 
@@ -472,7 +473,9 @@ class _SettingsScreenState
       _showMessage(
         'Language preference saved.',
       );
-    } on SettingsControllerException catch (error) {
+    } on SettingsControllerException catch (
+    error
+    ) {
       if (!mounted) {
         return;
       }
@@ -542,8 +545,7 @@ class _SettingsScreenState
               mainAxisSize:
               MainAxisSize.min,
               crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
+              CrossAxisAlignment.start,
               children:
               <Widget>[
                 Text(
@@ -553,16 +555,14 @@ class _SettingsScreenState
                     fontSize:
                     20,
                     fontWeight:
-                    FontWeight
-                        .w800,
+                    FontWeight.w800,
                     color:
                     _textColor,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  8,
+                  height: 8,
                 ),
 
                 Text(
@@ -579,8 +579,7 @@ class _SettingsScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  16,
+                  height: 16,
                 ),
 
                 RadioGroup<
@@ -623,8 +622,7 @@ class _SettingsScreenState
                             color:
                             _textColor,
                             fontWeight:
-                            FontWeight
-                                .w600,
+                            FontWeight.w600,
                           ),
                         ),
                         subtitle:
@@ -658,8 +656,7 @@ class _SettingsScreenState
                             color:
                             _textColor,
                             fontWeight:
-                            FontWeight
-                                .w600,
+                            FontWeight.w600,
                           ),
                         ),
                         subtitle:
@@ -693,8 +690,7 @@ class _SettingsScreenState
                             color:
                             _textColor,
                             fontWeight:
-                            FontWeight
-                                .w600,
+                            FontWeight.w600,
                           ),
                         ),
                         subtitle:
@@ -726,7 +722,8 @@ class _SettingsScreenState
     }
 
     setState(() {
-      _isSavingTheme = true;
+      _isSavingTheme =
+      true;
     });
 
     try {
@@ -751,7 +748,9 @@ class _SettingsScreenState
       _showMessage(
         'Appearance updated.',
       );
-    } on SettingsControllerException catch (error) {
+    } on SettingsControllerException catch (
+    error
+    ) {
       if (!mounted) {
         return;
       }
@@ -1059,8 +1058,7 @@ class _SettingsScreenState
               ),
 
               const SizedBox(
-                width:
-                12,
+                width: 12,
               ),
 
               Expanded(
@@ -1074,8 +1072,7 @@ class _SettingsScreenState
                     fontSize:
                     19,
                     fontWeight:
-                    FontWeight
-                        .w800,
+                    FontWeight.w800,
                   ),
                 ),
               ),
@@ -1088,8 +1085,7 @@ class _SettingsScreenState
               mainAxisSize:
               MainAxisSize.min,
               crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
+              CrossAxisAlignment.start,
               children:
               children,
             ),
@@ -1120,8 +1116,7 @@ class _SettingsScreenState
     return Padding(
       padding:
       const EdgeInsets.only(
-        bottom:
-        14,
+        bottom: 14,
       ),
       child:
       Text(
@@ -1147,8 +1142,7 @@ class _SettingsScreenState
     return Padding(
       padding:
       const EdgeInsets.only(
-        bottom:
-        14,
+        bottom: 14,
       ),
       child:
       Row(
@@ -1181,8 +1175,7 @@ class _SettingsScreenState
           ),
 
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
 
           Expanded(
@@ -1201,14 +1194,12 @@ class _SettingsScreenState
                     fontSize:
                     13,
                     fontWeight:
-                    FontWeight
-                        .w700,
+                    FontWeight.w700,
                   ),
                 ),
 
                 const SizedBox(
-                  height:
-                  3,
+                  height: 3,
                 ),
 
                 Text(
@@ -1373,8 +1364,7 @@ class _SettingsScreenState
               ),
 
               const SizedBox(
-                height:
-                14,
+                height: 14,
               ),
 
               Text(
@@ -1391,8 +1381,7 @@ class _SettingsScreenState
               ),
 
               const SizedBox(
-                height:
-                6,
+                height: 6,
               ),
 
               Text(
@@ -1409,8 +1398,7 @@ class _SettingsScreenState
               ),
 
               const SizedBox(
-                height:
-                18,
+                height: 18,
               ),
 
               ElevatedButton.icon(
@@ -1446,8 +1434,7 @@ class _SettingsScreenState
         _buildIntroCard(),
 
         const SizedBox(
-          height:
-          24,
+          height: 24,
         ),
 
         _sectionTitle(
@@ -1455,8 +1442,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          8,
+          height: 8,
         ),
 
         _settingsCard(
@@ -1545,8 +1531,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          24,
+          height: 24,
         ),
 
         _sectionTitle(
@@ -1554,8 +1539,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          8,
+          height: 8,
         ),
 
         _settingsCard(
@@ -1601,8 +1585,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          24,
+          height: 24,
         ),
 
         _sectionTitle(
@@ -1610,8 +1593,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          8,
+          height: 8,
         ),
 
         _settingsCard(
@@ -1683,8 +1665,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          24,
+          height: 24,
         ),
 
         _sectionTitle(
@@ -1692,8 +1673,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          8,
+          height: 8,
         ),
 
         _settingsCard(
@@ -1713,8 +1693,7 @@ class _SettingsScreenState
         ),
 
         const SizedBox(
-          height:
-          20,
+          height: 20,
         ),
 
         _buildInfoNotice(
@@ -1796,8 +1775,7 @@ class _SettingsScreenState
           ),
 
           const SizedBox(
-            width:
-            12,
+            width: 12,
           ),
 
           Expanded(
@@ -1821,8 +1799,7 @@ class _SettingsScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  4,
+                  height: 4,
                 ),
 
                 Text(
@@ -2110,8 +2087,7 @@ class _SettingsScreenState
           ),
 
           const SizedBox(
-            width:
-            10,
+            width: 10,
           ),
 
           Expanded(
@@ -2135,8 +2111,7 @@ class _SettingsScreenState
                 ),
 
                 const SizedBox(
-                  height:
-                  3,
+                  height: 3,
                 ),
 
                 Text(

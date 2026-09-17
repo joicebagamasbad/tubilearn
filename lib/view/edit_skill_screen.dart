@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller/my_skills_controller.dart';
-import '../model/repositories/my_skills_repository.dart';
+import '../model/managed_skill.dart';
 
 class EditSkillScreen extends StatefulWidget {
   final ManagedSkill managedSkill;
@@ -12,14 +12,19 @@ class EditSkillScreen extends StatefulWidget {
   });
 
   @override
-  State<EditSkillScreen> createState() => _EditSkillScreenState();
+  State<EditSkillScreen> createState() =>
+      _EditSkillScreenState();
 }
 
-class _EditSkillScreenState extends State<EditSkillScreen> {
-  final MySkillsController _controller = MySkillsController();
+class _EditSkillScreenState
+    extends State<EditSkillScreen> {
+  final MySkillsController _controller =
+  MySkillsController();
 
-  late final TextEditingController _skillNameController;
-  late final TextEditingController _descriptionController;
+  late final TextEditingController
+  _skillNameController;
+  late final TextEditingController
+  _descriptionController;
 
   late String _category;
   late String _experienceLevel;
@@ -57,7 +62,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   ];
 
   bool get _isDarkMode =>
-      Theme.of(context).brightness == Brightness.dark;
+      Theme.of(context).brightness ==
+          Brightness.dark;
 
   Color get _primaryColor =>
       Theme.of(context).colorScheme.primary;
@@ -66,16 +72,22 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       Theme.of(context).colorScheme.surface;
 
   Color get _surfaceVariantColor =>
-      Theme.of(context).colorScheme.surfaceContainerHighest;
+      Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest;
 
   Color get _textColor =>
       Theme.of(context).colorScheme.onSurface;
 
   Color get _mutedColor =>
-      Theme.of(context).colorScheme.onSurfaceVariant;
+      Theme.of(context)
+          .colorScheme
+          .onSurfaceVariant;
 
   Color get _borderColor =>
-      Theme.of(context).colorScheme.outlineVariant;
+      Theme.of(context)
+          .colorScheme
+          .outlineVariant;
 
   Color get _lockedFieldColor =>
       _isDarkMode
@@ -84,12 +96,16 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Color get _noticeBackground =>
       _isDarkMode
-          ? _primaryColor.withValues(alpha: 0.14)
+          ? _primaryColor.withValues(
+        alpha: 0.14,
+      )
           : const Color(0xFFE4F0EF);
 
   Color get _noticeBorder =>
       _isDarkMode
-          ? _primaryColor.withValues(alpha: 0.28)
+          ? _primaryColor.withValues(
+        alpha: 0.28,
+      )
           : const Color(0xFFD2E5E2);
 
   Color get _primaryForeground =>
@@ -100,52 +116,88 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   bool get _hasUnsavedChanges {
     final bool metadataChanged =
         _canEditMetadata &&
-            (_skillNameController.text.trim() != _originalSkillName ||
+            (_skillNameController.text.trim() !=
+                _originalSkillName ||
                 _descriptionController.text.trim() !=
                     _originalDescription ||
-                _category != _originalCategory);
+                _category !=
+                    _originalCategory);
 
     final bool teachingSettingsChanged =
-        _experienceLevel != _originalExperienceLevel ||
-            _availability != _originalAvailability;
+        _experienceLevel !=
+            _originalExperienceLevel ||
+            _availability !=
+                _originalAvailability;
 
-    return metadataChanged || teachingSettingsChanged;
+    return metadataChanged ||
+        teachingSettingsChanged;
   }
 
   @override
   void initState() {
     super.initState();
 
-    final skill = widget.managedSkill.skill;
-    final userSkill = widget.managedSkill.userSkill;
+    final skill =
+        widget.managedSkill.skill;
 
-    _skillNameController = TextEditingController(
-      text: skill.title,
-    );
+    final userSkill =
+        widget.managedSkill.userSkill;
 
-    _descriptionController = TextEditingController(
-      text: skill.description,
-    );
+    _skillNameController =
+        TextEditingController(
+          text: skill.title,
+        );
 
-    _category = skill.category;
-    _experienceLevel = userSkill.level;
-    _availability = userSkill.availability;
+    _descriptionController =
+        TextEditingController(
+          text: skill.description,
+        );
+
+    _category =
+        skill.category;
+
+    _experienceLevel =
+        userSkill.level;
+
+    _availability =
+        userSkill.availability;
 
     _canEditMetadata =
-        _controller.canEditMetadata(widget.managedSkill);
+        _controller.canEditMetadata(
+          widget.managedSkill,
+        );
 
-    _originalSkillName = skill.title.trim();
-    _originalDescription = skill.description.trim();
-    _originalCategory = skill.category;
-    _originalExperienceLevel = userSkill.level;
-    _originalAvailability = userSkill.availability;
+    _originalSkillName =
+        skill.title.trim();
 
-    if (!_categories.contains(_category)) {
-      _categories.insert(0, _category);
+    _originalDescription =
+        skill.description.trim();
+
+    _originalCategory =
+        skill.category;
+
+    _originalExperienceLevel =
+        userSkill.level;
+
+    _originalAvailability =
+        userSkill.availability;
+
+    if (!_categories.contains(
+      _category,
+    )) {
+      _categories.insert(
+        0,
+        _category,
+      );
     }
 
-    if (!_availabilityOptions.contains(_availability)) {
-      _availabilityOptions.insert(0, _availability);
+    if (!_availabilityOptions.contains(
+      _availability,
+    )) {
+      _availabilityOptions.insert(
+        0,
+        _availability,
+      );
     }
   }
 
@@ -161,7 +213,9 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // UNSAVED CHANGES
   // ============================================================
 
-  void _handlePopAttempt(bool didPop) {
+  void _handlePopAttempt(
+      bool didPop,
+      ) {
     if (didPop ||
         _saving ||
         _allowPop ||
@@ -172,7 +226,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     _confirmDiscardChanges();
   }
 
-  Future<void> _confirmDiscardChanges() async {
+  Future<void>
+  _confirmDiscardChanges() async {
     if (!mounted ||
         _saving ||
         _isExitDialogOpen) {
@@ -185,32 +240,42 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       });
 
       Navigator.pop(context);
+
       return;
     }
 
     FocusScope.of(context).unfocus();
 
-    _isExitDialogOpen = true;
+    _isExitDialogOpen =
+    true;
 
-    final bool? discard = await showDialog<bool>(
+    final bool? discard =
+    await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
+      builder: (
+          BuildContext dialogContext,
+          ) {
         return AlertDialog(
-          backgroundColor: _surfaceColor,
+          backgroundColor:
+          _surfaceColor,
           title: Text(
             'Discard changes?',
             style: TextStyle(
-              color: _textColor,
-              fontWeight: FontWeight.w800,
+              color:
+              _textColor,
+              fontWeight:
+              FontWeight.w800,
             ),
           ),
           content: Text(
             'You changed this offered skill but have not saved it yet. '
                 'Leaving now will discard those edits.',
             style: TextStyle(
-              color: _mutedColor,
-              height: 1.45,
+              color:
+              _mutedColor,
+              height:
+              1.45,
             ),
           ),
           actions: [
@@ -224,8 +289,10 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
               child: Text(
                 'KEEP EDITING',
                 style: TextStyle(
-                  color: _primaryColor,
-                  fontWeight: FontWeight.w800,
+                  color:
+                  _primaryColor,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
               ),
             ),
@@ -239,8 +306,10 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
               child: const Text(
                 'DISCARD',
                 style: TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w800,
+                  color:
+                  Colors.redAccent,
+                  fontWeight:
+                  FontWeight.w800,
                 ),
               ),
             ),
@@ -249,9 +318,11 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       },
     );
 
-    _isExitDialogOpen = false;
+    _isExitDialogOpen =
+    false;
 
-    if (!mounted || discard != true) {
+    if (!mounted ||
+        discard != true) {
       return;
     }
 
@@ -267,26 +338,33 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return PopScope(
       canPop:
       !_saving &&
-          (_allowPop || !_hasUnsavedChanges),
+          (_allowPop ||
+              !_hasUnsavedChanges),
       onPopInvokedWithResult: (
           bool didPop,
           Object? result,
           ) {
-        _handlePopAttempt(didPop);
+        _handlePopAttempt(
+          didPop,
+        );
       },
       child: Scaffold(
         backgroundColor:
-        Theme.of(context).scaffoldBackgroundColor,
+        Theme.of(context)
+            .scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
               _buildTopBar(),
               Expanded(
-                child: SingleChildScrollView(
+                child:
+                SingleChildScrollView(
                   physics:
                   const BouncingScrollPhysics(),
                   padding:
@@ -298,58 +376,87 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                   ),
                   child: Column(
                     crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    CrossAxisAlignment
+                        .start,
                     children: [
                       _buildIntro(),
 
                       if (!_canEditMetadata)
                         _buildSharedSkillNotice(),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(
+                        height: 20,
+                      ),
 
-                      _buildLabel('Skill Name'),
+                      _buildLabel(
+                        'Skill Name',
+                      ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(
+                        height: 8,
+                      ),
 
                       _buildSkillNameField(),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(
+                        height: 18,
+                      ),
 
-                      _buildLabel('Category'),
+                      _buildLabel(
+                        'Category',
+                      ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(
+                        height: 8,
+                      ),
 
                       _buildCategoryField(),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(
+                        height: 18,
+                      ),
 
-                      _buildLabel('Description'),
+                      _buildLabel(
+                        'Description',
+                      ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(
+                        height: 8,
+                      ),
 
                       _buildDescriptionField(),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(
+                        height: 18,
+                      ),
 
                       _buildLabel(
                         'Your Experience Level',
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(
+                        height: 10,
+                      ),
 
                       _buildExperienceLevel(),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(
+                        height: 18,
+                      ),
 
                       _buildLabel(
                         'Your Availability',
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(
+                        height: 8,
+                      ),
 
                       _buildAvailabilityField(),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(
+                        height: 24,
+                      ),
 
                       _buildUpdateButton(),
                     ],
@@ -369,29 +476,41 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildTopBar() {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(
+      height:
+      64,
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 10,
       ),
-      decoration: BoxDecoration(
-        color: _surfaceColor,
-        border: Border(
-          bottom: BorderSide(
-            color: _borderColor,
+      decoration:
+      BoxDecoration(
+        color:
+        _surfaceColor,
+        border:
+        Border(
+          bottom:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
       ),
-      child: Row(
+      child:
+      Row(
         children: [
           IconButton(
-            tooltip: 'Back',
+            tooltip:
+            'Back',
             onPressed:
             _saving
                 ? null
                 : _confirmDiscardChanges,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 18,
+            icon:
+            Icon(
+              Icons
+                  .arrow_back_ios_new_rounded,
+              size:
+              18,
               color:
               _saving
                   ? _mutedColor
@@ -400,19 +519,27 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           ),
 
           Expanded(
-            child: Center(
-              child: Text(
+            child:
+            Center(
+              child:
+              Text(
                 'Edit Skill',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: _textColor,
+                style:
+                TextStyle(
+                  fontSize:
+                  15,
+                  fontWeight:
+                  FontWeight.w800,
+                  color:
+                  _textColor,
                 ),
               ),
             ),
           ),
 
-          const SizedBox(width: 48),
+          const SizedBox(
+            width: 48,
+          ),
         ],
       ),
     );
@@ -428,40 +555,56 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Column(
+          child:
+          Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
               Text(
                 'Update your skill',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: _textColor,
+                style:
+                TextStyle(
+                  fontSize:
+                  15,
+                  fontWeight:
+                  FontWeight.w800,
+                  color:
+                  _textColor,
                 ),
               ),
 
-              const SizedBox(height: 4),
+              const SizedBox(
+                height: 4,
+              ),
 
               Text(
                 'Keep your teaching details accurate and up to date.',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  height: 1.4,
-                  color: _mutedColor,
+                style:
+                TextStyle(
+                  fontSize:
+                  10.5,
+                  height:
+                  1.4,
+                  color:
+                  _mutedColor,
                 ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(width: 10),
+        const SizedBox(
+          width: 10,
+        ),
 
         Image.asset(
           'assets/images/mascot/tubi_planning.png',
-          width: 68,
-          height: 68,
-          fit: BoxFit.contain,
+          width:
+          68,
+          height:
+          68,
+          fit:
+          BoxFit.contain,
         ),
       ],
     );
@@ -473,39 +616,61 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildSharedSkillNotice() {
     return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(
+      width:
+      double.infinity,
+      margin:
+      const EdgeInsets.only(
         top: 14,
       ),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _noticeBackground,
+      padding:
+      const EdgeInsets.all(
+        12,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _noticeBackground,
         borderRadius:
-        BorderRadius.circular(12),
-        border: Border.all(
-          color: _noticeBorder,
+        BorderRadius.circular(
+          12,
+        ),
+        border:
+        Border.all(
+          color:
+          _noticeBorder,
         ),
       ),
-      child: Row(
+      child:
+      Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.info_outline_rounded,
-            size: 17,
-            color: _primaryColor,
+            Icons
+                .info_outline_rounded,
+            size:
+            17,
+            color:
+            _primaryColor,
           ),
 
-          const SizedBox(width: 9),
+          const SizedBox(
+            width: 9,
+          ),
 
           Expanded(
-            child: Text(
+            child:
+            Text(
               'This is a shared TubiLearn skill. Its name, category, and description '
                   'are shared with other users, so you can only update your level and availability.',
-              style: TextStyle(
-                fontSize: 9.5,
-                height: 1.45,
-                color: _textColor,
+              style:
+              TextStyle(
+                fontSize:
+                9.5,
+                height:
+                1.45,
+                color:
+                _textColor,
               ),
             ),
           ),
@@ -518,13 +683,19 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // LABEL
   // ============================================================
 
-  Widget _buildLabel(String text) {
+  Widget _buildLabel(
+      String text,
+      ) {
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: _textColor,
+      style:
+      TextStyle(
+        fontSize:
+        11,
+        fontWeight:
+        FontWeight.w700,
+        color:
+        _textColor,
       ),
     );
   }
@@ -535,39 +706,58 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildSkillNameField() {
     return TextField(
-      controller: _skillNameController,
+      controller:
+      _skillNameController,
       readOnly:
-      !_canEditMetadata || _saving,
-      maxLength: 80,
+      !_canEditMetadata ||
+          _saving,
+      maxLength:
+      80,
       textCapitalization:
       TextCapitalization.words,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: _textColor,
+      style:
+      TextStyle(
+        fontSize:
+        12,
+        fontWeight:
+        FontWeight.w500,
+        color:
+        _textColor,
       ),
       onChanged:
       _canEditMetadata
-          ? (String value) {
+          ? (
+          String value,
+          ) {
         setState(() {});
       }
           : null,
-      decoration: InputDecoration(
-        counterText: '',
-        prefixIcon: Icon(
-          Icons.lightbulb_outline_rounded,
-          size: 19,
-          color: _primaryColor,
+      decoration:
+      InputDecoration(
+        counterText:
+        '',
+        prefixIcon:
+        Icon(
+          Icons
+              .lightbulb_outline_rounded,
+          size:
+          19,
+          color:
+          _primaryColor,
         ),
         suffixIcon:
         !_canEditMetadata
             ? Icon(
-          Icons.lock_outline_rounded,
-          size: 16,
-          color: _mutedColor,
+          Icons
+              .lock_outline_rounded,
+          size:
+          16,
+          color:
+          _mutedColor,
         )
             : null,
-        filled: true,
+        filled:
+        true,
         fillColor:
         _canEditMetadata
             ? _surfaceColor
@@ -577,25 +767,40 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           horizontal: 14,
           vertical: 14,
         ),
-        border: OutlineInputBorder(
+        border:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
-        enabledBorder: OutlineInputBorder(
+        enabledBorder:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
-        focusedBorder: OutlineInputBorder(
+        focusedBorder:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _primaryColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
           ),
         ),
       ),
@@ -608,80 +813,124 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildCategoryField() {
     return DropdownButtonFormField<String>(
-      initialValue: _category,
-      isExpanded: true,
-      dropdownColor: _surfaceColor,
-      icon: Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: _mutedColor,
+      initialValue:
+      _category,
+      isExpanded:
+      true,
+      dropdownColor:
+      _surfaceColor,
+      icon:
+      Icon(
+        Icons
+            .keyboard_arrow_down_rounded,
+        color:
+        _mutedColor,
       ),
-      decoration: InputDecoration(
-        prefixIcon: Icon(
-          Icons.grid_view_rounded,
-          size: 18,
-          color: _primaryColor,
+      decoration:
+      InputDecoration(
+        prefixIcon:
+        Icon(
+          Icons
+              .grid_view_rounded,
+          size:
+          18,
+          color:
+          _primaryColor,
         ),
-        filled: true,
+        filled:
+        true,
         fillColor:
         _canEditMetadata
             ? _surfaceColor
             : _lockedFieldColor,
-        border: OutlineInputBorder(
+        border:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
-        enabledBorder: OutlineInputBorder(
+        enabledBorder:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
-        disabledBorder: OutlineInputBorder(
+        disabledBorder:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
           ),
         ),
-        focusedBorder: OutlineInputBorder(
+        focusedBorder:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _primaryColor,
+          BorderRadius.circular(
+            12,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
           ),
         ),
       ),
       items:
       _categories.map(
-            (String category) {
+            (
+            String category,
+            ) {
           return DropdownMenuItem<String>(
-            value: category,
-            child: Text(
+            value:
+            category,
+            child:
+            Text(
               category,
               overflow:
               TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                color: _textColor,
+              style:
+              TextStyle(
+                fontSize:
+                11,
+                color:
+                _textColor,
               ),
             ),
           );
         },
       ).toList(),
       onChanged:
-      !_canEditMetadata || _saving
+      !_canEditMetadata ||
+          _saving
           ? null
-          : (String? value) {
-        if (value == null) {
+          : (
+          String? value,
+          ) {
+        if (value ==
+            null) {
           return;
         }
 
         setState(() {
-          _category = value;
+          _category =
+              value;
         });
       },
     );
@@ -698,25 +947,37 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
           controller:
           _descriptionController,
           readOnly:
-          !_canEditMetadata || _saving,
-          maxLines: 5,
-          maxLength: 200,
+          !_canEditMetadata ||
+              _saving,
+          maxLines:
+          5,
+          maxLength:
+          200,
           textCapitalization:
           TextCapitalization.sentences,
-          style: TextStyle(
-            fontSize: 11,
-            height: 1.5,
-            color: _textColor,
+          style:
+          TextStyle(
+            fontSize:
+            11,
+            height:
+            1.5,
+            color:
+            _textColor,
           ),
           onChanged:
           _canEditMetadata
-              ? (String value) {
+              ? (
+              String value,
+              ) {
             setState(() {});
           }
               : null,
-          decoration: InputDecoration(
-            counterText: '',
-            filled: true,
+          decoration:
+          InputDecoration(
+            counterText:
+            '',
+            filled:
+            true,
             fillColor:
             _canEditMetadata
                 ? _surfaceColor
@@ -728,40 +989,59 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
               14,
               30,
             ),
-            border: OutlineInputBorder(
+            border:
+            OutlineInputBorder(
               borderRadius:
-              BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: _borderColor,
+              BorderRadius.circular(
+                12,
+              ),
+              borderSide:
+              BorderSide(
+                color:
+                _borderColor,
               ),
             ),
             enabledBorder:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: _borderColor,
+              BorderRadius.circular(
+                12,
+              ),
+              borderSide:
+              BorderSide(
+                color:
+                _borderColor,
               ),
             ),
             focusedBorder:
             OutlineInputBorder(
               borderRadius:
-              BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: _primaryColor,
+              BorderRadius.circular(
+                12,
+              ),
+              borderSide:
+              BorderSide(
+                color:
+                _primaryColor,
               ),
             ),
           ),
         ),
 
         Positioned(
-          right: 12,
-          bottom: 10,
-          child: Text(
+          right:
+          12,
+          bottom:
+          10,
+          child:
+          Text(
             '${_descriptionController.text.length}/200',
-            style: TextStyle(
-              fontSize: 9,
-              color: _mutedColor,
+            style:
+            TextStyle(
+              fontSize:
+              9,
+              color:
+              _mutedColor,
             ),
           ),
         ),
@@ -781,29 +1061,41 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     ];
 
     return Row(
-      children: List.generate(
+      children:
+      List.generate(
         levels.length,
-            (int index) {
+            (
+            int index,
+            ) {
           final String level =
           levels[index];
 
           final bool selected =
-              _experienceLevel == level;
+              _experienceLevel ==
+                  level;
 
           return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
+            child:
+            Padding(
+              padding:
+              EdgeInsets.only(
                 left:
-                index == 0 ? 0 : 5,
+                index == 0
+                    ? 0
+                    : 5,
                 right:
                 index ==
-                    levels.length - 1
+                    levels.length -
+                        1
                     ? 0
                     : 5,
               ),
-              child: InkWell(
+              child:
+              InkWell(
                 borderRadius:
-                BorderRadius.circular(10),
+                BorderRadius.circular(
+                  10,
+                ),
                 onTap:
                 _saving
                     ? null
@@ -813,15 +1105,18 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                         level;
                   });
                 },
-                child: AnimatedContainer(
+                child:
+                AnimatedContainer(
                   duration:
                   const Duration(
                     milliseconds: 180,
                   ),
-                  height: 44,
+                  height:
+                  44,
                   alignment:
                   Alignment.center,
-                  decoration: BoxDecoration(
+                  decoration:
+                  BoxDecoration(
                     color:
                     selected
                         ? _primaryColor
@@ -830,17 +1125,21 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                     BorderRadius.circular(
                       10,
                     ),
-                    border: Border.all(
+                    border:
+                    Border.all(
                       color:
                       selected
                           ? _primaryColor
                           : _borderColor,
                     ),
                   ),
-                  child: Text(
+                  child:
+                  Text(
                     level,
-                    style: TextStyle(
-                      fontSize: 9,
+                    style:
+                    TextStyle(
+                      fontSize:
+                      9,
                       fontWeight:
                       selected
                           ? FontWeight.w700
@@ -867,51 +1166,74 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   Widget _buildAvailabilityField() {
     return InkWell(
       borderRadius:
-      BorderRadius.circular(12),
+      BorderRadius.circular(
+        12,
+      ),
       onTap:
       _saving
           ? null
           : _showAvailabilitySheet,
-      child: Container(
-        height: 50,
+      child:
+      Container(
+        height:
+        50,
         padding:
         const EdgeInsets.symmetric(
           horizontal: 14,
         ),
-        decoration: BoxDecoration(
-          color: _surfaceColor,
+        decoration:
+        BoxDecoration(
+          color:
+          _surfaceColor,
           borderRadius:
-          BorderRadius.circular(12),
-          border: Border.all(
-            color: _borderColor,
+          BorderRadius.circular(
+            12,
+          ),
+          border:
+          Border.all(
+            color:
+            _borderColor,
           ),
         ),
-        child: Row(
+        child:
+        Row(
           children: [
             Icon(
-              Icons.calendar_month_outlined,
-              size: 18,
-              color: _primaryColor,
+              Icons
+                  .calendar_month_outlined,
+              size:
+              18,
+              color:
+              _primaryColor,
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(
+              width: 12,
+            ),
 
             Expanded(
-              child: Text(
+              child:
+              Text(
                 _availability,
-                style: TextStyle(
-                  fontSize: 11,
+                style:
+                TextStyle(
+                  fontSize:
+                  11,
                   fontWeight:
                   FontWeight.w500,
-                  color: _textColor,
+                  color:
+                  _textColor,
                 ),
               ),
             ),
 
             Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: _mutedColor,
+              Icons
+                  .chevron_right_rounded,
+              size:
+              20,
+              color:
+              _mutedColor,
             ),
           ],
         ),
@@ -923,10 +1245,13 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   _showAvailabilitySheet() async {
     final String? selected =
     await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (BuildContext sheetContext) {
+      context:
+      context,
+      backgroundColor:
+      Colors.transparent,
+      builder: (
+          BuildContext sheetContext,
+          ) {
         return Container(
           padding:
           const EdgeInsets.fromLTRB(
@@ -935,22 +1260,32 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
             20,
             28,
           ),
-          decoration: BoxDecoration(
-            color: _surfaceColor,
+          decoration:
+          BoxDecoration(
+            color:
+            _surfaceColor,
             borderRadius:
             const BorderRadius.vertical(
-              top: Radius.circular(24),
+              top:
+              Radius.circular(
+                24,
+              ),
             ),
           ),
-          child: Column(
+          child:
+          Column(
             mainAxisSize:
             MainAxisSize.min,
             children: [
               Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _borderColor,
+                width:
+                40,
+                height:
+                4,
+                decoration:
+                BoxDecoration(
+                  color:
+                  _borderColor,
                   borderRadius:
                   BorderRadius.circular(
                     20,
@@ -958,48 +1293,60 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(
+                height: 18,
+              ),
 
               Align(
                 alignment:
                 Alignment.centerLeft,
-                child: Text(
+                child:
+                Text(
                   'Choose availability',
-                  style: TextStyle(
-                    fontSize: 15,
+                  style:
+                  TextStyle(
+                    fontSize:
+                    15,
                     fontWeight:
                     FontWeight.w800,
-                    color: _textColor,
+                    color:
+                    _textColor,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(
+                height: 12,
+              ),
 
               ..._availabilityOptions.map(
-                    (String option) {
-                  final bool selected =
+                    (
+                    String option,
+                    ) {
+                  final bool isSelected =
                       _availability ==
                           option;
 
                   return ListTile(
                     contentPadding:
                     EdgeInsets.zero,
-                    title: Text(
+                    title:
+                    Text(
                       option,
-                      style: TextStyle(
-                        fontSize: 12,
+                      style:
+                      TextStyle(
+                        fontSize:
+                        12,
                         fontWeight:
-                        selected
-                            ? FontWeight
-                            .w700
-                            : FontWeight
-                            .w500,
-                        color: _textColor,
+                        isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color:
+                        _textColor,
                       ),
                     ),
                     trailing:
-                    selected
+                    isSelected
                         ? Icon(
                       Icons
                           .check_circle_rounded,
@@ -1007,7 +1354,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
                       _primaryColor,
                     )
                         : null,
-                    onTap: () {
+                    onTap:
+                        () {
                       Navigator.pop(
                         sheetContext,
                         option,
@@ -1028,7 +1376,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     }
 
     setState(() {
-      _availability = selected;
+      _availability =
+          selected;
     });
   }
 
@@ -1038,45 +1387,62 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
 
   Widget _buildUpdateButton() {
     return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
+      width:
+      double.infinity,
+      height:
+      48,
+      child:
+      ElevatedButton(
         onPressed:
         _saving
             ? null
             : _updateSkill,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _primaryColor,
+        style:
+        ElevatedButton.styleFrom(
+          backgroundColor:
+          _primaryColor,
           foregroundColor:
           _primaryForeground,
           disabledBackgroundColor:
           _surfaceVariantColor,
           disabledForegroundColor:
           _mutedColor,
-          elevation: 0,
+          elevation:
+          0,
           minimumSize:
-          const Size(0, 48),
-          shape: RoundedRectangleBorder(
+          const Size(
+            0,
+            48,
+          ),
+          shape:
+          RoundedRectangleBorder(
             borderRadius:
-            BorderRadius.circular(12),
+            BorderRadius.circular(
+              12,
+            ),
           ),
         ),
         child:
         _saving
             ? SizedBox(
-          width: 20,
-          height: 20,
+          width:
+          20,
+          height:
+          20,
           child:
           CircularProgressIndicator(
-            strokeWidth: 2,
+            strokeWidth:
+            2,
             color:
             _primaryForeground,
           ),
         )
             : const Text(
           'UPDATE SKILL',
-          style: TextStyle(
-            fontSize: 10,
+          style:
+          TextStyle(
+            fontSize:
+            10,
             fontWeight:
             FontWeight.w800,
           ),
@@ -1097,12 +1463,18 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
     FocusScope.of(context).unfocus();
 
     setState(() {
-      _saving = true;
+      _saving =
+      true;
     });
 
     try {
-      await _controller.updateOfferedSkill(
-        userSkillId: widget.managedSkill.userSkill.id,
+      await _controller
+          .updateOfferedSkill(
+        userSkillId:
+        widget
+            .managedSkill
+            .userSkill
+            .id,
         title:
         _skillNameController.text,
         category:
@@ -1120,7 +1492,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       }
 
       setState(() {
-        _allowPop = true;
+        _allowPop =
+        true;
       });
 
       _showMessage(
@@ -1131,13 +1504,16 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
         context,
         true,
       );
-    } on MySkillsControllerException catch (error) {
+    } on MySkillsControllerException catch (
+    error
+    ) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _saving = false;
+        _saving =
+        false;
       });
 
       _showMessage(
@@ -1149,7 +1525,8 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       }
 
       setState(() {
-        _saving = false;
+        _saving =
+        false;
       });
 
       _showMessage(
@@ -1162,7 +1539,9 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
   // FEEDBACK
   // ============================================================
 
-  void _showMessage(String message) {
+  void _showMessage(
+      String message,
+      ) {
     if (!mounted) {
       return;
     }
@@ -1171,7 +1550,10 @@ class _EditSkillScreenState extends State<EditSkillScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content:
+          Text(
+            message,
+          ),
           behavior:
           SnackBarBehavior.floating,
         ),

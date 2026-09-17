@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../services/current_user_service.dart';
 import '../database/app_database.dart';
+import '../managed_skill.dart';
 import '../skill.dart';
 import '../user_skill.dart';
 import 'explore_repository.dart';
@@ -16,29 +17,6 @@ class MySkillsRepositoryException implements Exception {
 
   @override
   String toString() => message;
-}
-
-// ============================================================
-// MANAGED SKILL
-// ============================================================
-
-class ManagedSkill {
-  final Skill skill;
-  final UserSkill userSkill;
-  final String? ownerUserId;
-
-  const ManagedSkill({
-    required this.skill,
-    required this.userSkill,
-    required this.ownerUserId,
-  });
-
-  bool metadataCanBeEditedBy(
-      String userId,
-      ) {
-    return ownerUserId != null &&
-        ownerUserId == userId.trim();
-  }
 }
 
 class MySkillsRepository {
@@ -79,14 +57,6 @@ class MySkillsRepository {
 
       final Database db =
       await AppDatabase.instance.database;
-
-      // --------------------------------------------------------
-      // LOAD ALL SKILL OWNERS IN ONE QUERY
-      //
-      // Previous implementation queried the skills table once
-      // per relationship. This keeps reads bounded as the user's
-      // skill list grows.
-      // --------------------------------------------------------
 
       final Set<String> relationshipSkillIds =
       relationships
@@ -221,11 +191,11 @@ class MySkillsRepository {
       );
     } on MySkillsRepositoryException {
       rethrow;
-    } on ExploreRepositoryException catch (_) {
+    } on ExploreRepositoryException {
       throw const MySkillsRepositoryException(
         'Could not load your skills. Please try again.',
       );
-    } on DatabaseException catch (_) {
+    } on DatabaseException {
       throw const MySkillsRepositoryException(
         'Could not load your skills. Please try again.',
       );
@@ -295,10 +265,6 @@ class MySkillsRepository {
             (
             Transaction txn,
             ) async {
-          // ----------------------------------------------------
-          // CURRENT LOCAL USER MUST EXIST
-          // ----------------------------------------------------
-
           final List<Map<String, Object?>> userRows =
           await txn.query(
             'users',
@@ -317,10 +283,6 @@ class MySkillsRepository {
               'Current user profile could not be found.',
             );
           }
-
-          // ----------------------------------------------------
-          // EXISTING CATALOG / CUSTOM SKILL
-          // ----------------------------------------------------
 
           final List<Map<String, Object?>>
           existingSkills =
@@ -355,10 +317,6 @@ class MySkillsRepository {
                   'Skill ID',
                 );
           } else {
-            // --------------------------------------------------
-            // CREATE CUSTOM SKILL OWNED BY CURRENT USER
-            // --------------------------------------------------
-
             skillId =
                 _generateId(
                   'skill_custom',
@@ -368,13 +326,16 @@ class MySkillsRepository {
             await txn.insert(
               'skills',
               <String, Object?>{
-                'id': skillId,
+                'id':
+                skillId,
                 'owner_user_id':
                 cleanUserId,
-                'title': cleanTitle,
+                'title':
+                cleanTitle,
                 'category':
                 cleanCategory,
-                'level': cleanLevel,
+                'level':
+                cleanLevel,
                 'icon_code_point':
                 _iconForCategory(
                   cleanCategory,
@@ -385,7 +346,8 @@ class MySkillsRepository {
                 'Online / In-person',
                 'language':
                 'Filipino / English',
-                'prerequisite': '',
+                'prerequisite':
+                '',
                 'description':
                 cleanDescription,
               },
@@ -399,10 +361,6 @@ class MySkillsRepository {
               );
             }
           }
-
-          // ----------------------------------------------------
-          // PREVENT DUPLICATE OFFERED RELATIONSHIP
-          // ----------------------------------------------------
 
           final List<Map<String, Object?>>
           existingRelationship =
@@ -467,7 +425,7 @@ class MySkillsRepository {
       await _refreshExploreAfterWrite();
     } on MySkillsRepositoryException {
       rethrow;
-    } on DatabaseException catch (_) {
+    } on DatabaseException {
       throw const MySkillsRepositoryException(
         'Could not add the skill. Please try again.',
       );
@@ -616,10 +574,6 @@ class MySkillsRepository {
                   cleanUserId;
 
           if (ownsMetadata) {
-            // --------------------------------------------------
-            // PREVENT CUSTOM SKILL NAME COLLISION
-            // --------------------------------------------------
-
             final List<Map<String, Object?>>
             conflictingTitles =
             await txn.rawQuery(
@@ -677,10 +631,6 @@ class MySkillsRepository {
               );
             }
           } else {
-            // --------------------------------------------------
-            // SHARED CATALOG METADATA IS READ-ONLY
-            // --------------------------------------------------
-
             final String currentTitle =
             _requireRowString(
               skillRow,
@@ -745,7 +695,7 @@ class MySkillsRepository {
       await _refreshExploreAfterWrite();
     } on MySkillsRepositoryException {
       rethrow;
-    } on DatabaseException catch (_) {
+    } on DatabaseException {
       throw const MySkillsRepositoryException(
         'Could not update the skill. Please try again.',
       );
@@ -864,16 +814,7 @@ class MySkillsRepository {
             );
           }
 
-          // ----------------------------------------------------
-          // CLEAN UP UNUSED CUSTOM SKILL
-          //
-          // Only the current user's custom metadata is eligible
-          // for cleanup, and only when no relationships anywhere
-          // still reference it.
-          // ----------------------------------------------------
-
-          if (ownerUserId ==
-              cleanUserId) {
+          if (ownerUserId == cleanUserId) {
             final int remainingLinks =
                 Sqflite.firstIntValue(
                   await txn.rawQuery(
@@ -922,7 +863,7 @@ class MySkillsRepository {
       await _refreshExploreAfterWrite();
     } on MySkillsRepositoryException {
       rethrow;
-    } on DatabaseException catch (_) {
+    } on DatabaseException {
       throw const MySkillsRepositoryException(
         'Could not delete the skill. Please try again.',
       );
@@ -934,7 +875,7 @@ class MySkillsRepository {
   }
 
   // ============================================================
-  // CURRENT LOCAL USER BOUNDARY
+  // CURRENT LOCAL USER
   // ============================================================
 
   String _requireCurrentLocalUser(
@@ -952,7 +893,7 @@ class MySkillsRepository {
         message:
         'You can only modify skills for the active local user.',
       );
-    } on CurrentUserServiceException catch (_) {
+    } on CurrentUserServiceException {
       throw const MySkillsRepositoryException(
         'You can only modify skills for the active local user.',
       );
@@ -962,13 +903,13 @@ class MySkillsRepository {
   }
 
   // ============================================================
-  // REFRESH AFTER WRITE
+  // REFRESH
   // ============================================================
 
   Future<void> _refreshExploreAfterWrite() async {
     try {
       await ExploreRepository.instance.refresh();
-    } on ExploreRepositoryException catch (_) {
+    } on ExploreRepositoryException {
       throw const MySkillsRepositoryException(
         'Your change was saved, but the refreshed skill data could not be loaded.',
       );
@@ -976,18 +917,16 @@ class MySkillsRepository {
   }
 
   // ============================================================
-  // ID GENERATION
+  // ID
   // ============================================================
 
   String _generateId(
       String prefix,
       ) {
     final int current =
-        DateTime.now()
-            .microsecondsSinceEpoch;
+        DateTime.now().microsecondsSinceEpoch;
 
-    if (current >
-        _lastGeneratedIdValue) {
+    if (current > _lastGeneratedIdValue) {
       _lastGeneratedIdValue =
           current;
     } else {
@@ -998,7 +937,7 @@ class MySkillsRepository {
   }
 
   // ============================================================
-  // INPUT VALIDATION
+  // VALIDATION
   // ============================================================
 
   String _requireText(
@@ -1062,7 +1001,7 @@ class MySkillsRepository {
   }
 
   // ============================================================
-  // DEFENSIVE DATABASE PARSING
+  // ROW PARSING
   // ============================================================
 
   String _requireRowString(
@@ -1144,40 +1083,31 @@ class MySkillsRepository {
       ) {
     switch (category) {
       case 'Design & Creative':
-        return Icons
-            .design_services_outlined;
+        return Icons.design_services_outlined;
 
       case 'Photography':
-        return Icons
-            .camera_alt_outlined;
+        return Icons.camera_alt_outlined;
 
       case 'Video & Media':
-        return Icons
-            .movie_creation_outlined;
+        return Icons.movie_creation_outlined;
 
       case 'Technology':
-        return Icons
-            .code_rounded;
+        return Icons.code_rounded;
 
       case 'Music':
-        return Icons
-            .music_note_rounded;
+        return Icons.music_note_rounded;
 
       case 'Language':
-        return Icons
-            .translate_rounded;
+        return Icons.translate_rounded;
 
       case 'Education':
-        return Icons
-            .school_outlined;
+        return Icons.school_outlined;
 
       case 'Lifestyle':
-        return Icons
-            .self_improvement_rounded;
+        return Icons.self_improvement_rounded;
 
       default:
-        return Icons
-            .lightbulb_outline_rounded;
+        return Icons.lightbulb_outline_rounded;
     }
   }
 }

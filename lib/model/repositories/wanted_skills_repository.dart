@@ -3,11 +3,13 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../services/current_user_service.dart';
 import '../database/app_database.dart';
+import '../managed_skill.dart';
 import '../skill.dart';
 import '../user_skill.dart';
 import 'explore_repository.dart';
 
-class WantedSkillsRepositoryException implements Exception {
+class WantedSkillsRepositoryException
+    implements Exception {
   final String message;
 
   const WantedSkillsRepositoryException(
@@ -16,25 +18,6 @@ class WantedSkillsRepositoryException implements Exception {
 
   @override
   String toString() => message;
-}
-
-class ManagedWantedSkill {
-  final Skill skill;
-  final UserSkill userSkill;
-  final String? ownerUserId;
-
-  const ManagedWantedSkill({
-    required this.skill,
-    required this.userSkill,
-    required this.ownerUserId,
-  });
-
-  bool metadataCanBeEditedBy(
-      String userId,
-      ) {
-    return ownerUserId != null &&
-        ownerUserId == userId.trim();
-  }
 }
 
 class WantedSkillsRepository {
@@ -52,7 +35,8 @@ class WantedSkillsRepository {
   // GET WANTED SKILLS
   // ============================================================
 
-  Future<List<ManagedWantedSkill>> getWantedSkills(
+  Future<List<ManagedWantedSkill>>
+  getWantedSkills(
       String userId,
       ) async {
     final String cleanUserId =
@@ -175,8 +159,10 @@ class WantedSkillsRepository {
 
         result.add(
           ManagedWantedSkill(
-            skill: skill,
-            userSkill: relationship,
+            skill:
+            skill,
+            userSkill:
+            relationship,
             ownerUserId:
             ownersBySkillId[
             relationship.skillId],
@@ -264,8 +250,10 @@ class WantedSkillsRepository {
     );
 
     _validateLengths(
-      title: cleanTitle,
-      description: cleanDescription,
+      title:
+      cleanTitle,
+      description:
+      cleanDescription,
     );
 
     try {
@@ -279,14 +267,18 @@ class WantedSkillsRepository {
           final List<Map<String, Object?>> userRows =
           await txn.query(
             'users',
-            columns: const <String>[
+            columns:
+            const <String>[
               'id',
             ],
-            where: 'id = ?',
-            whereArgs: <Object?>[
+            where:
+            'id = ?',
+            whereArgs:
+            <Object?>[
               cleanUserId,
             ],
-            limit: 1,
+            limit:
+            1,
           );
 
           if (userRows.length != 1) {
@@ -377,20 +369,24 @@ class WantedSkillsRepository {
           existingRelationship =
           await txn.query(
             'user_skills',
-            columns: const <String>[
+            columns:
+            const <String>[
               'id',
             ],
-            where: '''
+            where:
+            '''
               user_id = ?
               AND skill_id = ?
               AND type = ?
             ''',
-            whereArgs: <Object?>[
+            whereArgs:
+            <Object?>[
               cleanUserId,
               skillId,
               'wanted',
             ],
-            limit: 1,
+            limit:
+            1,
           );
 
           if (existingRelationship.isNotEmpty) {
@@ -501,8 +497,10 @@ class WantedSkillsRepository {
     );
 
     _validateLengths(
-      title: cleanTitle,
-      description: cleanDescription,
+      title:
+      cleanTitle,
+      description:
+      cleanDescription,
     );
 
     try {
@@ -517,21 +515,25 @@ class WantedSkillsRepository {
           relationshipRows =
           await txn.query(
             'user_skills',
-            columns: const <String>[
+            columns:
+            const <String>[
               'id',
               'skill_id',
             ],
-            where: '''
+            where:
+            '''
               id = ?
               AND user_id = ?
               AND type = ?
             ''',
-            whereArgs: <Object?>[
+            whereArgs:
+            <Object?>[
               cleanUserSkillId,
               cleanUserId,
               'wanted',
             ],
-            limit: 1,
+            limit:
+            1,
           );
 
           if (relationshipRows.length != 1) {
@@ -550,18 +552,22 @@ class WantedSkillsRepository {
           final List<Map<String, Object?>> skillRows =
           await txn.query(
             'skills',
-            columns: const <String>[
+            columns:
+            const <String>[
               'id',
               'owner_user_id',
               'title',
               'category',
               'description',
             ],
-            where: 'id = ?',
-            whereArgs: <Object?>[
+            where:
+            'id = ?',
+            whereArgs:
+            <Object?>[
               skillId,
             ],
-            limit: 1,
+            limit:
+            1,
           );
 
           if (skillRows.length != 1) {
@@ -623,11 +629,13 @@ class WantedSkillsRepository {
                 'description':
                 cleanDescription,
               },
-              where: '''
+              where:
+              '''
                 id = ?
                 AND owner_user_id = ?
               ''',
-              whereArgs: <Object?>[
+              whereArgs:
+              <Object?>[
                 skillId,
                 cleanUserId,
               ],
@@ -665,7 +673,8 @@ class WantedSkillsRepository {
                 cleanDescription !=
                     storedDescription) {
               throw const WantedSkillsRepositoryException(
-                'Shared skill details cannot be changed. You can only update your level and availability.',
+                'Shared skill details cannot be changed. '
+                    'You can only update your level and availability.',
               );
             }
           }
@@ -679,12 +688,14 @@ class WantedSkillsRepository {
               'availability':
               cleanAvailability,
             },
-            where: '''
+            where:
+            '''
               id = ?
               AND user_id = ?
               AND type = ?
             ''',
-            whereArgs: <Object?>[
+            whereArgs:
+            <Object?>[
               cleanUserSkillId,
               cleanUserId,
               'wanted',
@@ -744,21 +755,25 @@ class WantedSkillsRepository {
           relationshipRows =
           await txn.query(
             'user_skills',
-            columns: const <String>[
+            columns:
+            const <String>[
               'id',
               'skill_id',
             ],
-            where: '''
+            where:
+            '''
               id = ?
               AND user_id = ?
               AND type = ?
             ''',
-            whereArgs: <Object?>[
+            whereArgs:
+            <Object?>[
               cleanUserSkillId,
               cleanUserId,
               'wanted',
             ],
-            limit: 1,
+            limit:
+            1,
           );
 
           if (relationshipRows.length != 1) {
@@ -777,12 +792,14 @@ class WantedSkillsRepository {
           final int deletedRows =
           await txn.delete(
             'user_skills',
-            where: '''
+            where:
+            '''
               id = ?
               AND user_id = ?
               AND type = ?
             ''',
-            whereArgs: <Object?>[
+            whereArgs:
+            <Object?>[
               cleanUserSkillId,
               cleanUserId,
               'wanted',
@@ -796,9 +813,12 @@ class WantedSkillsRepository {
           }
 
           await _deleteUnusedOwnedCustomSkill(
-            txn: txn,
-            skillId: skillId,
-            userId: cleanUserId,
+            txn:
+            txn,
+            skillId:
+            skillId,
+            userId:
+            cleanUserId,
           );
         },
       );
@@ -818,7 +838,7 @@ class WantedSkillsRepository {
   }
 
   // ============================================================
-  // CLEAN UP UNUSED CUSTOM SKILL
+  // CLEANUP
   // ============================================================
 
   Future<void> _deleteUnusedOwnedCustomSkill({
@@ -829,15 +849,19 @@ class WantedSkillsRepository {
     final List<Map<String, Object?>> skillRows =
     await txn.query(
       'skills',
-      columns: const <String>[
+      columns:
+      const <String>[
         'id',
         'owner_user_id',
       ],
-      where: 'id = ?',
-      whereArgs: <Object?>[
+      where:
+      'id = ?',
+      whereArgs:
+      <Object?>[
         skillId,
       ],
-      limit: 1,
+      limit:
+      1,
     );
 
     if (skillRows.isEmpty) {
@@ -858,14 +882,18 @@ class WantedSkillsRepository {
     final List<Map<String, Object?>> references =
     await txn.query(
       'user_skills',
-      columns: const <String>[
+      columns:
+      const <String>[
         'id',
       ],
-      where: 'skill_id = ?',
-      whereArgs: <Object?>[
+      where:
+      'skill_id = ?',
+      whereArgs:
+      <Object?>[
         skillId,
       ],
-      limit: 1,
+      limit:
+      1,
     );
 
     if (references.isNotEmpty) {
@@ -875,11 +903,13 @@ class WantedSkillsRepository {
     final int deletedSkillRows =
     await txn.delete(
       'skills',
-      where: '''
+      where:
+      '''
         id = ?
         AND owner_user_id = ?
       ''',
-      whereArgs: <Object?>[
+      whereArgs:
+      <Object?>[
         skillId,
         userId,
       ],
@@ -893,7 +923,7 @@ class WantedSkillsRepository {
   }
 
   // ============================================================
-  // REFRESH EXPLORE CACHE
+  // REFRESH
   // ============================================================
 
   Future<void> _refreshExploreAfterWrite() async {
@@ -928,7 +958,9 @@ class WantedSkillsRepository {
         message:
         'You can only manage learning interests for your current profile.',
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw WantedSkillsRepositoryException(
         error.message,
       );
@@ -1060,15 +1092,14 @@ class WantedSkillsRepository {
   }
 
   // ============================================================
-  // ID GENERATION
+  // ID
   // ============================================================
 
   String _generateId(
       String prefix,
       ) {
     final int currentMicros =
-        DateTime.now()
-            .microsecondsSinceEpoch;
+        DateTime.now().microsecondsSinceEpoch;
 
     if (currentMicros >
         _lastGeneratedIdValue) {

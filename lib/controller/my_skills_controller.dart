@@ -1,3 +1,4 @@
+import '../model/managed_skill.dart';
 import '../model/repositories/my_skills_repository.dart';
 import '../model/repositories/wanted_skills_repository.dart';
 import '../services/current_user_service.dart';
@@ -6,7 +7,8 @@ import '../services/current_user_service.dart';
 // CONTROLLER EXCEPTION
 // ============================================================
 
-class MySkillsControllerException implements Exception {
+class MySkillsControllerException
+    implements Exception {
   final String message;
 
   const MySkillsControllerException(
@@ -53,7 +55,8 @@ class MySkillsController {
 
   final MySkillsRepository _mySkillsRepository;
 
-  final WantedSkillsRepository _wantedSkillsRepository;
+  final WantedSkillsRepository
+  _wantedSkillsRepository;
 
   final CurrentUserService _currentUserService;
 
@@ -61,18 +64,22 @@ class MySkillsController {
   // LOAD ALL MY SKILLS
   // ============================================================
 
-  Future<MySkillsSnapshot> loadAllSkills() async {
+  Future<MySkillsSnapshot>
+  loadAllSkills() async {
     try {
       final String currentUserId =
           _currentUserService.userId;
 
       final List<ManagedSkill> offeredSkills =
-      await _mySkillsRepository.getOfferedSkills(
+      await _mySkillsRepository
+          .getOfferedSkills(
         currentUserId,
       );
 
-      final List<ManagedWantedSkill> wantedSkills =
-      await _wantedSkillsRepository.getWantedSkills(
+      final List<ManagedWantedSkill>
+      wantedSkills =
+      await _wantedSkillsRepository
+          .getWantedSkills(
         currentUserId,
       );
 
@@ -80,15 +87,21 @@ class MySkillsController {
         offeredSkills: offeredSkills,
         wantedSkills: wantedSkills,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on MySkillsRepositoryException catch (error) {
+    } on MySkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on WantedSkillsRepositoryException catch (error) {
+    } on WantedSkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -113,7 +126,9 @@ class MySkillsController {
       return managedSkill.metadataCanBeEditedBy(
         currentUserId,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -135,10 +150,13 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      return managedWantedSkill.metadataCanBeEditedBy(
+      return managedWantedSkill
+          .metadataCanBeEditedBy(
         currentUserId,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -187,7 +205,8 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _mySkillsRepository.addOfferedSkill(
+      await _mySkillsRepository
+          .addOfferedSkill(
         userId: currentUserId,
         title: cleanTitle,
         category: cleanCategory,
@@ -195,11 +214,15 @@ class MySkillsController {
         level: cleanLevel,
         availability: cleanAvailability,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on MySkillsRepositoryException catch (error) {
+    } on MySkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -258,7 +281,8 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _mySkillsRepository.updateOfferedSkill(
+      await _mySkillsRepository
+          .updateOfferedSkill(
         userId: currentUserId,
         userSkillId: cleanUserSkillId,
         title: cleanTitle,
@@ -267,11 +291,15 @@ class MySkillsController {
         level: cleanLevel,
         availability: cleanAvailability,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on MySkillsRepositoryException catch (error) {
+    } on MySkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -302,15 +330,20 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _mySkillsRepository.deleteOfferedSkill(
+      await _mySkillsRepository
+          .deleteOfferedSkill(
         userId: currentUserId,
         userSkillId: cleanUserSkillId,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on MySkillsRepositoryException catch (error) {
+    } on MySkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -359,7 +392,8 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _wantedSkillsRepository.addWantedSkill(
+      await _wantedSkillsRepository
+          .addWantedSkill(
         userId: currentUserId,
         title: cleanTitle,
         category: cleanCategory,
@@ -367,11 +401,15 @@ class MySkillsController {
         level: cleanLevel,
         availability: cleanAvailability,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on WantedSkillsRepositoryException catch (error) {
+    } on WantedSkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -430,7 +468,8 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _wantedSkillsRepository.updateWantedSkill(
+      await _wantedSkillsRepository
+          .updateWantedSkill(
         userId: currentUserId,
         userSkillId: cleanUserSkillId,
         title: cleanTitle,
@@ -439,11 +478,15 @@ class MySkillsController {
         level: cleanLevel,
         availability: cleanAvailability,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on WantedSkillsRepositoryException catch (error) {
+    } on WantedSkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
@@ -474,15 +517,20 @@ class MySkillsController {
       final String currentUserId =
           _currentUserService.userId;
 
-      await _wantedSkillsRepository.deleteWantedSkill(
+      await _wantedSkillsRepository
+          .deleteWantedSkill(
         userId: currentUserId,
         userSkillId: cleanUserSkillId,
       );
-    } on CurrentUserServiceException catch (error) {
+    } on CurrentUserServiceException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );
-    } on WantedSkillsRepositoryException catch (error) {
+    } on WantedSkillsRepositoryException catch (
+    error
+    ) {
       throw MySkillsControllerException(
         error.message,
       );

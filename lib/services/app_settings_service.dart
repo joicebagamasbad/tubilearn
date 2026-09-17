@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../model/app_settings.dart';
 import '../model/repositories/app_settings_repository.dart';
 
-class AppSettingsService extends ChangeNotifier {
+class AppSettingsService
+    extends ChangeNotifier {
   AppSettingsService._();
 
   static final AppSettingsService instance =
@@ -22,9 +24,11 @@ class AppSettingsService extends ChangeNotifier {
   );
 
   bool _isInitialized = false;
+
   bool _isLoading = false;
 
-  AppSettings get settings => _settings;
+  AppSettings get settings =>
+      _settings;
 
   bool get isInitialized =>
       _isInitialized;
@@ -54,25 +58,38 @@ class AppSettingsService extends ChangeNotifier {
     }
   }
 
+  // ============================================================
+  // INITIALIZE
+  // ============================================================
+
   Future<void> initialize() async {
     if (_isInitialized ||
         _isLoading) {
       return;
     }
 
-    _isLoading = true;
+    _isLoading =
+    true;
+
     notifyListeners();
 
     try {
       _settings =
       await _repository.loadSettings();
 
-      _isInitialized = true;
+      _isInitialized =
+      true;
     } finally {
-      _isLoading = false;
+      _isLoading =
+      false;
+
       notifyListeners();
     }
   }
+
+  // ============================================================
+  // NOTIFICATIONS
+  // ============================================================
 
   Future<void> setNotificationsEnabled(
       bool enabled,
@@ -106,6 +123,10 @@ class AppSettingsService extends ChangeNotifier {
     }
   }
 
+  // ============================================================
+  // LANGUAGE
+  // ============================================================
+
   Future<void> setLanguage(
       AppLanguagePreference language,
       ) async {
@@ -136,6 +157,10 @@ class AppSettingsService extends ChangeNotifier {
       rethrow;
     }
   }
+
+  // ============================================================
+  // THEME
+  // ============================================================
 
   Future<void> setTheme(
       AppThemePreference theme,

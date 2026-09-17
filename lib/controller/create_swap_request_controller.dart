@@ -1,4 +1,5 @@
 import '../model/repositories/explore_repository.dart';
+import '../model/managed_skill.dart';
 import '../model/repositories/my_skills_repository.dart';
 import '../model/skill.dart';
 import '../model/swap_request.dart';
