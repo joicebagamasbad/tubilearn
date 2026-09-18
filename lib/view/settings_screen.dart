@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../controller/auth_controller.dart';
 import '../controller/settings_controller.dart';
 import '../model/app_settings.dart';
 
@@ -15,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState
     extends State<SettingsScreen> {
+  final AuthController _authController = AuthController();
   final SettingsController _controller =
   SettingsController();
 
@@ -22,6 +24,7 @@ class _SettingsScreenState
   bool _isSavingNotifications = false;
   bool _isSavingLanguage = false;
   bool _isSavingTheme = false;
+  bool _isSigningOut = false;
 
   bool _notificationsEnabled = true;
 
@@ -878,11 +881,11 @@ class _SettingsScreenState
       icon:
       Icons.person_outline_rounded,
       title:
-      'Local prototype profile',
+      'Account and local profile',
       children:
       <Widget>[
         _dialogParagraph(
-          'TubiLearn currently uses a local prototype identity instead of a real signed-in account.',
+          'You are signed in with Firebase Authentication. Profile, skill, chat, and swap data still use this device\'s local prototype identity.',
         ),
         _dialogPoint(
           icon:
@@ -896,9 +899,9 @@ class _SettingsScreenState
           icon:
           Icons.lock_outline_rounded,
           title:
-          'Authentication not connected',
+          'Local data',
           text:
-          'There is no real email/password sign-in, secure server session, password reset, or account verification yet.',
+          'Your local data is not yet linked to your Firebase user ID or synced across devices.',
         ),
         _dialogPoint(
           icon:
@@ -906,7 +909,7 @@ class _SettingsScreenState
           title:
           'Single-device prototype',
           text:
-          'The current identity is intended for this local prototype and does not represent a cloud account.',
+          'Your signed-in account is cloud-based, but the app data on this device still uses a separate local prototype identity.',
         ),
       ],
     );
@@ -978,9 +981,9 @@ class _SettingsScreenState
           icon:
           Icons.cloud_off_rounded,
           title:
-          'No production cloud account',
+          'Authentication and local data',
           text:
-          'Cloud synchronization, account recovery, and remote backup are not active.',
+          'Firebase Authentication supports sign-in and password reset. Profile and app data remain on this device and are not yet linked to your Firebase UID or backed up.',
         ),
         _dialogPoint(
           icon:
@@ -988,7 +991,7 @@ class _SettingsScreenState
           title:
           'Production requirement',
           text:
-          'Before real-user release, TubiLearn will need a full privacy policy, secure backend handling, authentication, authorization, and account-data controls.',
+          'Before real-user release, TubiLearn will need a full privacy policy, secure backend handling, authorization, and account-data controls.',
         ),
       ],
     );
@@ -1274,6 +1277,23 @@ class _SettingsScreenState
           SnackBarBehavior.floating,
         ),
       );
+  }
+
+  Future<void> _signOut() async {
+    if (_isSigningOut) return;
+    setState(() => _isSigningOut = true);
+    try {
+      await _authController.signOut();
+      if (mounted) {
+        Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+      }
+    } on AuthControllerException catch (error) {
+      _showMessage(error.message);
+    } catch (_) {
+      _showMessage('Could not sign out. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isSigningOut = false);
+    }
   }
 
   // ============================================================
@@ -1603,18 +1623,28 @@ class _SettingsScreenState
               icon:
               Icons.person_outline_rounded,
               title:
-              'Local prototype profile',
+              'Signed-in account',
               subtitle:
-              'No real sign-in account is connected',
+              _authController.currentSession?.email ?? 'Signed in',
               trailing:
               _buildStatusBadge(
                 label:
-                'LOCAL',
+                'ACTIVE',
                 positive:
                 true,
               ),
               onTap:
               _showPrototypeAccountDialog,
+            ),
+
+            _divider(),
+
+            _actionTile(
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              subtitle: _isSigningOut ? 'Signing out...' : 'Return to login',
+              isBusy: _isSigningOut,
+              onTap: _isSigningOut ? null : _signOut,
             ),
 
             _divider(),
@@ -1702,7 +1732,7 @@ class _SettingsScreenState
           title:
           'Prototype boundary',
           text:
-          'Real authentication, password management, account deletion, cloud sync, realtime delivery, and push notifications require the production backend. They are intentionally not presented here as working account features.',
+          'Firebase Authentication provides sign-in and password reset. Profile and other app data stay local until the Firebase UID and SQLite data are linked. Account deletion, cloud sync, realtime delivery, and push notifications are not available here yet.',
         ),
       ],
     );

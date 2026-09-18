@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import 'dashboard_video_session_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
@@ -59,31 +58,6 @@ class _SplashScreenState
         );
 
     _animationController.forward();
-
-    _openDashboard();
-  }
-
-  Future<void> _openDashboard() async {
-    await Future<void>.delayed(
-      const Duration(
-        seconds: 3,
-      ),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    await Navigator.of(
-      context,
-    ).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (
-            BuildContext context,
-            ) =>
-        const DashboardVideoSessionShell(),
-      ),
-    );
   }
 
   @override
