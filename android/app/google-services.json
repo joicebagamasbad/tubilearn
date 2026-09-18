@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "297665808039",
+    "project_id": "tubilearn",
+    "storage_bucket": "tubilearn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:297665808039:android:40459b23b6b76709643d82",
+        "android_client_info": {
+          "package_name": "com.example.tubilearn_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDK_He-uC476b0BMY-6KtPLPhk1FfmeBq8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
