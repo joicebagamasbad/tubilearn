@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../services/current_user_service.dart';
+
 import '../database/app_database.dart';
 import '../swap_request.dart';
 import 'user_visibility_repository.dart';
@@ -28,7 +30,7 @@ class SwapRepository {
   // ============================================================
 
   Future<List<SwapRequest>> getAllSwapRequests({
-    String? userId,
+    required String userId,
     bool includeHidden = false,
   }) async {
     final String? cleanUserId =
@@ -36,12 +38,12 @@ class SwapRepository {
       userId,
     );
 
-    if (!includeHidden &&
-        cleanUserId == null) {
+    if (cleanUserId == null) {
       throw const SwapRepositoryException(
-        'User ID is required when loading visible swap requests.',
+        'User ID is required when loading swap requests.',
       );
     }
+    CurrentUserService.instance.requireCurrentUser(cleanUserId);
 
     try {
       final Database db =
@@ -55,6 +57,8 @@ class SwapRepository {
       final List<Map<String, Object?>> rows =
       await db.query(
         'swap_requests',
+        where: 'requester_user_id = ? OR provider_user_id = ?',
+        whereArgs: <Object?>[cleanUserId, cleanUserId],
         orderBy:
         'created_at DESC',
       );
@@ -87,8 +91,7 @@ class SwapRepository {
         );
       }
 
-      if (includeHidden ||
-          cleanUserId == null) {
+      if (includeHidden) {
         return List<SwapRequest>.unmodifiable(
           allRequests,
         );

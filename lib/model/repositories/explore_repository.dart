@@ -48,6 +48,18 @@ class ExploreRepository {
   bool get isInitialized =>
       _initialized;
 
+  Future<void> clearSessionCache() async {
+    try {
+      await _loadingFuture;
+    } catch (_) {
+      // A failed load still needs its partial state cleared.
+    }
+    _users.clear();
+    _skills.clear();
+    _userSkills.clear();
+    _initialized = false;
+  }
+
   // ============================================================
   // INITIALIZE
   // ============================================================
@@ -1586,12 +1598,14 @@ class ExploreRepository {
       'User city',
     );
 
-    final String bio =
-    _requireString(
-      map,
-      'bio',
-      'User bio',
-    );
+    // A newly provisioned, incomplete profile may have no bio yet.
+    final Object? storedBio = map['bio'];
+    if (storedBio is! String) {
+      throw const ExploreRepositoryException(
+        'User bio is invalid.',
+      );
+    }
+    final String bio = storedBio.trim();
 
     final double rating =
     _requireDouble(

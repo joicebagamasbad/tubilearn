@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../services/current_user_service.dart';
+
 import '../conversation.dart';
 import '../database/app_database.dart';
 import '../message.dart';
@@ -40,9 +42,12 @@ class ChatRepository {
       userId,
       'User ID',
     );
+    CurrentUserService.instance.requireCurrentUser(cleanUserId);
 
     final List<Conversation> allConversations =
-    await _loadAllConversations();
+    await _loadAllConversations(
+      cleanUserId,
+    );
 
     if (includeHidden) {
       return List<Conversation>.unmodifiable(
@@ -102,6 +107,7 @@ class ChatRepository {
       userId,
       'User ID',
     );
+    CurrentUserService.instance.requireCurrentUser(cleanUserId);
 
     final String cleanParticipantUserId =
     _requireInputText(
@@ -110,7 +116,9 @@ class ChatRepository {
     );
 
     final List<Conversation> allConversations =
-    await _loadAllConversations();
+    await _loadAllConversations(
+      cleanUserId,
+    );
 
     final List<Conversation> participantConversations =
     allConversations
@@ -187,6 +195,7 @@ class ChatRepository {
       userId,
       'User ID',
     );
+    CurrentUserService.instance.requireCurrentUser(cleanUserId);
 
     final String cleanParticipantUserId =
     _requireInputText(
@@ -195,7 +204,9 @@ class ChatRepository {
     );
 
     final List<Conversation> allConversations =
-    await _loadAllConversations();
+    await _loadAllConversations(
+      cleanUserId,
+    );
 
     late final List<String> hiddenIdsNewestFirst;
 
@@ -299,7 +310,7 @@ class ChatRepository {
   // ============================================================
 
   Future<List<Conversation>>
-  _loadAllConversations() async {
+  _loadAllConversations(String userId) async {
     try {
       final Database db =
       await _appDatabase.database;
@@ -308,14 +319,19 @@ class ChatRepository {
       conversationRows =
       await db.query(
         'conversations',
+        where: 'owner_user_id = ?',
+        whereArgs: <Object?>[userId],
       );
 
       final List<Map<String, Object?>>
       messageRows =
-      await db.query(
-        'messages',
-        orderBy:
-        'conversation_id ASC, sent_at ASC',
+      await db.rawQuery(
+        '''SELECT messages.* FROM messages
+           INNER JOIN conversations
+             ON conversations.id = messages.conversation_id
+           WHERE conversations.owner_user_id = ?
+           ORDER BY messages.conversation_id ASC, messages.sent_at ASC''',
+        <Object?>[userId],
       );
 
       final Set<String> conversationIds =
@@ -535,6 +551,7 @@ class ChatRepository {
   Future<void> saveConversation(
       Conversation conversation,
       ) async {
+    final String ownerUserId = CurrentUserService.instance.requireUserId();
     final String conversationId =
     _requireInputText(
       conversation.id,
@@ -588,6 +605,7 @@ class ChatRepository {
 
       final Map<String, Object?> values =
       <String, Object?>{
+        'owner_user_id': ownerUserId,
         'participant_user_id':
         participantUserId,
         'user_name':
@@ -608,14 +626,15 @@ class ChatRepository {
             (
             Transaction txn,
             ) async {
+          CurrentUserService.instance.requireActiveOperation();
           final int updatedRows =
           await txn.update(
             'conversations',
             values,
-            where:
-            'id = ?',
+            where: 'id = ? AND owner_user_id = ?',
             whereArgs: <Object?>[
               conversationId,
+              ownerUserId,
             ],
           );
 
@@ -669,6 +688,7 @@ class ChatRepository {
     required String conversationId,
     required Message message,
   }) async {
+    final String ownerUserId = CurrentUserService.instance.requireUserId();
     final String cleanConversationId =
     _requireInputText(
       conversationId,
@@ -733,10 +753,10 @@ class ChatRepository {
             columns: <String>[
               'id',
             ],
-            where:
-            'id = ?',
+            where: 'id = ? AND owner_user_id = ?',
             whereArgs: <Object?>[
               cleanConversationId,
+              ownerUserId,
             ],
             limit: 1,
           );
@@ -746,6 +766,8 @@ class ChatRepository {
               'The conversation could not be found.',
             );
           }
+
+        CurrentUserService.instance.requireActiveOperation();
 
           // ----------------------------------------------------
           // MESSAGE IDS ARE STABLE
@@ -832,6 +854,8 @@ class ChatRepository {
     );
 
     try {
+      await _requireOwnedConversation(cleanConversationId, cleanUserId);
+      CurrentUserService.instance.requireCurrentUser(cleanUserId);
       await _visibilityRepository
           .hideConversation(
         conversationId:
@@ -871,6 +895,8 @@ class ChatRepository {
     );
 
     try {
+      await _requireOwnedConversation(cleanConversationId, cleanUserId);
+      CurrentUserService.instance.requireCurrentUser(cleanUserId);
       await _visibilityRepository
           .unhideConversation(
         conversationId:
@@ -896,9 +922,33 @@ class ChatRepository {
   // Normal user-facing removal should always use hideConversation.
   // ============================================================
 
+  Future<void> _requireOwnedConversation(
+    String conversationId,
+    String ownerUserId,
+  ) async {
+    if (CurrentUserService.instance.requireUserId() != ownerUserId) {
+      throw const ChatRepositoryException('Conversation owner is not active.');
+    }
+    final Database db = await _appDatabase.database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'conversations',
+      columns: <String>['id'],
+      where: 'id = ? AND owner_user_id = ?',
+      whereArgs: <Object?>[conversationId, ownerUserId],
+      limit: 1,
+    );
+    if (rows.length != 1 ||
+        CurrentUserService.instance.requireUserId() != ownerUserId) {
+      throw const ChatRepositoryException(
+        'Conversation owner could not be verified.',
+      );
+    }
+  }
+
   Future<void> deleteConversationPermanently(
       String conversationId,
       ) async {
+    final String ownerUserId = CurrentUserService.instance.requireUserId();
     final String cleanConversationId =
     _requireInputText(
       conversationId,
@@ -912,10 +962,10 @@ class ChatRepository {
       final int deletedRows =
       await db.delete(
         'conversations',
-        where:
-        'id = ?',
+        where: 'id = ? AND owner_user_id = ?',
         whereArgs: <Object?>[
           cleanConversationId,
+          ownerUserId,
         ],
       );
 

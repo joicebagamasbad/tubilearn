@@ -82,6 +82,32 @@ class ChatService {
         _conversations,
       );
 
+  Future<void> resetSession() async {
+    try {
+      await _initializingFuture;
+    } catch (_) {
+      // A failed load still needs its partial state cleared.
+    }
+    try {
+      await Future.wait<dynamic>(<Future<dynamic>>[
+        ..._pendingConversationCreations.values,
+        ..._pendingConversationHides.values,
+        ..._pendingMessageSends.values,
+        ..._pendingConversationMetadataWrites.values,
+      ]);
+    } catch (_) {
+      // Pending operation errors are already reported to their callers.
+    }
+    _conversations.clear();
+    _pendingConversationCreations.clear();
+    _pendingConversationHides.clear();
+    _pendingMessageSends.clear();
+    _pendingConversationMetadataWrites.clear();
+    _lastMessageIdMicros = 0;
+    _lastConversationIdMicros = 0;
+    _initialized = false;
+  }
+
   // ============================================================
   // INITIALIZE
   // ============================================================
@@ -161,24 +187,17 @@ class ChatService {
     }
 
     // ----------------------------------------------------------
-    // BRAND-NEW DATABASE ONLY
-    //
-    // Empty visible chats does NOT mean there are no chats.
-    // Everything may simply be archived.
+    // A new authenticated account starts without seeded conversations.
+    // Archived conversations are included in allConversations.
     // ----------------------------------------------------------
 
     if (allConversations.isEmpty) {
       _conversations.clear();
 
+      if (_currentUserService.usesLocalPrototypeSession) {
+
       await _createInitialData();
-
-      _syncMessageIdCounterFromLoadedData(
-        _conversations,
-      );
-
-      _syncConversationIdCounterFromLoadedData(
-        _conversations,
-      );
+      }
 
       _initialized = true;
       return;
@@ -687,7 +706,9 @@ class ChatService {
     required String skillWanted,
     required String skillOffered,
   }) async {
+    return _currentUserService.runForSession<Conversation>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final _ValidatedParticipantInput input =
     _validateParticipantInput(
@@ -717,6 +738,7 @@ class ChatService {
     await _findLatestHiddenConversationForUser(
       input.userId,
     );
+      _currentUserService.requireActiveOperation();
 
     if (latestHidden != null) {
       throw HiddenConversationException(
@@ -740,6 +762,7 @@ class ChatService {
         );
       },
     );
+  });
   }
 
   // ============================================================
@@ -757,7 +780,9 @@ class ChatService {
     required String skillWanted,
     required String skillOffered,
   }) async {
+    return _currentUserService.runForSession<Conversation>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final _ValidatedParticipantInput input =
     _validateParticipantInput(
@@ -796,6 +821,7 @@ class ChatService {
         );
       },
     );
+  });
   }
 
   // ============================================================
@@ -908,6 +934,7 @@ class ChatService {
     required Future<Conversation> Function()
     operation,
   }) async {
+    _currentUserService.requireActiveOperation();
     final Future<Conversation>? pending =
     _pendingConversationCreations[
     participantUserId
@@ -1043,7 +1070,8 @@ class ChatService {
     }
 
     final String conversationId =
-    useFreshUniqueId
+        (
+    useFreshUniqueId || !_currentUserService.usesLocalPrototypeSession)
         ? await _createFreshConversationId(
       input.userId,
     )
@@ -1131,6 +1159,7 @@ class ChatService {
         'Conversation history could not be checked before creating a new chat.',
       );
     }
+    _currentUserService.requireActiveOperation();
 
     final Set<String> existingIds =
     allConversations
@@ -1157,7 +1186,7 @@ class ChatService {
           candidate;
 
       final String id =
-          'conversation_${cleanUserId}_$candidate';
+          'conversation_${currentUserId}_${cleanUserId}_$candidate';
 
       if (!existingIds.contains(
         id,
@@ -1361,6 +1390,7 @@ class ChatService {
     operation,
   }) async {
     while (true) {
+      _currentUserService.requireActiveOperation();
       final Future<Conversation>? pending =
       _pendingConversationMetadataWrites[
       conversationId
@@ -1382,6 +1412,7 @@ class ChatService {
     _throwIfConversationHiding(
       conversationId,
     );
+    _currentUserService.requireActiveOperation();
 
     final Future<Conversation> write =
     operation();
@@ -1409,6 +1440,7 @@ class ChatService {
   void _replaceConversationInMemory(
       Conversation replacement,
       ) {
+    _currentUserService.requireActiveOperation();
     final String? participantId =
     _cleanOptionalText(
       replacement.participantUserId,
@@ -1456,7 +1488,9 @@ class ChatService {
     required String conversationId,
     required String text,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanConversationId =
     _requireText(
@@ -1476,6 +1510,7 @@ class ChatService {
     );
 
     while (true) {
+        _currentUserService.requireActiveOperation();
       final Future<void>? pendingSend =
       _pendingMessageSends[
       cleanConversationId
@@ -1493,6 +1528,8 @@ class ChatService {
         cleanConversationId,
       );
     }
+
+      _currentUserService.requireActiveOperation();
 
     final Future<void> sendOperation =
     _sendMessageInternal(
@@ -1520,6 +1557,7 @@ class ChatService {
         );
       }
     }
+  });
   }
 
   Future<void> _sendMessageInternal({
@@ -1595,6 +1633,7 @@ class ChatService {
         message,
       );
     } on ChatRepositoryException catch (_) {
+      _currentUserService.requireActiveOperation();
       conversation.messages.removeWhere(
             (
             Message existingMessage,
@@ -1607,6 +1646,7 @@ class ChatService {
         'Message could not be saved. Please try again.',
       );
     } catch (_) {
+      _currentUserService.requireActiveOperation();
       conversation.messages.removeWhere(
             (
             Message existingMessage,
@@ -1690,7 +1730,9 @@ class ChatService {
   Future<void> deleteConversation(
       String conversationId,
       ) async {
+    await _currentUserService.runForSession<void>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanConversationId =
     _requireText(
@@ -1742,6 +1784,7 @@ class ChatService {
         );
       }
     }
+  });
   }
 
   Future<void> _hideConversationInternal(
@@ -1799,6 +1842,8 @@ class ChatService {
       );
     }
 
+    _currentUserService.requireActiveOperation();
+
     _conversations.removeWhere(
           (
           Conversation conversation,
@@ -1815,7 +1860,9 @@ class ChatService {
   Future<Conversation> restoreConversation(
       String conversationId,
       ) async {
+    return _currentUserService.runForSession<Conversation>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanConversationId =
     _requireText(
@@ -1851,6 +1898,7 @@ class ChatService {
         'Conversation history could not be loaded.',
       );
     }
+      _currentUserService.requireActiveOperation();
 
     final List<Conversation> matches =
     allConversations.where(
@@ -1919,6 +1967,7 @@ class ChatService {
     );
 
     return mutable;
+  });
   }
 
   void _throwIfConversationHiding(

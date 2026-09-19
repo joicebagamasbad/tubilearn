@@ -72,6 +72,33 @@ class SwapService {
         _requests,
       );
 
+  Future<void> resetSession() async {
+    try {
+      await _initializingFuture;
+    } catch (_) {
+      // A failed load still needs its partial state cleared.
+    }
+    try {
+      await Future.wait<dynamic>(<Future<dynamic>>[
+        ..._pendingCreations.values,
+        ..._pendingStatusChanges.values,
+        ..._pendingHides.values,
+        ..._pendingRestores.values,
+        _scheduleConfirmationQueue,
+      ]);
+    } catch (_) {
+      // Pending operation errors are already reported to their callers.
+    }
+    _requests.clear();
+    _pendingCreations.clear();
+    _pendingStatusChanges.clear();
+    _pendingHides.clear();
+    _pendingRestores.clear();
+    _lastRequestIdMicros = 0;
+    _scheduleConfirmationQueue = Future<void>.value();
+    _initialized = false;
+  }
+
   // ============================================================
   // INITIALIZE
   // ============================================================
@@ -379,7 +406,9 @@ class SwapService {
     String? meetingDetails,
     String? note,
   }) async {
+    return _currentUserService.runForSession<SwapRequest>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String currentUserId =
     _requireCurrentLocalUser();
@@ -471,6 +500,7 @@ class SwapService {
     }
 
     await _refreshExploreForValidation();
+      _currentUserService.requireActiveOperation();
 
     final provider =
     _exploreRepository.findUserById(
@@ -645,6 +675,7 @@ class SwapService {
         );
       }
     }
+  });
   }
 
   Future<SwapRequest> _createRequestInternal({
@@ -720,6 +751,7 @@ class SwapService {
     );
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.saveSwapRequest(
         request,
       );
@@ -728,6 +760,8 @@ class SwapService {
         'Could not save the swap request. Please try again.',
       );
     }
+
+    _currentUserService.requireActiveOperation();
 
     _requests.insert(
       0,
@@ -819,7 +853,9 @@ class SwapService {
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     await _runSerializedScheduleConfirmation(
           () async {
@@ -867,6 +903,7 @@ class SwapService {
         }
 
         await _refreshExploreForValidation();
+        _currentUserService.requireActiveOperation();
 
         _validateModeSupportedByRequest(
           request:
@@ -888,6 +925,7 @@ class SwapService {
         );
       },
     );
+  });
   }
 
   // ============================================================
@@ -898,7 +936,9 @@ class SwapService {
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanRequestId =
     _requireRequestId(
@@ -915,6 +955,7 @@ class SwapService {
     );
 
     while (true) {
+        _currentUserService.requireActiveOperation();
       final Future<void>? pending =
       _pendingStatusChanges[
       cleanRequestId
@@ -932,6 +973,7 @@ class SwapService {
         cleanRequestId,
       );
     }
+      _currentUserService.requireActiveOperation();
 
     final SwapRequest request =
     _requireRequest(
@@ -982,6 +1024,7 @@ class SwapService {
         );
       }
     }
+  });
   }
 
   Future<void> _completeRequestInternal({
@@ -1015,6 +1058,7 @@ class SwapService {
     DateTime.now();
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.completeSwap(
         requestId:
         request.id,
@@ -1030,6 +1074,8 @@ class SwapService {
         'Could not complete the swap request. Please try again.',
       );
     }
+
+    _currentUserService.requireActiveOperation();
 
     request.status =
         SwapRequestStatus.completed;
@@ -1053,6 +1099,7 @@ class SwapService {
   Future<void> _runSerializedScheduleConfirmation(
       Future<void> Function() action,
       ) {
+    _currentUserService.requireActiveOperation();
     final Completer<void> release =
     Completer<void>();
 
@@ -1082,6 +1129,8 @@ class SwapService {
       try {
         await previous;
       } catch (_) {}
+
+      _currentUserService.requireActiveOperation();
 
       await action();
     } finally {
@@ -1185,7 +1234,9 @@ class SwapService {
     required String mode,
     required String meetingDetails,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanRequestId =
     _requireRequestId(
@@ -1261,6 +1312,7 @@ class SwapService {
     }
 
     await _refreshExploreForValidation();
+      _currentUserService.requireActiveOperation();
 
     _validateModeSupportedByRequest(
       request:
@@ -1314,6 +1366,7 @@ class SwapService {
         );
       }
     }
+  });
   }
 
   Future<void> _updateScheduleInternal({
@@ -1336,6 +1389,7 @@ class SwapService {
     DateTime.now();
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.updateSchedule(
         requestId:
         request.id,
@@ -1385,6 +1439,8 @@ class SwapService {
       );
     }
 
+    _currentUserService.requireActiveOperation();
+
     _requests[index] =
         updatedRequest;
 
@@ -1405,7 +1461,9 @@ class SwapService {
         ) permission,
     required String permissionError,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanRequestId =
     _requireRequestId(
@@ -1445,6 +1503,7 @@ class SwapService {
       nextStatus:
       target,
     );
+  });
   }
 
   Future<void> _changeStatus({
@@ -1459,6 +1518,7 @@ class SwapService {
     );
 
     while (true) {
+      _currentUserService.requireActiveOperation();
       final Future<void>? pending =
       _pendingStatusChanges[
       requestId
@@ -1476,6 +1536,7 @@ class SwapService {
         requestId,
       );
     }
+    _currentUserService.requireActiveOperation();
 
     final Future<void> operation =
     _changeStatusInternal(
@@ -1532,6 +1593,7 @@ class SwapService {
     DateTime.now();
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.updateStatus(
         requestId:
         request.id,
@@ -1545,6 +1607,8 @@ class SwapService {
         'Could not update the swap request. Please try again.',
       );
     }
+
+    _currentUserService.requireActiveOperation();
 
     request.status =
         nextStatus;
@@ -1563,7 +1627,9 @@ class SwapService {
     required String requestId,
     required String actorUserId,
   }) async {
-    await initialize();
+    await _currentUserService.runForSession<void>(() async {
+      await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanRequestId =
     _requireRequestId(
@@ -1603,6 +1669,7 @@ class SwapService {
     await _waitForPendingStatusChange(
       cleanRequestId,
     );
+      _currentUserService.requireActiveOperation();
 
     final Future<void> operation =
     _removeFromHistoryInternal(
@@ -1630,6 +1697,7 @@ class SwapService {
         );
       }
     }
+  });
   }
 
   Future<void> _removeFromHistoryInternal({
@@ -1657,6 +1725,7 @@ class SwapService {
     }
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.hideSwapRequest(
         requestId:
         request.id,
@@ -1668,6 +1737,8 @@ class SwapService {
         'Could not remove the swap request from your history. Please try again.',
       );
     }
+
+    _currentUserService.requireActiveOperation();
 
     _requests.removeWhere(
           (
@@ -1698,7 +1769,9 @@ class SwapService {
     required String requestId,
     required String actorUserId,
   }) async {
+    return _currentUserService.runForSession<SwapRequest>(() async {
     await initialize();
+      _currentUserService.requireActiveOperation();
 
     final String cleanRequestId =
     _requireRequestId(
@@ -1735,6 +1808,7 @@ class SwapService {
     await _waitForPendingStatusChange(
       cleanRequestId,
     );
+      _currentUserService.requireActiveOperation();
 
     final Future<SwapRequest> operation =
     _restoreRequestInternal(
@@ -1762,6 +1836,7 @@ class SwapService {
         );
       }
     }
+  });
   }
 
   Future<SwapRequest> _restoreRequestInternal({
@@ -1791,6 +1866,7 @@ class SwapService {
     try {
       allRequests =
       await _repository.getAllSwapRequests(
+        userId: _requireCurrentLocalUser(),
         includeHidden:
         true,
       );
@@ -1844,6 +1920,7 @@ class SwapService {
     }
 
     try {
+      _currentUserService.requireActiveOperation();
       await _repository.unhideSwapRequest(
         requestId:
         request.id,
@@ -1855,6 +1932,8 @@ class SwapService {
         'Could not restore the swap request. Please try again.',
       );
     }
+
+    _currentUserService.requireActiveOperation();
 
     final bool alreadyVisible =
     _requests.any(
@@ -2010,6 +2089,7 @@ class SwapService {
       String requestId,
       ) async {
     while (true) {
+      _currentUserService.requireActiveOperation();
       final Future<void>? pending =
       _pendingStatusChanges[
       requestId

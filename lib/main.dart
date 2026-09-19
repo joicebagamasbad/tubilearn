@@ -6,13 +6,9 @@ import 'firebase_options.dart';
 import 'model/skill.dart';
 import 'model/user.dart';
 
-import 'model/repositories/explore_repository.dart';
-
 import 'theme/app_theme.dart';
 
 import 'services/app_settings_service.dart';
-import 'services/chat_service.dart';
-import 'services/swap_service.dart';
 
 import 'view/auth_gate.dart';
 import 'view/add_skill_screen.dart';
@@ -43,12 +39,6 @@ Future<void> main() async {
   // ============================================================
 
   await AppSettingsService.instance.initialize();
-
-  await ExploreRepository.instance.initialize();
-
-  await ChatService.instance.initialize();
-
-  await SwapService.instance.initialize();
 
   runApp(
     const TubiLearnApp(),

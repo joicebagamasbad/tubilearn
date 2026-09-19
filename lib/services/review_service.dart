@@ -41,6 +41,16 @@ class ReviewService {
 
   int _lastReviewIdMicros = 0;
 
+  Future<void> resetSession() async {
+    try {
+      await Future.wait<Review>(_pendingSubmissions.values.toList());
+    } catch (_) {
+      // Pending submission errors are reported to their callers.
+    }
+    _pendingSubmissions.clear();
+    _lastReviewIdMicros = 0;
+  }
+
   // ============================================================
   // REVIEW ELIGIBILITY
   // ============================================================
@@ -119,6 +129,7 @@ class ReviewService {
     required int rating,
     String? comment,
   }) async {
+    return _currentUserService.runForSession<Review>(() async {
     await _swapService.initialize();
 
     final String requestId =
@@ -232,6 +243,7 @@ class ReviewService {
         );
       }
     }
+  });
   }
 
   Future<Review> _submitReviewInternal({
@@ -264,6 +276,8 @@ class ReviewService {
       );
     }
 
+    _currentUserService.requireActiveOperation();
+
     final DateTime createdAt =
     DateTime.now();
 
@@ -273,6 +287,7 @@ class ReviewService {
     );
 
     try {
+      _currentUserService.requireActiveOperation();
       final Review review =
       await _reviewRepository.createReview(
         id:
@@ -290,6 +305,8 @@ class ReviewService {
         createdAt:
         createdAt,
       );
+
+      _currentUserService.requireActiveOperation();
 
       try {
         await _exploreRepository.refresh();

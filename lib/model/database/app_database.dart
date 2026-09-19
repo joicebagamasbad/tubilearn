@@ -12,7 +12,7 @@ AppDatabase._();
 static const String _databaseName =
 'tubilearn.db';
 
-static const int _databaseVersion = 12;
+static const int _databaseVersion = 13;
 
 Database? _database;
 
@@ -163,6 +163,8 @@ db,
 await _createProfileImageColumnV12(
 db,
 );
+
+await _createConversationOwnerColumnV13(db);
 },
 
 // ========================================================
@@ -238,6 +240,10 @@ if (oldVersion < 12) {
 await _migrateToVersion12(
 db,
 );
+}
+
+if (oldVersion < 13) {
+await _createConversationOwnerColumnV13(db);
 }
 },
 );
@@ -439,6 +445,7 @@ requiredColumns =
 },
 'conversations': <String>{
 'id',
+'owner_user_id',
 'participant_user_id',
 'user_name',
 },
@@ -556,6 +563,7 @@ const Set<String> requiredIndexes =
 'idx_swap_requests_unique_active_exchange',
 'idx_skills_owner_user',
 'idx_conversations_participant_user',
+'idx_conversations_owner_user',
 'idx_conversation_visibility_user_hidden',
 'idx_swap_visibility_user_hidden',
 'idx_reviews_swap_request',
@@ -2348,6 +2356,26 @@ await db.execute(
         )
       ''',
 );
+}
+
+// ============================================================
+// VERSION 13 - CONVERSATION OWNER
+// ============================================================
+
+Future<void> _createConversationOwnerColumnV13(Database db) async {
+  final List<Map<String, Object?>> columns =
+      await db.rawQuery('PRAGMA table_info(conversations)');
+  if (!columns.any((Map<String, Object?> column) =>
+      column['name'] == 'owner_user_id')) {
+    await db.execute('''
+      ALTER TABLE conversations
+      ADD COLUMN owner_user_id TEXT REFERENCES users(id)
+    ''');
+  }
+  await db.execute('''
+    CREATE INDEX IF NOT EXISTS idx_conversations_owner_user
+    ON conversations(owner_user_id)
+  ''');
 }
 
 // ============================================================
