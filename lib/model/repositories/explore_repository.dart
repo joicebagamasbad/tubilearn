@@ -43,21 +43,36 @@ class ExploreRepository {
 
   Future<void>? _loadingFuture;
 
+  ActiveUserSession? _loadingSession;
+
+  ActiveUserSession? _loadedSession;
+
   bool _initialized = false;
 
-  bool get isInitialized =>
-      _initialized;
+  bool get isInitialized {
+    final ActiveUserSession? loadedSession = _loadedSession;
+    if (!_initialized || loadedSession == null) {
+      return false;
+    }
+
+    try {
+      CurrentUserService.instance.requireSameSession(loadedSession);
+      return true;
+    } on CurrentUserServiceException {
+      return false;
+    }
+  }
 
   Future<void> clearSessionCache() async {
-    try {
-      await _loadingFuture;
-    } catch (_) {
-      // A failed load still needs its partial state cleared.
+    final Future<void>? pending = _loadingFuture;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {
+        // A failed load still needs its partial state cleared.
+      }
     }
-    _users.clear();
-    _skills.clear();
-    _userSkills.clear();
-    _initialized = false;
+    _clearCachedState();
   }
 
   // ============================================================
@@ -65,34 +80,7 @@ class ExploreRepository {
   // ============================================================
 
   Future<void> initialize() async {
-    if (_initialized) {
-      return;
-    }
-
-    final Future<void>? pending =
-        _loadingFuture;
-
-    if (pending != null) {
-      await pending;
-      return;
-    }
-
-    final Future<void> loading =
-    _loadFromDatabase();
-
-    _loadingFuture =
-        loading;
-
-    try {
-      await loading;
-    } finally {
-      if (identical(
-        _loadingFuture,
-        loading,
-      )) {
-        _loadingFuture = null;
-      }
-    }
+    await _loadForActiveSession(forceRefresh: false);
   }
 
   // ============================================================
@@ -100,71 +88,206 @@ class ExploreRepository {
   // ============================================================
 
   Future<void> refresh() async {
-    final Future<void>? pending =
-        _loadingFuture;
+    await _loadForActiveSession(forceRefresh: true);
+  }
 
-    if (pending != null) {
-      await pending;
+  Future<void> _loadForActiveSession({required bool forceRefresh}) async {
+    final CurrentUserService currentUserService = CurrentUserService.instance;
+    final ActiveUserSession session;
+    try {
+      session = currentUserService.captureSession();
+    } on CurrentUserServiceException {
+      _clearCachedState();
+      rethrow;
     }
 
-    final Future<void> loading =
-    _loadFromDatabase();
+    if (!forceRefresh && _isLoadedFor(session)) {
+      return;
+    }
 
-    _loadingFuture =
-        loading;
+    final Future<void>? pending = _loadingFuture;
+    final ActiveUserSession? pendingSession = _loadingSession;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {
+        currentUserService.requireSameSession(session);
+        if (_isSameSession(pendingSession, session)) {
+          rethrow;
+        }
+      }
+      currentUserService.requireSameSession(session);
+      if (_isLoadedFor(session)) {
+        return;
+      }
+    }
+
+    final Future<void> loading = _loadFromDatabase(session);
+    _loadingFuture = loading;
+    _loadingSession = session;
 
     try {
       await loading;
     } finally {
-      if (identical(
-        _loadingFuture,
-        loading,
-      )) {
+      if (identical(_loadingFuture, loading)) {
         _loadingFuture = null;
+        _loadingSession = null;
       }
     }
+  }
+
+  bool _isLoadedFor(ActiveUserSession session) {
+    return _initialized && _isSameSession(_loadedSession, session);
+  }
+
+  bool _isSameSession(
+    ActiveUserSession? first,
+    ActiveUserSession second,
+  ) {
+    return first != null &&
+        first.uid == second.uid &&
+        first.generation == second.generation;
+  }
+
+  bool get _hasReadableCache {
+    final ActiveUserSession? loadedSession = _loadedSession;
+    if (!_initialized || loadedSession == null) {
+      return false;
+    }
+
+    try {
+      CurrentUserService.instance.requireSameSession(loadedSession);
+      return true;
+    } on CurrentUserServiceException {
+      return false;
+    }
+  }
+
+  void _clearCachedState() {
+    _users.clear();
+    _skills.clear();
+    _userSkills.clear();
+    _loadedSession = null;
+    _initialized = false;
   }
 
   // ============================================================
   // LOAD FROM DATABASE
   // ============================================================
 
-  Future<void> _loadFromDatabase() async {
+  Future<void> _loadFromDatabase(ActiveUserSession session) async {
     try {
-      final db =
-      await AppDatabase.instance.database;
+      final db = await AppDatabase.instance.database;
+      CurrentUserService.instance.requireSameSession(session);
 
-      final List<Map<String, Object?>>
-      userRows =
-      await db.query(
-        'users',
-        orderBy:
-        'name COLLATE NOCASE ASC',
+      final List<Map<String, Object?>> manifestRows = await db.query(
+        'explore_remote_users',
+        columns: <String>['candidate_uid'],
+        where: 'viewer_uid = ?',
+        whereArgs: <Object?>[session.uid],
+        orderBy: 'candidate_uid ASC',
       );
+      CurrentUserService.instance.requireSameSession(session);
 
-      final List<Map<String, Object?>>
-      skillRows =
-      await db.query(
-        'skills',
-        orderBy:
-        'title COLLATE NOCASE ASC',
-      );
+      final Set<String> candidateIds = <String>{};
+      for (final Map<String, Object?> row in manifestRows) {
+        final String candidateId = _requireString(
+          row,
+          'candidate_uid',
+          'Explore candidate ID',
+        );
+        if (candidateId == session.uid || candidateId == 'user_joice_local') {
+          throw const ExploreRepositoryException(
+            'Explore contains an invalid remote candidate.',
+          );
+        }
+        if (!candidateIds.add(candidateId)) {
+          throw const ExploreRepositoryException(
+            'Explore contains a duplicate remote candidate.',
+          );
+        }
+      }
 
-      final List<Map<String, Object?>>
-      learningRows =
-      await db.query(
-        'skill_learnings',
-        orderBy:
-        'skill_id ASC, position ASC',
-      );
+      final Set<String> allowedUserIds = <String>{
+        session.uid,
+        ...candidateIds,
+      };
 
-      final List<Map<String, Object?>>
-      userSkillRows =
-      await db.query(
-        'user_skills',
-        orderBy:
-        'id ASC',
+      final List<Map<String, Object?>> userRows = await db.rawQuery(
+        '''
+        SELECT u.*
+        FROM users AS u
+        WHERE u.id = ?
+           OR EXISTS (
+             SELECT 1
+             FROM explore_remote_users AS eru
+             WHERE eru.viewer_uid = ?
+               AND eru.candidate_uid = u.id
+           )
+        ORDER BY u.name COLLATE NOCASE ASC
+        ''',
+        <Object?>[session.uid, session.uid],
       );
+      CurrentUserService.instance.requireSameSession(session);
+
+      final List<Map<String, Object?>> userSkillRows = await db.rawQuery(
+        '''
+        SELECT us.*
+        FROM user_skills AS us
+        WHERE us.user_id = ?
+           OR EXISTS (
+             SELECT 1
+             FROM explore_remote_users AS eru
+             WHERE eru.viewer_uid = ?
+               AND eru.candidate_uid = us.user_id
+           )
+        ORDER BY us.id ASC
+        ''',
+        <Object?>[session.uid, session.uid],
+      );
+      CurrentUserService.instance.requireSameSession(session);
+
+      final List<Map<String, Object?>> skillRows = await db.rawQuery(
+        '''
+        SELECT DISTINCT s.*
+        FROM skills AS s
+        INNER JOIN user_skills AS us ON us.skill_id = s.id
+        WHERE us.user_id = ?
+           OR EXISTS (
+             SELECT 1
+             FROM explore_remote_users AS eru
+             WHERE eru.viewer_uid = ?
+               AND eru.candidate_uid = us.user_id
+           )
+        ORDER BY s.title COLLATE NOCASE ASC
+        ''',
+        <Object?>[session.uid, session.uid],
+      );
+      CurrentUserService.instance.requireSameSession(session);
+
+      final List<Map<String, Object?>> learningRows = await db.rawQuery(
+        '''
+        SELECT sl.*
+        FROM skill_learnings AS sl
+        WHERE EXISTS (
+          SELECT 1
+          FROM user_skills AS us
+          WHERE us.skill_id = sl.skill_id
+            AND (
+              us.user_id = ?
+              OR EXISTS (
+                SELECT 1
+                FROM explore_remote_users AS eru
+                WHERE eru.viewer_uid = ?
+                  AND eru.candidate_uid = us.user_id
+              )
+            )
+        )
+        ORDER BY sl.skill_id ASC, sl.position ASC
+        ''',
+        <Object?>[session.uid, session.uid],
+      );
+      CurrentUserService.instance.requireSameSession(session);
 
       // --------------------------------------------------------
       // USERS
@@ -176,12 +299,26 @@ class ExploreRepository {
       final Set<String> userIds =
       <String>{};
 
-      for (final Map<String, Object?> row
-      in userRows) {
-        final User user =
-        _userFromMap(
-          row,
-        );
+      for (final Map<String, Object?> row in userRows) {
+        final String userId = _requireString(row, 'id', 'User ID');
+        if (!allowedUserIds.contains(userId) ||
+            userId == 'user_joice_local') {
+          throw const ExploreRepositoryException(
+            'Explore contains a user outside the active viewer scope.',
+          );
+        }
+        final Map<String, Object?> safeRow = candidateIds.contains(userId)
+            ? <String, Object?>{
+                ...row,
+                'rating': 0.0,
+                'review_count': 0,
+                'completed_swaps': 0,
+                'response_rate': 0,
+                'email_verified': 0,
+                'profile_image_path': null,
+              }
+            : row;
+        final User user = _userFromMap(safeRow);
 
         if (!userIds.add(
           user.id,
@@ -193,6 +330,13 @@ class ExploreRepository {
 
         loadedUsers.add(
           user,
+        );
+      }
+
+      if (userIds.length != allowedUserIds.length ||
+          !userIds.containsAll(allowedUserIds)) {
+        throw const ExploreRepositoryException(
+          'Explore could not resolve every viewer-scoped user.',
         );
       }
 
@@ -388,6 +532,8 @@ class ExploreRepository {
       // REPLACE CACHE ONLY AFTER SUCCESS
       // --------------------------------------------------------
 
+      CurrentUserService.instance.requireSameSession(session);
+
       _users
         ..clear()
         ..addAll(
@@ -406,7 +552,10 @@ class ExploreRepository {
           loadedUserSkills,
         );
 
+      _loadedSession = session;
       _initialized = true;
+    } on CurrentUserServiceException {
+      rethrow;
     } on ExploreRepositoryException {
       rethrow;
     } catch (_) {
@@ -429,19 +578,11 @@ class ExploreRepository {
     required String preferredMode,
     required String teachingStyle,
   }) async {
+    final ActiveUserSession session =
+        CurrentUserService.instance.captureSession();
     await initialize();
-
-    final String currentUserId;
-
-    try {
-      currentUserId =
-          CurrentUserService.instance
-              .requireUserId();
-    } on CurrentUserServiceException {
-      throw const ExploreRepositoryException(
-        'No active local user is available.',
-      );
-    }
+    CurrentUserService.instance.requireSameSession(session);
+    final String currentUserId = session.uid;
 
     final User? existing =
     findUserById(
@@ -580,6 +721,9 @@ class ExploreRepository {
           'Your profile could not be saved.',
         );
       }
+      CurrentUserService.instance.requireSameSession(session);
+    } on CurrentUserServiceException {
+      rethrow;
     } on ExploreRepositoryException {
       rethrow;
     } catch (_) {
@@ -638,19 +782,11 @@ class ExploreRepository {
   Future<User> updateCurrentUserProfileImagePath({
     String? profileImagePath,
   }) async {
+    final ActiveUserSession session =
+        CurrentUserService.instance.captureSession();
     await initialize();
-
-    final String currentUserId;
-
-    try {
-      currentUserId =
-          CurrentUserService.instance
-              .requireUserId();
-    } on CurrentUserServiceException {
-      throw const ExploreRepositoryException(
-        'No active local user is available.',
-      );
-    }
+    CurrentUserService.instance.requireSameSession(session);
+    final String currentUserId = session.uid;
 
     final User? existing =
     findUserById(
@@ -700,6 +836,9 @@ class ExploreRepository {
           'Your profile photo could not be saved.',
         );
       }
+      CurrentUserService.instance.requireSameSession(session);
+    } on CurrentUserServiceException {
+      rethrow;
     } on ExploreRepositoryException {
       rethrow;
     } catch (_) {
@@ -2190,20 +2329,40 @@ class ExploreRepository {
   // PUBLIC READ METHODS
   // ============================================================
 
-  List<User> get users =>
-      List<User>.unmodifiable(
-        _users,
-      );
+  List<User> get users {
+    if (!_hasReadableCache) {
+      return const <User>[];
+    }
+    return List<User>.unmodifiable(_users);
+  }
 
-  List<Skill> get skills =>
-      List<Skill>.unmodifiable(
-        _skills,
-      );
+  List<Skill> get skills {
+    if (!_hasReadableCache) {
+      return const <Skill>[];
+    }
 
-  List<UserSkill> get userSkills =>
-      List<UserSkill>.unmodifiable(
-        _userSkills,
-      );
+    final String activeUid = _loadedSession!.uid;
+    final Set<String> remotelyOfferedSkillIds = _userSkills
+        .where(
+          (UserSkill relationship) =>
+              relationship.userId != activeUid &&
+              relationship.type == UserSkillType.offered,
+        )
+        .map((UserSkill relationship) => relationship.skillId)
+        .toSet();
+    return List<Skill>.unmodifiable(
+      _skills.where(
+        (Skill skill) => remotelyOfferedSkillIds.contains(skill.id),
+      ),
+    );
+  }
+
+  List<UserSkill> get userSkills {
+    if (!_hasReadableCache) {
+      return const <UserSkill>[];
+    }
+    return List<UserSkill>.unmodifiable(_userSkills);
+  }
 
   // ============================================================
   // FIND USER
@@ -2212,6 +2371,10 @@ class ExploreRepository {
   User? findUserById(
       String userId,
       ) {
+    if (!_hasReadableCache) {
+      return null;
+    }
+
     final String normalizedId =
     userId.trim();
 
@@ -2237,6 +2400,10 @@ class ExploreRepository {
   Skill? findSkillById(
       String skillId,
       ) {
+    if (!_hasReadableCache) {
+      return null;
+    }
+
     final String normalizedId =
     skillId.trim();
 
@@ -2262,6 +2429,10 @@ class ExploreRepository {
   List<UserSkill> getOfferedSkillsForUser(
       String userId,
       ) {
+    if (!_hasReadableCache) {
+      return <UserSkill>[];
+    }
+
     final String normalizedUserId =
     userId.trim();
 
@@ -2289,6 +2460,10 @@ class ExploreRepository {
   List<UserSkill> getWantedSkillsForUser(
       String userId,
       ) {
+    if (!_hasReadableCache) {
+      return <UserSkill>[];
+    }
+
     final String normalizedUserId =
     userId.trim();
 
@@ -2316,6 +2491,10 @@ class ExploreRepository {
   List<User> getProvidersForSkill(
       String skillId,
       ) {
+    if (!_hasReadableCache) {
+      return <User>[];
+    }
+
     final String normalizedSkillId =
     skillId.trim();
 
@@ -2342,14 +2521,16 @@ class ExploreRepository {
     )
         .toSet();
 
+    final String activeUid = _loadedSession!.uid;
     return _users
         .where(
           (
           User user,
           ) =>
-          providerIds.contains(
-            user.id,
-          ),
+          user.id != activeUid &&
+              providerIds.contains(
+                user.id,
+              ),
     )
         .toList();
   }
@@ -2363,6 +2544,10 @@ class ExploreRepository {
     required String skillId,
     required UserSkillType type,
   }) {
+    if (!_hasReadableCache) {
+      return null;
+    }
+
     final String normalizedUserId =
     userId.trim();
 

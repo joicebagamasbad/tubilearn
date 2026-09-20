@@ -2,6 +2,7 @@ import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/local_user_repository.dart';
 import '../model/user.dart';
 import 'current_user_service.dart';
 
@@ -37,6 +38,9 @@ class ChatService {
 
   final ChatRepository _repository =
   ChatRepository();
+
+  final LocalUserRepository _localUserRepository =
+      LocalUserRepository();
 
   final ExploreRepository _exploreRepository =
       ExploreRepository.instance;
@@ -144,18 +148,6 @@ class ChatService {
   }
 
   Future<void> _initializeInternal() async {
-    try {
-      await _exploreRepository.refresh();
-    } on ExploreRepositoryException catch (_) {
-      throw const ChatServiceException(
-        'Chat reference data could not be loaded. Please try again.',
-      );
-    } catch (_) {
-      throw const ChatServiceException(
-        'Chat reference data could not be loaded. Please try again.',
-      );
-    }
-
     final String currentUserId =
     _requireCurrentUserId();
 
@@ -204,6 +196,35 @@ class ChatService {
     }
 
     // ----------------------------------------------------------
+    // KNOWN LOCAL PARTICIPANTS
+    //
+    // Historical chat participants only need to still exist in
+    // the local database, not to currently be an Explore/Smart
+    // Match candidate. Explore eligibility narrows independently
+    // (viewer-scoped manifest) and must not invalidate old chats.
+    // ----------------------------------------------------------
+
+    final Set<String> referencedParticipantIds = <String>{
+      for (final Conversation conversation in allConversations)
+        if (_cleanOptionalText(conversation.participantUserId) != null)
+          _cleanOptionalText(conversation.participantUserId)!,
+    };
+
+    final Set<String> existingLocalUserIds;
+
+    try {
+      existingLocalUserIds = await _localUserRepository.findExistingUserIds(
+        referencedParticipantIds,
+      );
+    } on CurrentUserServiceException {
+      rethrow;
+    } catch (_) {
+      throw const ChatServiceException(
+        'Your conversations could not be loaded. Please try again.',
+      );
+    }
+
+    // ----------------------------------------------------------
     // ALL STORED HISTORY
     //
     // Multiple archived threads for the same participant are
@@ -213,6 +234,7 @@ class ChatService {
     _validateLoadedConversations(
       allConversations,
       requireUniqueParticipants: false,
+      existingLocalUserIds: existingLocalUserIds,
     );
 
     // ----------------------------------------------------------
@@ -225,6 +247,7 @@ class ChatService {
     _validateLoadedConversations(
       visibleConversations,
       requireUniqueParticipants: true,
+      existingLocalUserIds: existingLocalUserIds,
     );
 
     _syncMessageIdCounterFromLoadedData(
@@ -260,6 +283,7 @@ class ChatService {
   void _validateLoadedConversations(
       List<Conversation> conversations, {
         required bool requireUniqueParticipants,
+        required Set<String> existingLocalUserIds,
       }) {
     final Set<String> conversationIds =
     <String>{};
@@ -338,10 +362,9 @@ class ChatService {
           );
         }
 
-        if (_exploreRepository.findUserById(
+        if (!existingLocalUserIds.contains(
           participantUserId,
-        ) ==
-            null) {
+        )) {
           throw const ChatServiceException(
             'Stored conversation points to an unavailable user.',
           );
@@ -1600,10 +1623,24 @@ class ChatService {
       );
     }
 
-    if (_exploreRepository.findUserById(
+    final Set<String> existingParticipantIds;
+
+    try {
+      existingParticipantIds =
+      await _localUserRepository.findExistingUserIds(
+        <String>{participantUserId},
+      );
+    } on CurrentUserServiceException {
+      rethrow;
+    } catch (_) {
+      throw const ChatServiceException(
+        'Chat participant is no longer available.',
+      );
+    }
+
+    if (!existingParticipantIds.contains(
       participantUserId,
-    ) ==
-        null) {
+    )) {
       throw const ChatServiceException(
         'Chat participant is no longer available.',
       );

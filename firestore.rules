@@ -1,0 +1,435 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validCloudUid(uid) {
+      return uid is string
+        && uid.size() > 0
+        && uid != 'user_joice_local';
+    }
+
+    function isOwner(uid) {
+      return signedIn()
+        && validCloudUid(uid)
+        && request.auth.uid == uid;
+    }
+
+    function nonEmptyText(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function validProfile(data) {
+      return data.keys().hasOnly([
+          'name',
+          'city',
+          'bio',
+          'availability',
+          'language',
+          'preferredMode',
+          'teachingStyle',
+          'memberSince',
+          'profileCompleted',
+          'schemaVersion',
+          'skillsBootstrapVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'name',
+          'city',
+          'bio',
+          'availability',
+          'language',
+          'preferredMode',
+          'teachingStyle',
+          'memberSince',
+          'profileCompleted',
+          'schemaVersion',
+          'skillsBootstrapVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && nonEmptyText(data.name)
+        && data.name.size() <= 80
+        && nonEmptyText(data.city)
+        && data.city.size() <= 100
+        && data.bio is string
+        && data.bio.size() <= 500
+        && (!data.profileCompleted || data.bio.size() > 0)
+        && nonEmptyText(data.availability)
+        && nonEmptyText(data.language)
+        && nonEmptyText(data.preferredMode)
+        && nonEmptyText(data.teachingStyle)
+        && nonEmptyText(data.memberSince)
+        && data.profileCompleted is bool
+        && data.schemaVersion == 1
+        && data.skillsBootstrapVersion is int
+        && data.skillsBootstrapVersion >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function publicProfile(uid) {
+      return validCloudUid(uid)
+        && get(/databases/$(database)/documents/users/$(uid))
+          .data.profileCompleted == true;
+    }
+
+    function validSkillLink(data) {
+      return data.keys().hasOnly([
+          'skillId',
+          'type',
+          'level',
+          'availability',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'skillId',
+          'type',
+          'level',
+          'availability',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && nonEmptyText(data.skillId)
+        && data.type in ['offered', 'wanted']
+        && data.level in ['Beginner', 'Intermediate', 'Advanced']
+        && nonEmptyText(data.availability)
+        && data.schemaVersion == 1
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validSkill(data) {
+      return data.keys().hasOnly([
+          'ownerUid',
+          'title',
+          'titleKey',
+          'category',
+          'level',
+          'iconCodePoint',
+          'sessionLength',
+          'mode',
+          'language',
+          'prerequisite',
+          'description',
+          'learnings',
+          'linkCount',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'ownerUid',
+          'title',
+          'titleKey',
+          'category',
+          'level',
+          'iconCodePoint',
+          'sessionLength',
+          'mode',
+          'language',
+          'prerequisite',
+          'description',
+          'learnings',
+          'linkCount',
+          'schemaVersion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && (data.ownerUid == null || validCloudUid(data.ownerUid))
+        && nonEmptyText(data.title)
+        && data.title.size() <= 80
+        && nonEmptyText(data.titleKey)
+        && nonEmptyText(data.category)
+        && nonEmptyText(data.level)
+        && data.iconCodePoint is int
+        && data.iconCodePoint > 0
+        && nonEmptyText(data.sessionLength)
+        && nonEmptyText(data.mode)
+        && nonEmptyText(data.language)
+        && data.prerequisite is string
+        && nonEmptyText(data.description)
+        && data.learnings is list
+        && data.learnings.size() <= 50
+        && data.linkCount is int
+        && data.linkCount >= 0
+        && data.schemaVersion == 1
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validTitleKey(data) {
+      return data.keys().hasOnly(['skillId', 'titleKey', 'createdAt'])
+        && data.keys().hasAll(['skillId', 'titleKey', 'createdAt'])
+        && nonEmptyText(data.skillId)
+        && nonEmptyText(data.titleKey)
+        && data.createdAt is timestamp;
+    }
+
+    function titleKeyMatchesSkillAfter(data) {
+      return getAfter(
+          /databases/$(database)/documents/skills/$(data.skillId)
+        ).data.titleKey == data.titleKey;
+    }
+
+    function validLinkKey(data) {
+      return data.keys().hasOnly([
+          'userSkillId',
+          'skillId',
+          'type',
+          'createdAt'
+        ])
+        && data.keys().hasAll([
+          'userSkillId',
+          'skillId',
+          'type',
+          'createdAt'
+        ])
+        && nonEmptyText(data.userSkillId)
+        && nonEmptyText(data.skillId)
+        && data.type in ['offered', 'wanted']
+        && data.createdAt is timestamp;
+    }
+
+    function linkKeyMatchesLinkAfter(uid, data) {
+      return getAfter(
+          /databases/$(database)/documents/users/$(uid)/skillLinks/$(data.userSkillId)
+        ).data.skillId == data.skillId
+        && getAfter(
+          /databases/$(database)/documents/users/$(uid)/skillLinks/$(data.userSkillId)
+        ).data.type == data.type;
+    }
+
+    function skillLinkCreateMatchesCatalog(data) {
+      return existsAfter(
+          /databases/$(database)/documents/skills/$(data.skillId)
+        )
+        && getAfter(
+          /databases/$(database)/documents/skills/$(data.skillId)
+        ).data.linkCount == (
+          exists(/databases/$(database)/documents/skills/$(data.skillId))
+            ? get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount + 1
+            : 1
+        );
+    }
+
+    function skillLinkDeleteMatchesCatalog(uid, data) {
+      return exists(/databases/$(database)/documents/skills/$(data.skillId))
+        && get(
+          /databases/$(database)/documents/skills/$(data.skillId)
+        ).data.linkCount > 0
+        && (
+          (
+            get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount > 1
+            && existsAfter(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            )
+            && getAfter(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount == get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount - 1
+          )
+          ||
+          (
+            get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount == 1
+            && get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.ownerUid == uid
+            && !existsAfter(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            )
+          )
+          ||
+          (
+            get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount == 1
+            && get(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.ownerUid != uid
+            && existsAfter(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            )
+            && getAfter(
+              /databases/$(database)/documents/skills/$(data.skillId)
+            ).data.linkCount == 0
+          )
+        );
+    }
+
+    function skillLinkStillHasCatalog(data) {
+      return existsAfter(
+        /databases/$(database)/documents/skills/$(data.skillId)
+      );
+    }
+
+    function titleKeyDeleteMatchesOwnerChange(data) {
+      return get(
+          /databases/$(database)/documents/skills/$(data.skillId)
+        ).data.ownerUid == request.auth.uid
+        && (
+          !existsAfter(
+            /databases/$(database)/documents/skills/$(data.skillId)
+          )
+          || getAfter(
+            /databases/$(database)/documents/skills/$(data.skillId)
+          ).data.titleKey != data.titleKey
+        );
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn()
+        && (isOwner(uid) || resource.data.profileCompleted == true);
+      allow list: if signedIn()
+        && resource.data.profileCompleted == true;
+
+      allow create: if isOwner(uid)
+        && validProfile(request.resource.data);
+
+      allow update: if isOwner(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && (!resource.data.profileCompleted
+          || request.resource.data.profileCompleted)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'city',
+          'bio',
+          'availability',
+          'language',
+          'preferredMode',
+          'teachingStyle',
+          'memberSince',
+          'profileCompleted',
+          'skillsBootstrapVersion',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+
+      match /skillLinks/{userSkillId} {
+        allow read: if signedIn()
+          && (isOwner(uid) || publicProfile(uid));
+
+        allow create: if isOwner(uid)
+          && validSkillLink(request.resource.data)
+          && skillLinkCreateMatchesCatalog(request.resource.data);
+
+        allow update: if isOwner(uid)
+          && validSkillLink(request.resource.data)
+          && request.resource.data.skillId == resource.data.skillId
+          && request.resource.data.type == resource.data.type
+          && request.resource.data.schemaVersion == resource.data.schemaVersion
+          && request.resource.data.createdAt == resource.data.createdAt
+          && skillLinkStillHasCatalog(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'level',
+            'availability',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(uid)
+          && skillLinkDeleteMatchesCatalog(uid, resource.data);
+      }
+
+      match /skillLinkKeys/{keyId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && validLinkKey(request.resource.data)
+          && linkKeyMatchesLinkAfter(uid, request.resource.data);
+        allow update: if false;
+        allow delete: if isOwner(uid)
+          && !existsAfter(
+            /databases/$(database)/documents/users/$(uid)/skillLinks/$(resource.data.userSkillId)
+          );
+      }
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /skills/{skillId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && validSkill(request.resource.data)
+        && request.resource.data.linkCount == 1
+        && (request.resource.data.ownerUid == null
+          || request.resource.data.ownerUid == request.auth.uid);
+
+      allow update: if signedIn()
+        && validSkill(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'linkCount',
+              'updatedAt'
+            ])
+            && (
+              request.resource.data.linkCount == resource.data.linkCount + 1
+              || request.resource.data.linkCount == resource.data.linkCount - 1
+            )
+          )
+          ||
+          (
+            resource.data.ownerUid == request.auth.uid
+            && request.resource.data.linkCount == resource.data.linkCount
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'title',
+              'titleKey',
+              'category',
+              'level',
+              'iconCodePoint',
+              'description',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && resource.data.linkCount == 1;
+    }
+
+    match /skillTitleKeys/{keyId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validTitleKey(request.resource.data)
+        && titleKeyMatchesSkillAfter(request.resource.data);
+      allow update: if signedIn()
+        && validTitleKey(request.resource.data)
+        && request.resource.data.skillId == resource.data.skillId
+        && request.resource.data.titleKey == resource.data.titleKey
+        && titleKeyMatchesSkillAfter(request.resource.data)
+        && getAfter(
+          /databases/$(database)/documents/skills/$(request.resource.data.skillId)
+        ).data.ownerUid == request.auth.uid;
+      allow delete: if signedIn()
+        && titleKeyDeleteMatchesOwnerChange(resource.data);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

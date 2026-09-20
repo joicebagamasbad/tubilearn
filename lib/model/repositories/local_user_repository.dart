@@ -1,10 +1,59 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../../services/current_user_service.dart';
 import '../auth_session.dart';
 import '../database/app_database.dart';
 
 class LocalUserRepository {
   final AppDatabase _database = AppDatabase.instance;
+
+  Future<Set<String>> findExistingUserIds(Set<String> userIds) async {
+    final CurrentUserService currentUserService =
+        CurrentUserService.instance;
+    final ActiveUserSession session = currentUserService.captureSession();
+    final List<String> cleanIds = userIds
+        .map((String id) => id.trim())
+        .where((String id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (cleanIds.isEmpty) {
+      return <String>{};
+    }
+
+    final Database db = await _database.database;
+    currentUserService.requireSameSession(session);
+
+    const int queryBatchSize = 400;
+    final Set<String> existingIds = <String>{};
+
+    for (int offset = 0; offset < cleanIds.length; offset += queryBatchSize) {
+      final int end = (offset + queryBatchSize < cleanIds.length)
+          ? offset + queryBatchSize
+          : cleanIds.length;
+      final List<String> batch = cleanIds.sublist(offset, end);
+      final String placeholders =
+          List<String>.filled(batch.length, '?').join(',');
+      final List<Map<String, Object?>> rows = await db.query(
+        'users',
+        columns: <String>['id'],
+        where: 'id IN ($placeholders)',
+        whereArgs: batch,
+      );
+      currentUserService.requireSameSession(session);
+
+      for (final Map<String, Object?> row in rows) {
+        final Object? rawId = row['id'];
+        if (rawId is! String || rawId.trim().isEmpty) {
+          throw StateError('Stored local user ID is invalid.');
+        }
+        existingIds.add(rawId.trim());
+      }
+    }
+
+    currentUserService.requireSameSession(session);
+    return Set<String>.unmodifiable(existingIds);
+  }
 
   Future<void> provision(AuthSession session) async {
     final String uid = session.uid.trim();

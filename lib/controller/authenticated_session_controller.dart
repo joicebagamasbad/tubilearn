@@ -5,6 +5,7 @@ import '../model/repositories/explore_repository.dart';
 import '../model/repositories/local_user_repository.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
+import '../services/explore_service.dart';
 import '../services/my_skills_service.dart';
 import '../services/profile_service.dart';
 import '../services/review_service.dart';
@@ -14,10 +15,21 @@ class AuthenticatedSessionController {
   final LocalUserRepository _localUsers = LocalUserRepository();
   Future<void> _transition = Future<void>.value();
   String? _preparedUid;
+  int _latestRequest = 0;
 
   Future<void> prepare(AuthSession? session) {
+    final String? requestedUid = session?.uid.trim();
+    final int request = ++_latestRequest;
+    if (CurrentUserService.instance.hasAuthenticatedBackendSession &&
+        (requestedUid == null ||
+            !CurrentUserService.instance.isCurrentUser(requestedUid))) {
+      CurrentUserService.instance.clearSession();
+    }
+
     final Future<void> next = _transition.catchError((_) {}).then((_) async {
-      final String? uid = session?.uid.trim();
+      if (request != _latestRequest) return;
+
+      final String? uid = requestedUid;
       if (uid == _preparedUid &&
           (uid != null && CurrentUserService.instance.isCurrentUser(uid) ||
               uid == null &&
@@ -28,23 +40,26 @@ class AuthenticatedSessionController {
       }
 
       await _clearActiveSession();
+      if (request != _latestRequest) return;
       if (session == null) return;
 
       String stage = 'local profile provisioning';
       try {
         await _localUsers.provision(session);
+        if (request != _latestRequest) return;
         stage = 'current-user configuration';
         CurrentUserService.instance.configureAuthenticatedUid(session.uid);
         stage = 'cloud profile preparation';
         await ProfileService.instance.prepareCurrentSession();
         stage = 'cloud My Skills preparation';
         await MySkillsService.instance.prepareCurrentSession();
-        stage = 'Explore data loading';
-        await ExploreRepository.instance.refresh();
+        stage = 'remote Explore preparation';
+        await ExploreService.instance.prepareCurrentSession();
         stage = 'chat loading';
         await ChatService.instance.initialize();
         stage = 'swap loading';
         await SwapService.instance.initialize();
+        if (request != _latestRequest) return;
         _preparedUid = session.uid.trim();
       } catch (error, stackTrace) {
         if (kDebugMode) {

@@ -3,6 +3,7 @@ import '../model/skill.dart';
 import '../model/skill_match.dart';
 import '../model/user.dart';
 import '../services/current_user_service.dart';
+import '../services/explore_service.dart';
 
 class ExploreControllerException implements Exception {
   final String message;
@@ -56,15 +57,20 @@ class SmartMatchesSnapshot {
 class ExploreController {
   ExploreController({
     ExploreRepository? exploreRepository,
+    ExploreService? exploreService,
     CurrentUserService? currentUserService,
   })  : _repository =
       exploreRepository ??
           ExploreRepository.instance,
+        _exploreService =
+            exploreService ??
+                ExploreService.instance,
         _currentUserService =
             currentUserService ??
                 CurrentUserService.instance;
 
   final ExploreRepository _repository;
+  final ExploreService _exploreService;
   final CurrentUserService _currentUserService;
 
   // ============================================================
@@ -75,12 +81,16 @@ class ExploreController {
     int? smartMatchLimit,
   }) async {
     try {
-      await _repository.initialize();
+      await _prepareExploreIfNeeded();
 
       return _buildExploreSnapshot(
         smartMatchLimit: smartMatchLimit,
       );
     } on CurrentUserServiceException catch (error) {
+      throw ExploreControllerException(
+        error.message,
+      );
+    } on ExploreServiceException catch (error) {
       throw ExploreControllerException(
         error.message,
       );
@@ -103,12 +113,16 @@ class ExploreController {
     int? smartMatchLimit,
   }) async {
     try {
-      await _repository.refresh();
+      await _exploreService.refreshCurrentExplore();
 
       return _buildExploreSnapshot(
         smartMatchLimit: smartMatchLimit,
       );
     } on CurrentUserServiceException catch (error) {
+      throw ExploreControllerException(
+        error.message,
+      );
+    } on ExploreServiceException catch (error) {
       throw ExploreControllerException(
         error.message,
       );
@@ -129,10 +143,14 @@ class ExploreController {
 
   Future<SmartMatchesSnapshot> loadSmartMatches() async {
     try {
-      await _repository.initialize();
+      await _prepareExploreIfNeeded();
 
       return _buildSmartMatchesSnapshot();
     } on CurrentUserServiceException catch (error) {
+      throw ExploreControllerException(
+        error.message,
+      );
+    } on ExploreServiceException catch (error) {
       throw ExploreControllerException(
         error.message,
       );
@@ -153,10 +171,14 @@ class ExploreController {
 
   Future<SmartMatchesSnapshot> refreshSmartMatches() async {
     try {
-      await _repository.refresh();
+      await _exploreService.refreshCurrentExplore();
 
       return _buildSmartMatchesSnapshot();
     } on CurrentUserServiceException catch (error) {
+      throw ExploreControllerException(
+        error.message,
+      );
+    } on ExploreServiceException catch (error) {
       throw ExploreControllerException(
         error.message,
       );
@@ -169,6 +191,13 @@ class ExploreController {
         'Smart matches could not be refreshed.',
       );
     }
+  }
+
+  Future<void> _prepareExploreIfNeeded() async {
+    if (_repository.isInitialized) {
+      return;
+    }
+    await _exploreService.prepareCurrentSession();
   }
 
   // ============================================================

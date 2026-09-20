@@ -12,7 +12,7 @@ AppDatabase._();
 static const String _databaseName =
 'tubilearn.db';
 
-static const int _databaseVersion = 13;
+static const int _databaseVersion = 14;
 
 Database? _database;
 
@@ -165,6 +165,8 @@ db,
 );
 
 await _createConversationOwnerColumnV13(db);
+
+await _createExploreRemoteUsersTableV14(db);
 },
 
 // ========================================================
@@ -244,6 +246,10 @@ db,
 
 if (oldVersion < 13) {
 await _createConversationOwnerColumnV13(db);
+}
+
+if (oldVersion < 14) {
+await _createExploreRemoteUsersTableV14(db);
 }
 },
 );
@@ -368,6 +374,7 @@ const Set<String> requiredTables =
 'conversation_user_visibility',
 'swap_request_user_visibility',
 'reviews',
+'explore_remote_users',
 };
 
 final List<Map<String, Object?>> rows =
@@ -487,6 +494,11 @@ requiredColumns =
 'comment',
 'created_at',
 },
+'explore_remote_users': <String>{
+'viewer_uid',
+'candidate_uid',
+'projected_at',
+},
 };
 
 for (final MapEntry<String, Set<String>>
@@ -571,6 +583,7 @@ const Set<String> requiredIndexes =
 'idx_reviews_reviewee_user',
 'idx_reviews_reviewee_created',
 'idx_reviews_unique_swap_reviewer',
+'idx_explore_remote_users_candidate',
 };
 
 final List<Map<String, Object?>> rows =
@@ -2376,6 +2389,50 @@ Future<void> _createConversationOwnerColumnV13(Database db) async {
     CREATE INDEX IF NOT EXISTS idx_conversations_owner_user
     ON conversations(owner_user_id)
   ''');
+}
+
+// ============================================================
+// VERSION 14 - VIEWER-SCOPED REMOTE EXPLORE USERS
+// ============================================================
+
+Future<void> _createExploreRemoteUsersTableV14(Database db) async {
+await db.execute(
+'''
+      CREATE TABLE IF NOT EXISTS explore_remote_users (
+        viewer_uid TEXT NOT NULL
+          CHECK(
+            length(trim(viewer_uid)) > 0
+            AND viewer_uid = trim(viewer_uid)
+            AND viewer_uid != 'user_joice_local'
+          ),
+
+        candidate_uid TEXT NOT NULL
+          CHECK(
+            length(trim(candidate_uid)) > 0
+            AND candidate_uid = trim(candidate_uid)
+            AND candidate_uid != 'user_joice_local'
+          ),
+
+        projected_at INTEGER NOT NULL
+          CHECK(projected_at > 0),
+
+        PRIMARY KEY (
+          viewer_uid,
+          candidate_uid
+        ),
+
+        CHECK(viewer_uid != candidate_uid)
+      )
+      ''',
+);
+
+await db.execute(
+'''
+      CREATE INDEX IF NOT EXISTS
+      idx_explore_remote_users_candidate
+      ON explore_remote_users(candidate_uid)
+      ''',
+);
 }
 
 // ============================================================
