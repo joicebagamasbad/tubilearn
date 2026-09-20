@@ -5,6 +5,8 @@ import '../model/repositories/explore_repository.dart';
 import '../model/repositories/local_user_repository.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
+import '../services/my_skills_service.dart';
+import '../services/profile_service.dart';
 import '../services/review_service.dart';
 import '../services/swap_service.dart';
 
@@ -33,6 +35,10 @@ class AuthenticatedSessionController {
         await _localUsers.provision(session);
         stage = 'current-user configuration';
         CurrentUserService.instance.configureAuthenticatedUid(session.uid);
+        stage = 'cloud profile preparation';
+        await ProfileService.instance.prepareCurrentSession();
+        stage = 'cloud My Skills preparation';
+        await MySkillsService.instance.prepareCurrentSession();
         stage = 'Explore data loading';
         await ExploreRepository.instance.refresh();
         stage = 'chat loading';

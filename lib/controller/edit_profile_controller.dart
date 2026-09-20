@@ -2,6 +2,7 @@ import '../model/repositories/explore_repository.dart';
 import '../model/user.dart';
 import '../services/current_user_service.dart';
 import '../services/profile_image_service.dart';
+import '../services/profile_service.dart';
 
 // ============================================================
 // EXCEPTION
@@ -39,11 +40,13 @@ class EditProfileController {
   final ExploreRepository _repository;
   final CurrentUserService _currentUserService;
   final ProfileImageService _profileImageService;
+  final ProfileService _profileService;
 
   EditProfileController({
     ExploreRepository? repository,
     CurrentUserService? currentUserService,
     ProfileImageService? profileImageService,
+    ProfileService? profileService,
   })  : _repository =
       repository ??
           ExploreRepository.instance,
@@ -52,7 +55,10 @@ class EditProfileController {
                 CurrentUserService.instance,
         _profileImageService =
             profileImageService ??
-                ProfileImageService.instance;
+                ProfileImageService.instance,
+        _profileService =
+            profileService ??
+                ProfileService.instance;
 
   // ============================================================
   // LOAD
@@ -62,17 +68,26 @@ class EditProfileController {
     bool refresh = false,
   }) async {
     try {
+      final User user =
+      await _profileService
+          .loadCurrentProfile();
+
       if (refresh) {
         await _repository.refresh();
       } else {
         await _repository.initialize();
       }
-
-      final User user =
-      _requireCurrentUser();
+      _currentUserService.requireCurrentUser(
+        user.id,
+        message: 'The authenticated account changed while loading your profile.',
+      );
 
       return EditProfileSnapshot(
         user: user,
+      );
+    } on ProfileServiceException catch (error) {
+      throw EditProfileControllerException(
+        error.message,
       );
     } on EditProfileControllerException {
       rethrow;
@@ -131,8 +146,8 @@ class EditProfileController {
   }) async {
     try {
       final User updatedUser =
-      await _repository
-          .updateCurrentUserProfile(
+      await _profileService
+          .saveCurrentProfile(
         name: name,
         city: city,
         bio: bio,
@@ -145,7 +160,7 @@ class EditProfileController {
       return EditProfileSnapshot(
         user: updatedUser,
       );
-    } on ExploreRepositoryException catch (error) {
+    } on ProfileServiceException catch (error) {
       throw EditProfileControllerException(
         error.message,
       );

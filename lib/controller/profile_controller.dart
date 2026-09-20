@@ -3,6 +3,7 @@ import '../model/skill.dart';
 import '../model/user.dart';
 import '../model/user_skill.dart';
 import '../services/current_user_service.dart';
+import '../services/profile_service.dart';
 import '../services/profile_image_service.dart';
 
 class ProfileControllerException implements Exception {
@@ -31,11 +32,13 @@ class ProfileSnapshot {
 class ProfileController {
   final ExploreRepository _repository;
   final CurrentUserService _currentUserService;
+  final ProfileService _profileService;
   final ProfileImageService _profileImageService;
 
   ProfileController({
     ExploreRepository? repository,
     CurrentUserService? currentUserService,
+    ProfileService? profileService,
     ProfileImageService? profileImageService,
   })  : _repository =
       repository ??
@@ -43,6 +46,9 @@ class ProfileController {
         _currentUserService =
             currentUserService ??
                 CurrentUserService.instance,
+        _profileService =
+            profileService ??
+                ProfileService.instance,
         _profileImageService =
             profileImageService ??
                 ProfileImageService.instance;
@@ -55,13 +61,23 @@ class ProfileController {
     bool refresh = false,
   }) async {
     try {
+      final User user =
+      await _profileService
+          .loadCurrentProfile();
+
       if (refresh) {
         await _repository.refresh();
       } else {
         await _repository.initialize();
       }
 
-      return _buildSnapshot();
+      return _buildSnapshot(
+        authoritativeUser: user,
+      );
+    } on ProfileServiceException catch (error) {
+      throw ProfileControllerException(
+        error.message,
+      );
     } on CurrentUserServiceException catch (error) {
       throw ProfileControllerException(
         error.message,
@@ -168,16 +184,19 @@ class ProfileController {
   // BUILD SNAPSHOT
   // ============================================================
 
-  ProfileSnapshot _buildSnapshot() {
+  ProfileSnapshot _buildSnapshot({
+    User? authoritativeUser,
+  }) {
     final String userId =
     _currentUserService.requireUserId();
 
     final User? user =
-    _repository.findUserById(
-      userId,
-    );
+    authoritativeUser ??
+        _repository.findUserById(
+          userId,
+        );
 
-    if (user == null) {
+    if (user == null || user.id != userId) {
       throw const ProfileControllerException(
         'Your profile could not be found.',
       );
