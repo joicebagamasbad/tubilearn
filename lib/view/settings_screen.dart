@@ -795,7 +795,7 @@ class _SettingsScreenState
       children:
       <Widget>[
         _dialogParagraph(
-          'This TubiLearn prototype keeps its working data on this device using local storage and SQLite.',
+          'TubiLearn uses cloud sync for your profile, My Skills, and Explore data. Some features still store data only on this device.',
         ),
         _dialogPoint(
           icon:
@@ -803,7 +803,7 @@ class _SettingsScreenState
           title:
           'Skills and preferences',
           text:
-          'Your offered skills, learning interests, profile settings, and app preferences are stored locally.',
+          'Your profile, offered skills, and learning interests are connected to your signed-in account. App preferences remain on this device.',
         ),
         _dialogPoint(
           icon:
@@ -825,9 +825,9 @@ class _SettingsScreenState
           icon:
           Icons.cloud_off_outlined,
           title:
-          'No cloud backup',
+          'Partial cloud sync',
           text:
-          'Cloud synchronization and cross-device recovery are not connected in this phase.',
+          'Chats, swaps and sessions, reviews, app preferences, and profile photos are not included in cloud sync.',
         ),
       ],
     );
@@ -864,9 +864,9 @@ class _SettingsScreenState
           icon:
           Icons.cloud_upload_outlined,
           title:
-          'Production later',
+          'Not cloud synced',
           text:
-          'A production version will need secure remote image storage and account-based synchronization.',
+          'Profile photos remain on this device and are not included in account cloud sync.',
         ),
       ],
     );
@@ -881,35 +881,35 @@ class _SettingsScreenState
       icon:
       Icons.person_outline_rounded,
       title:
-      'Account and local profile',
+      'Account and data',
       children:
       <Widget>[
         _dialogParagraph(
-          'You are signed in with Firebase Authentication. Profile, skill, chat, and swap data still use this device\'s local prototype identity.',
+          'Your Firebase account is your TubiLearn identity. Profile, My Skills, and Explore data use cloud sync, while some features remain on this device.',
         ),
         _dialogPoint(
           icon:
           Icons.check_circle_outline_rounded,
           title:
-          'Working locally',
+          'Cloud-backed data',
           text:
-          'Profile information, skills, swaps, reviews, settings, and messages can use the current local user identity.',
+          'Your profile, offered skills, learning interests, and Explore candidate data are connected to your signed-in account.',
         ),
         _dialogPoint(
           icon:
           Icons.lock_outline_rounded,
           title:
-          'Local data',
+          'Stored on this device',
           text:
-          'Your local data is not yet linked to your Firebase user ID or synced across devices.',
+          'Chats, swaps and sessions, reviews, app preferences, and profile photos remain local to this device.',
         ),
         _dialogPoint(
           icon:
           Icons.devices_outlined,
           title:
-          'Single-device prototype',
+          'Partial cloud sync',
           text:
-          'Your signed-in account is cloud-based, but the app data on this device still uses a separate local prototype identity.',
+          'Cloud-backed data can follow your account, while local-only data remains on this device.',
         ),
       ],
     );
@@ -944,7 +944,7 @@ class _SettingsScreenState
           title:
           'Smart matching',
           text:
-          'Local matching considers skill compatibility together with relevant profile and session preferences.',
+          'Smart Match compares skills and preferences from the current cloud-backed Explore candidates.',
         ),
         _dialogPoint(
           icon:
@@ -952,7 +952,7 @@ class _SettingsScreenState
           title:
           'Current build',
           text:
-          'This is the local-first prototype phase of TubiLearn.',
+          'This build combines cloud-backed account, profile, skills, and Explore data with device-only features.',
         ),
       ],
     );
@@ -967,31 +967,31 @@ class _SettingsScreenState
       children:
       <Widget>[
         _dialogParagraph(
-          'This prototype stores its working data locally on the device. It does not currently send profile, chat, swap, or settings data to a TubiLearn production backend.',
+          'TubiLearn uses cloud services for authentication, profiles, skills, and Explore. Chats, swaps, reviews, app preferences, and profile photos remain on this device.',
         ),
         _dialogPoint(
           icon:
           Icons.storage_rounded,
           title:
-          'Local storage',
+          'Local-only data',
           text:
-          'Prototype records remain in local app storage unless they are changed or removed through the app or the application data is cleared.',
+          'Chats, swaps, reviews, app preferences, and profile photos remain in this app installation unless they are changed or removed.',
         ),
         _dialogPoint(
           icon:
           Icons.cloud_off_rounded,
           title:
-          'Authentication and local data',
+          'Account and cloud data',
           text:
-          'Firebase Authentication supports sign-in and password reset. Profile and app data remain on this device and are not yet linked to your Firebase UID or backed up.',
+          'Firebase Authentication identifies your account, and cloud sync supports your profile, My Skills, and Explore data.',
         ),
         _dialogPoint(
           icon:
           Icons.policy_outlined,
           title:
-          'Production requirement',
+          'What stays local',
           text:
-          'Before real-user release, TubiLearn will need a full privacy policy, secure backend handling, authorization, and account-data controls.',
+          'Chats, swaps, reviews, app preferences, and profile photos are not included in cloud sync.',
         ),
       ],
     );
@@ -1569,9 +1569,9 @@ class _SettingsScreenState
               icon:
               Icons.storage_outlined,
               title:
-              'On-device data',
+              'Data storage',
               subtitle:
-              'SQLite and local app storage',
+              'Cloud-backed and device-only data',
               onTap:
               _showLocalDataDialog,
             ),
@@ -1597,7 +1597,7 @@ class _SettingsScreenState
               title:
               'Privacy',
               subtitle:
-              'How this prototype handles your data',
+              'How TubiLearn handles your data',
               onTap:
               _showPrivacyDialog,
             ),
@@ -1674,7 +1674,7 @@ class _SettingsScreenState
               ),
               subtitle:
               Text(
-                'Cross-device sync is not connected yet',
+                'Profile, My Skills, and Explore use cloud sync',
                 style:
                 TextStyle(
                   color:
@@ -1686,7 +1686,7 @@ class _SettingsScreenState
               trailing:
               _buildStatusBadge(
                 label:
-                'OFF',
+                'PARTIAL',
                 positive:
                 false,
               ),
@@ -1715,7 +1715,7 @@ class _SettingsScreenState
               title:
               'About TubiLearn',
               subtitle:
-              'Local-first skill exchange prototype',
+              'Skill exchange with partial cloud sync',
               onTap:
               _showAboutDialog,
             ),
@@ -1730,9 +1730,9 @@ class _SettingsScreenState
           icon:
           Icons.construction_rounded,
           title:
-          'Prototype boundary',
+          'Data availability',
           text:
-          'Firebase Authentication provides sign-in and password reset. Profile and other app data stay local until the Firebase UID and SQLite data are linked. Account deletion, cloud sync, realtime delivery, and push notifications are not available here yet.',
+          'Your account, profile, My Skills, and Explore data use cloud services. Chats, swaps and sessions, reviews, app preferences, and profile photos remain on this device.',
         ),
       ],
     );
