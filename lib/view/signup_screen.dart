@@ -18,6 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _confirmation = TextEditingController();
   bool _busy = false;
   bool _hidePassword = true;
+  bool _hideConfirmation = true;
   String? _error;
 
   @override
@@ -121,7 +122,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   TextField(
                     controller: _confirmation,
                     enabled: !_busy,
-                    obscureText: _hidePassword,
+                    obscureText: _hideConfirmation,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _authenticate(() => _controller.signUp(
                           displayName: _name.text,
@@ -129,7 +130,22 @@ class _SignupScreenState extends State<SignupScreen> {
                           password: _password.text,
                           confirmPassword: _confirmation.text,
                         )),
-                    decoration: const InputDecoration(labelText: 'Confirm password'),
+                    decoration: InputDecoration(
+                      labelText: 'Confirm password',
+                      suffixIcon: IconButton(
+                        tooltip: _hideConfirmation
+                            ? 'Show password'
+                            : 'Hide password',
+                        onPressed: () => setState(
+                          () => _hideConfirmation = !_hideConfirmation,
+                        ),
+                        icon: Icon(
+                          _hideConfirmation
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 22),
                   ElevatedButton(

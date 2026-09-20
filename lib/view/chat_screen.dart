@@ -720,7 +720,7 @@ class _ChatScreenState
                               .ellipsis,
                           style:
                           const TextStyle(
-                            fontSize: 9,
+                            fontSize: 11,
                             fontWeight:
                             FontWeight
                                 .w600,
@@ -752,7 +752,7 @@ class _ChatScreenState
                           style:
                           TextStyle(
                             fontSize:
-                            10,
+                            12,
                             color:
                             _mutedColor,
                           ),
