@@ -1946,7 +1946,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               _resetFilters,
               icon:
               const Icon(
-                Icons.refresh_rounded,
+                Icons.filter_alt_off_rounded,
                 size: 18,
               ),
               label:

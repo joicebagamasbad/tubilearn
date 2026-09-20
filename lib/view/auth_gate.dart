@@ -91,13 +91,13 @@ class _AuthGateState extends State<AuthGate> {
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         const Text(
-                          'Could not prepare your local account. Please try again.',
+                          'Could not prepare your account. Please try again.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: () => _retry(session),
-                          child: const Text('Retry'),
+                          child: const Text('Try again'),
                         ),
                         if (session != null)
                           TextButton(

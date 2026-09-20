@@ -827,6 +827,21 @@ class _SwapRequestsScreenState
               color: _textColor,
             ),
           ),
+          const SizedBox(
+            height: 7,
+          ),
+          Text(
+            filtered
+                ? 'Try another filter to see your other requests.'
+                : 'Incoming and sent skill-swap requests will appear here when available.',
+            textAlign:
+            TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: _mutedColor,
+            ),
+          ),
         ],
       ),
     );
