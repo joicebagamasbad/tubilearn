@@ -428,6 +428,33 @@ service cloud.firestore {
         && titleKeyDeleteMatchesOwnerChange(resource.data);
     }
 
+    // Day 6, undeployed: first two-named-party (requester + provider)
+    // access pattern in this file. Update is intentionally permissive
+    // about WHICH fields change or WHETHER a status transition is legal —
+    // Firestore Rules cannot easily encode the full swap-request state
+    // machine, and this project does not pretend a rule proves an
+    // invariant it can't actually prove. Full transition-legality
+    // enforcement at the rules level is deferred to Day 9 hardening.
+    match /swapRequests/{swapRequestId} {
+      allow read: if request.auth != null
+        && (resource.data.requesterUserId == request.auth.uid
+          || resource.data.providerUserId == request.auth.uid);
+
+      allow create: if request.auth != null
+        && validCloudUid(request.resource.data.requesterUserId)
+        && validCloudUid(request.resource.data.providerUserId)
+        && request.resource.data.requesterUserId
+          != request.resource.data.providerUserId
+        && (request.auth.uid == request.resource.data.requesterUserId
+          || request.auth.uid == request.resource.data.providerUserId);
+
+      allow update: if request.auth != null
+        && (resource.data.requesterUserId == request.auth.uid
+          || resource.data.providerUserId == request.auth.uid);
+
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
