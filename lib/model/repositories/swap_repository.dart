@@ -820,6 +820,54 @@ class SwapRepository {
   }
 
   // ============================================================
+  // RECALCULATE COMPLETED SWAPS (CURRENT USER ONLY)
+  // ============================================================
+
+  /// Recalculates completed_swaps for [userId] alone, in its own
+  /// transaction, reusing _recalculateCompletedSwapsForUser's exact
+  /// query. Unlike completeSwap (which recalculates BOTH participants
+  /// atomically alongside its own status flip), this is a standalone,
+  /// narrowly-scoped entry point for a caller that only wants to refresh
+  /// one user's own derived counter from whatever is currently in local
+  /// swap_requests — it does not touch status and does not assume it is
+  /// running inside a larger transaction.
+  Future<void> recalculateCompletedSwapsForCurrentUser(
+      String userId,
+      ) async {
+    final String cleanUserId =
+    _requireText(
+      userId,
+      'User ID',
+    );
+
+    try {
+      final Database db =
+      await _appDatabase.database;
+
+      await db.transaction(
+            (
+            Transaction txn,
+            ) async {
+          await _recalculateCompletedSwapsForUser(
+            txn,
+            cleanUserId,
+          );
+        },
+      );
+    } on SwapRepositoryException {
+      rethrow;
+    } on DatabaseException catch (_) {
+      throw const SwapRepositoryException(
+        'Completed swap total could not be recalculated.',
+      );
+    } catch (_) {
+      throw const SwapRepositoryException(
+        'Completed swap total could not be recalculated.',
+      );
+    }
+  }
+
+  // ============================================================
   // UPDATE SCHEDULE
   // ============================================================
 

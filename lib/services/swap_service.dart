@@ -182,6 +182,24 @@ class SwapService {
     );
 
     _initialized = true;
+
+    // Best-effort self-heal, not correctness-critical: recalculates the
+    // current user's own completed_swaps counter from the local data
+    // just loaded above, so it stays accurate even if the OTHER
+    // participant completed a swap on their own device (which this
+    // device would only learn about via a fresh Firestore-backed
+    // reconciliation cycle, not from anything this device did itself).
+    // Purely local — no Firestore call here. A failure here must not
+    // fail the swap list load itself, matching the existing
+    // ExploreRepository.refresh() best-effort pattern below.
+    try {
+      await _repository.recalculateCompletedSwapsForCurrentUser(
+        currentUserId,
+      );
+    } catch (_) {
+      // The swap list itself loaded successfully; the derived counter
+      // merely failed to refresh this time.
+    }
   }
 
   // ============================================================
@@ -1121,36 +1139,63 @@ class SwapService {
       );
     }
 
-    final DateTime updatedAt =
-    DateTime.now();
+    try {
+      await _firestoreSwapRepository.updateStatus(
+        request.id,
+        newStatus: SwapRequestStatus.completed.databaseValue,
+      );
+    } on FirestoreSwapRepositoryException catch (error) {
+      // Nothing local has changed yet — clean, retry-safe failure.
+      throw SwapServiceException(error.message);
+    }
+
+    _currentUserService.requireActiveOperation();
+
+    // From here on, the completion DOES exist in Firestore. Every
+    // failure below must communicate that, rather than reusing the
+    // "nothing happened yet" message above.
+    final String reconcileUid = _requireCurrentLocalUser();
+    final FirestoreSwapSnapshot cloud;
+    try {
+      cloud = await _firestoreSwapRepository.getSwapRequestsForUser(
+        reconcileUid,
+      );
+    } on FirestoreSwapRepositoryException {
+      throw const SwapServiceException(
+        'This swap request was completed, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
+    _currentUserService.requireActiveOperation();
+    if (cloud.source != FirestoreSwapSource.server) {
+      throw const SwapServiceException(
+        'This swap request was completed, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
 
     try {
-      _currentUserService.requireActiveOperation();
-      await _repository.completeSwap(
-        requestId:
-        request.id,
-        updatedAt:
-        updatedAt,
+      await _localSwapProjectionRepository.project(
+        viewerUid: reconcileUid,
+        snapshot: cloud,
       );
-    } on SwapRepositoryException catch (error) {
-      throw SwapServiceException(
-        error.message,
-      );
-    } catch (_) {
+    } on LocalSwapProjectionException {
       throw const SwapServiceException(
-        'Could not complete the swap request. Please try again.',
+        'This swap request was completed, but could not be saved '
+        'locally. Please reload your swap requests to see it.',
       );
     }
 
     _currentUserService.requireActiveOperation();
 
-    request.status =
-        SwapRequestStatus.completed;
-
-    request.updatedAt =
-        updatedAt;
-
-    _sortRequests();
+    // Reuses the existing full local-reload mechanism (the same one
+    // initialize()/createRequest/accept-decline-cancel-schedule use)
+    // rather than duplicating "read SQLite, validate, replace _requests"
+    // logic here. This also self-heals the current user's
+    // completed_swaps counter via _initializeInternal's own new step —
+    // no separate recalculation call is made here to avoid duplicating
+    // that logic.
+    await _initializeInternal();
 
     try {
       await _exploreRepository.refresh();
