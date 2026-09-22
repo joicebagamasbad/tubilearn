@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../controller/ai_match_controller.dart';
 import '../controller/explore_controller.dart';
+import '../model/ai_match_analysis.dart';
 import '../model/skill_match.dart';
 import '../model/user.dart';
 import '../theme/app_theme.dart';
@@ -23,11 +25,15 @@ class _SmartMatchesScreenState
   final ExploreController _controller =
   ExploreController();
 
+  final AiMatchController _aiMatchController =
+  AiMatchController();
+
   bool _isLoading = true;
   bool _isRefreshing = false;
 
   String? _errorMessage;
   String? _openingSwapUserId;
+  String? _analyzingCandidateUid;
 
   bool _hasOfferedSkills = false;
   bool _hasWantedSkills = false;
@@ -84,7 +90,8 @@ class _SmartMatchesScreenState
           : Colors.white;
 
   bool get _hasPendingAction =>
-      _openingSwapUserId != null;
+      _openingSwapUserId != null ||
+          _analyzingCandidateUid != null;
 
   // ============================================================
   // LIFECYCLE
@@ -490,6 +497,10 @@ class _SmartMatchesScreenState
 
     final bool isOpeningSwap =
         _openingSwapUserId ==
+            user.id;
+
+    final bool isAnalyzing =
+        _analyzingCandidateUid ==
             user.id;
 
     final bool canRequestSwap =
@@ -928,6 +939,59 @@ class _SmartMatchesScreenState
               ),
             ],
           ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed:
+              _hasPendingAction
+                  ? null
+                  : () {
+                _analyzeCandidateWithAi(
+                  match,
+                );
+              },
+              style:
+              OutlinedButton.styleFrom(
+                foregroundColor:
+                _primaryColor,
+                side: BorderSide(
+                  color:
+                  _primaryColor.withValues(
+                    alpha: 0.4,
+                  ),
+                ),
+                disabledForegroundColor:
+                _mutedColor,
+              ),
+              icon:
+              isAnalyzing
+                  ? SizedBox(
+                width: 16,
+                height: 16,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth:
+                  2,
+                  color:
+                  _primaryColor,
+                ),
+              )
+                  : const Icon(
+                Icons.auto_awesome_rounded,
+                size: 18,
+              ),
+              label: Text(
+                isAnalyzing
+                    ? 'ANALYZING...'
+                    : 'ANALYZE WITH AI',
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1066,6 +1130,394 @@ class _SmartMatchesScreenState
         });
       }
     }
+  }
+
+  // ============================================================
+  // AI MATCH ANALYSIS
+  // ============================================================
+
+  Future<void> _analyzeCandidateWithAi(
+      SkillMatch match,
+      ) async {
+    if (_hasPendingAction) {
+      return;
+    }
+
+    final String candidateUserId =
+    match.user.id.trim();
+
+    if (candidateUserId.isEmpty) {
+      _showMessage(
+        'This match is no longer available.',
+      );
+
+      return;
+    }
+
+    setState(() {
+      _analyzingCandidateUid =
+          candidateUserId;
+    });
+
+    try {
+      final AiMatchAnalysis analysis =
+      await _aiMatchController.analyzeCandidate(
+        candidateUserId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _analyzingCandidateUid =
+        null;
+      });
+
+      _showAiAnalysisResult(
+        match.user,
+        analysis,
+      );
+    } on AiMatchControllerException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_analyzingCandidateUid != null) {
+        setState(() {
+          _analyzingCandidateUid =
+          null;
+        });
+      }
+
+      _showMessage(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_analyzingCandidateUid != null) {
+        setState(() {
+          _analyzingCandidateUid =
+          null;
+        });
+      }
+
+      _showMessage(
+        'This match could not be analyzed. Please try again.',
+      );
+    } finally {
+      if (mounted &&
+          _analyzingCandidateUid != null) {
+        setState(() {
+          _analyzingCandidateUid =
+          null;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // AI ANALYSIS RESULT SHEET
+  // ============================================================
+
+  Future<void> _showAiAnalysisResult(
+      User candidateUser,
+      AiMatchAnalysis analysis,
+      ) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled:
+      true,
+      backgroundColor:
+      Colors.transparent,
+      builder: (
+          BuildContext sheetContext,
+          ) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            padding:
+            EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              20 +
+                  MediaQuery.of(
+                    sheetContext,
+                  ).viewInsets.bottom,
+            ),
+            decoration:
+            BoxDecoration(
+              color:
+              _surfaceColor,
+              borderRadius:
+              const BorderRadius.vertical(
+                top:
+                Radius.circular(
+                  26,
+                ),
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                MainAxisSize.min,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        _borderColor,
+                        borderRadius:
+                        BorderRadius.circular(
+                          20,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 18,
+                  ),
+
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 18,
+                        color:
+                        _primaryColor,
+                      ),
+
+                      const SizedBox(
+                        width: 8,
+                      ),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'AI Compatibility Insight',
+                              style:
+                              AppTextStyles.caption
+                                  .copyWith(
+                                color:
+                                _primaryColor,
+                                fontWeight:
+                                FontWeight.w700,
+                              ),
+                            ),
+
+                            Text(
+                              candidateUser.name,
+                              style:
+                              AppTextStyles.cardTitle
+                                  .copyWith(
+                                color:
+                                _textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(
+                    height: 14,
+                  ),
+
+                  Text(
+                    analysis.compatibilitySummary,
+                    style:
+                    AppTextStyles.bodyMuted
+                        .copyWith(
+                      color:
+                      _textColor,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 18,
+                  ),
+
+                  Text(
+                    'Strengths',
+                    style:
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _textColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 8,
+                  ),
+
+                  ...analysis.strengths.map(
+                        (
+                        String strength,
+                        ) =>
+                        _buildAiListItem(
+                          strength,
+                        ),
+                  ),
+
+                  if (analysis.potentialChallenges.isNotEmpty) ...[
+                    const SizedBox(
+                      height: 18,
+                    ),
+
+                    Text(
+                      'Potential Challenges',
+                      style:
+                      AppTextStyles.caption
+                          .copyWith(
+                        color:
+                        _textColor,
+                        fontWeight:
+                        FontWeight.w700,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 8,
+                    ),
+
+                    ...analysis.potentialChallenges.map(
+                          (
+                          String challenge,
+                          ) =>
+                          _buildAiListItem(
+                            challenge,
+                          ),
+                    ),
+                  ],
+
+                  const SizedBox(
+                    height: 18,
+                  ),
+
+                  Text(
+                    'Suggested First Session',
+                    style:
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _textColor,
+                      fontWeight:
+                      FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 8,
+                  ),
+
+                  Text(
+                    analysis.suggestedFirstSession,
+                    style:
+                    AppTextStyles.bodyMuted
+                        .copyWith(
+                      color:
+                      _textColor,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 18,
+                  ),
+
+                  Text(
+                    analysis.confidenceNote,
+                    style:
+                    AppTextStyles.caption
+                        .copyWith(
+                      color:
+                      _mutedColor,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(
+                          sheetContext,
+                        );
+                      },
+                      child: const Text(
+                        'CLOSE',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAiListItem(
+      String text,
+      ) {
+    return Padding(
+      padding:
+      const EdgeInsets.only(
+        bottom: 6,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.check_circle_outline_rounded,
+            size: 15,
+            color:
+            _primaryColor,
+          ),
+
+          const SizedBox(
+            width: 7,
+          ),
+
+          Expanded(
+            child: Text(
+              text,
+              style:
+              AppTextStyles.bodyMuted
+                  .copyWith(
+                color:
+                _textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ============================================================
