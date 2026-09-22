@@ -1497,66 +1497,87 @@ class SwapService {
       request,
     );
 
-    final DateTime updatedAt =
-    DateTime.now();
-
+    // Status is written FIRST, schedule fields SECOND. These are two
+    // separate Firestore writes (no combined equivalent exists), and this
+    // order is not arbitrary: if only the first succeeds, the worst-case
+    // observable state is "status: accepted + stale schedule fields" —
+    // benign, a state that already naturally occurs right after
+    // acceptRequest. The reverse order would risk a concurrent reader
+    // observing "status: scheduled + not-yet-confirmed new schedule
+    // fields," which is actively misleading.
     try {
-      _currentUserService.requireActiveOperation();
-      await _repository.updateSchedule(
-        requestId:
+      await _firestoreSwapRepository.updateStatus(
         request.id,
-        proposedAt:
-        proposedAt,
-        mode:
-        mode,
-        meetingDetails:
-        meetingDetails,
-        status:
-        nextStatus,
-        updatedAt:
-        updatedAt,
+        newStatus: nextStatus.databaseValue,
       );
-    } on SwapRepositoryException catch (_) {
-      throw const SwapServiceException(
-        'Could not update the session schedule. Please try again.',
-      );
+    } on FirestoreSwapRepositoryException catch (error) {
+      // Nothing local has changed yet — clean, retry-safe failure.
+      throw SwapServiceException(error.message);
     }
 
-    final SwapRequest updatedRequest =
-    request.copyWith(
-      proposedAt:
-      proposedAt,
-      mode:
-      mode,
-      meetingDetails:
-      meetingDetails,
-      status:
-      nextStatus,
-      updatedAt:
-      updatedAt,
-    );
+    _currentUserService.requireActiveOperation();
 
-    final int index =
-    _requests.indexWhere(
-          (
-          SwapRequest item,
-          ) =>
-      item.id ==
-          request.id,
-    );
-
-    if (index < 0) {
-      throw const SwapServiceException(
-        'Swap request not found after schedule update.',
+    try {
+      await _firestoreSwapRepository.updateSchedule(
+        request.id,
+        proposedAt: proposedAt,
+        mode: mode,
+        meetingDetails: meetingDetails,
+      );
+    } on FirestoreSwapRepositoryException catch (error) {
+      // Status has already been updated in Firestore at this point — this
+      // is a partial-success state (benign per design: status now
+      // reflects 'accepted', schedule fields remain whatever they were
+      // before). Surface this clearly rather than reusing a "nothing
+      // happened" message.
+      throw SwapServiceException(
+        'The swap status was updated, but the new schedule could not be '
+        'saved. Please try updating the schedule again. '
+        'Details: ${error.message}',
       );
     }
 
     _currentUserService.requireActiveOperation();
 
-    _requests[index] =
-        updatedRequest;
+    final String reconcileUid = _requireCurrentLocalUser();
+    final FirestoreSwapSnapshot cloud;
+    try {
+      cloud = await _firestoreSwapRepository.getSwapRequestsForUser(
+        reconcileUid,
+      );
+    } on FirestoreSwapRepositoryException {
+      throw const SwapServiceException(
+        'This schedule was updated, but could not be confirmed locally. '
+        'Please reload your swap requests to see it.',
+      );
+    }
+    _currentUserService.requireActiveOperation();
+    if (cloud.source != FirestoreSwapSource.server) {
+      throw const SwapServiceException(
+        'This schedule was updated, but could not be confirmed locally. '
+        'Please reload your swap requests to see it.',
+      );
+    }
 
-    _sortRequests();
+    try {
+      await _localSwapProjectionRepository.project(
+        viewerUid: reconcileUid,
+        snapshot: cloud,
+      );
+    } on LocalSwapProjectionException {
+      throw const SwapServiceException(
+        'This schedule was updated, but could not be saved locally. '
+        'Please reload your swap requests to see it.',
+      );
+    }
+
+    _currentUserService.requireActiveOperation();
+
+    // Reuses the existing full local-reload mechanism (the same one
+    // initialize()/createRequest/accept-decline-cancel-schedule/complete
+    // use) rather than duplicating "read SQLite, validate, replace
+    // _requests" logic here.
+    await _initializeInternal();
   }
 
   // ============================================================
