@@ -45,6 +45,8 @@ class SwapService {
 
   Future<void>? _initializingFuture;
 
+  Future<void>? _refreshingFuture;
+
   final Map<String, Future<SwapRequest>>
   _pendingCreations =
   <String, Future<SwapRequest>>{};
@@ -140,6 +142,82 @@ class SwapService {
         _initializingFuture = null;
       }
     }
+  }
+
+  // ============================================================
+  // MANUAL REFRESH FROM REMOTE
+  // ============================================================
+
+  /// Manual, pull-triggered authoritative refresh — NOT gated by
+  /// _initialized (unlike initialize(), this always performs a fresh
+  /// Firestore fetch when called). Concurrent calls share the same
+  /// in-flight Future rather than racing, mirroring initialize()'s own
+  /// single-flight shape via a separate field, since the two guards have
+  /// opposite semantics (skip-if-loaded vs. always-reload-but-dedupe).
+  Future<void> refreshFromRemote() {
+    final Future<void>? pending =
+        _refreshingFuture;
+
+    if (pending != null) {
+      return pending;
+    }
+
+    final Future<void> refresh =
+    _refreshFromRemoteInternal();
+
+    _refreshingFuture =
+        refresh;
+
+    return refresh.whenComplete(
+          () {
+        if (identical(
+          _refreshingFuture,
+          refresh,
+        )) {
+          _refreshingFuture = null;
+        }
+      },
+    );
+  }
+
+  Future<void> _refreshFromRemoteInternal() {
+    return _currentUserService.runForSession<void>(() async {
+      _currentUserService.requireActiveOperation();
+      final String uid =
+          _requireCurrentLocalUser();
+
+      final FirestoreSwapSnapshot cloud;
+      try {
+        cloud = await _firestoreSwapRepository.getSwapRequestsForUser(
+          uid,
+        );
+      } on FirestoreSwapRepositoryException catch (error) {
+        throw SwapServiceException(
+          error.message,
+        );
+      }
+      _currentUserService.requireActiveOperation();
+      if (cloud.source != FirestoreSwapSource.server) {
+        throw const SwapServiceException(
+          'Your swap requests could not be refreshed from the cloud '
+          'right now. Please try again.',
+        );
+      }
+
+      try {
+        await _localSwapProjectionRepository.project(
+          viewerUid: uid,
+          snapshot: cloud,
+        );
+      } on LocalSwapProjectionException catch (error) {
+        throw SwapServiceException(
+          error.message,
+        );
+      }
+      _currentUserService.requireActiveOperation();
+
+      await _initializeInternal();
+    });
   }
 
   Future<void> _initializeInternal() async {

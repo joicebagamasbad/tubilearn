@@ -182,7 +182,7 @@ class _SwapRequestsScreenState
 
     try {
       final SwapRequestsSnapshot snapshot =
-      await _controller.currentSnapshot();
+      await _controller.refreshFromRemote();
 
       if (!mounted) {
         return;

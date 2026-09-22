@@ -509,6 +509,26 @@ class SwapRequestsController {
   }
 
   // ============================================================
+  // REFRESH FROM REMOTE
+  // ============================================================
+
+  Future<SwapRequestsSnapshot> refreshFromRemote() async {
+    try {
+      await _swapService.refreshFromRemote();
+
+      return await _buildSnapshot();
+    } on SwapServiceException catch (error) {
+      throw SwapRequestsControllerException(
+        error.message,
+      );
+    } catch (_) {
+      throw const SwapRequestsControllerException(
+        'Swap requests could not be refreshed from the cloud.',
+      );
+    }
+  }
+
+  // ============================================================
   // REMOVE FROM HISTORY
   // ============================================================
 
