@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/firestore_swap_repository.dart';
+import '../model/repositories/local_swap_projection_repository.dart';
 import '../model/repositories/swap_repository.dart';
 import '../model/swap_request.dart';
 
@@ -31,6 +33,12 @@ class SwapService {
 
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
+
+  final FirestoreSwapRepository _firestoreSwapRepository =
+      FirestoreSwapRepository.instance;
+
+  final LocalSwapProjectionRepository _localSwapProjectionRepository =
+      LocalSwapProjectionRepository.instance;
 
   final List<SwapRequest> _requests =
   <SwapRequest>[];
@@ -750,27 +758,86 @@ class SwapService {
       now,
     );
 
+    final FirestoreSwapRequestRecord record = FirestoreSwapRequestRecord(
+      id: request.id,
+      requesterUserId: requesterUserId,
+      providerUserId: providerUserId,
+      skillToLearnId: skillToLearnId,
+      skillToOfferId: skillToOfferId,
+      providerName: providerName,
+      providerInitials: providerInitials,
+      providerCity: providerCity,
+      skillToLearn: skillToLearn,
+      skillToOffer: skillToOffer,
+      proposedAt: proposedAt,
+      mode: mode,
+      meetingDetails: meetingDetails,
+      note: note,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    );
+
     try {
       _currentUserService.requireActiveOperation();
-      await _repository.saveSwapRequest(
-        request,
+      await _firestoreSwapRepository.createSwapRequest(record);
+    } on FirestoreSwapRepositoryException catch (error) {
+      // Nothing was written anywhere yet — clean, retry-safe failure.
+      throw SwapServiceException(error.message);
+    }
+
+    _currentUserService.requireActiveOperation();
+
+    // From here on, the swap request DOES exist in Firestore. Every
+    // failure below must communicate that, rather than reusing the
+    // "nothing happened yet" message above.
+    final FirestoreSwapSnapshot cloud;
+    try {
+      cloud = await _firestoreSwapRepository.getSwapRequestsForUser(
+        requesterUserId,
       );
-    } on SwapRepositoryException catch (_) {
+    } on FirestoreSwapRepositoryException {
       throw const SwapServiceException(
-        'Could not save the swap request. Please try again.',
+        'Your swap request was created, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
+    _currentUserService.requireActiveOperation();
+    if (cloud.source != FirestoreSwapSource.server) {
+      throw const SwapServiceException(
+        'Your swap request was created, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
+
+    try {
+      await _localSwapProjectionRepository.project(
+        viewerUid: requesterUserId,
+        snapshot: cloud,
+      );
+    } on LocalSwapProjectionException {
+      throw const SwapServiceException(
+        'Your swap request was created, but could not be saved '
+        'locally. Please reload your swap requests to see it.',
       );
     }
 
     _currentUserService.requireActiveOperation();
 
-    _requests.insert(
-      0,
-      request,
-    );
+    // Reuses the existing full local-reload mechanism (the same one
+    // initialize() uses) rather than duplicating "read SQLite, validate,
+    // replace _requests" logic here.
+    await _initializeInternal();
 
-    _sortRequests();
+    final SwapRequest? createdRequest = findById(request.id);
+    if (createdRequest == null) {
+      throw const SwapServiceException(
+        'Your swap request was created and saved, but could not be '
+        'displayed. Please reload your swap requests to see it.',
+      );
+    }
 
-    return request;
+    return createdRequest;
   }
 
   // ============================================================
