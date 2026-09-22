@@ -1,7 +1,18 @@
 class AiMatchAnalysisFormatException implements Exception {
   final String message;
 
-  const AiMatchAnalysisFormatException(this.message);
+  /// True when this validation failure is plausibly transient model-output
+  /// content/count variance (e.g. a list came back the wrong length, or a
+  /// string exceeded a length bound) — a fresh generation attempt may
+  /// produce a compliant result. False for structural/type/presence
+  /// failures (wrong type, missing field, empty string/item), which are
+  /// deterministic contract violations a retry is unlikely to fix.
+  final bool isRetryable;
+
+  const AiMatchAnalysisFormatException(
+    this.message, {
+    required this.isRetryable,
+  });
 
   @override
   String toString() => message;
@@ -50,6 +61,7 @@ class AiMatchAnalysis {
     if (cleanCandidateUid.isEmpty) {
       throw const AiMatchAnalysisFormatException(
         'candidateUid is required.',
+        isRetryable: false,
       );
     }
 
@@ -61,17 +73,20 @@ class AiMatchAnalysis {
       throw AiMatchAnalysisFormatException(
         'compatibilitySummary must be $_maxCompatibilitySummaryLength '
         'characters or fewer.',
+        isRetryable: true,
       );
     }
 
     final List<String> strengths = _requireStringList(
       json,
       'strengths',
+      emptyListIsRetryable: true,
     );
     if (strengths.length < _minStrengths || strengths.length > _maxStrengths) {
       throw AiMatchAnalysisFormatException(
         'strengths must contain between $_minStrengths and '
         '$_maxStrengths items.',
+        isRetryable: true,
       );
     }
 
@@ -79,11 +94,13 @@ class AiMatchAnalysis {
       json,
       'potentialChallenges',
       allowEmptyList: true,
+      emptyListIsRetryable: false,
     );
     if (potentialChallenges.length > _maxPotentialChallenges) {
       throw AiMatchAnalysisFormatException(
         'potentialChallenges must contain at most '
         '$_maxPotentialChallenges items.',
+        isRetryable: true,
       );
     }
 
@@ -110,12 +127,18 @@ class AiMatchAnalysis {
   static String _requireString(Map<String, Object?> json, String key) {
     final Object? value = json[key];
     if (value is! String) {
-      throw AiMatchAnalysisFormatException('$key is invalid.');
+      throw AiMatchAnalysisFormatException(
+        '$key is invalid.',
+        isRetryable: false,
+      );
     }
 
     final String cleaned = value.trim();
     if (cleaned.isEmpty) {
-      throw AiMatchAnalysisFormatException('$key is required.');
+      throw AiMatchAnalysisFormatException(
+        '$key is required.',
+        isRetryable: false,
+      );
     }
 
     return cleaned;
@@ -125,28 +148,41 @@ class AiMatchAnalysis {
     Map<String, Object?> json,
     String key, {
     bool allowEmptyList = false,
+    bool emptyListIsRetryable = false,
   }) {
     final Object? value = json[key];
     if (value is! List) {
-      throw AiMatchAnalysisFormatException('$key is invalid.');
+      throw AiMatchAnalysisFormatException(
+        '$key is invalid.',
+        isRetryable: false,
+      );
     }
 
     final List<String> items = <String>[];
     for (final Object? entry in value) {
       if (entry is! String) {
-        throw AiMatchAnalysisFormatException('$key contains an invalid item.');
+        throw AiMatchAnalysisFormatException(
+          '$key contains an invalid item.',
+          isRetryable: false,
+        );
       }
 
       final String cleaned = entry.trim();
       if (cleaned.isEmpty) {
-        throw AiMatchAnalysisFormatException('$key contains an empty item.');
+        throw AiMatchAnalysisFormatException(
+          '$key contains an empty item.',
+          isRetryable: false,
+        );
       }
 
       items.add(cleaned);
     }
 
     if (!allowEmptyList && items.isEmpty) {
-      throw AiMatchAnalysisFormatException('$key is required.');
+      throw AiMatchAnalysisFormatException(
+        '$key is required.',
+        isRetryable: emptyListIsRetryable,
+      );
     }
 
     return items;

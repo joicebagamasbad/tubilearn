@@ -108,8 +108,8 @@ class AiMatchRepository {
   static final Schema _responseSchema = Schema.object(
     properties: <String, Schema>{
       'compatibilitySummary': Schema.string(),
-      'strengths': Schema.array(items: Schema.string()),
-      'potentialChallenges': Schema.array(items: Schema.string()),
+      'strengths': Schema.array(items: Schema.string(), maxItems: 3),
+      'potentialChallenges': Schema.array(items: Schema.string(), maxItems: 2),
       'suggestedFirstSession': Schema.string(),
       'confidenceNote': Schema.string(),
     },
@@ -129,6 +129,8 @@ class AiMatchRepository {
     );
   }
 
+  static const int _maxAttempts = 3;
+
   /// Generates an [AiMatchAnalysis] for [candidateUid] from a sanitized
   /// [request]. Not invoked anywhere yet in this batch — no live Gemini
   /// call is made until a later batch wires a caller to this method.
@@ -142,54 +144,80 @@ class AiMatchRepository {
     }
 
     final GenerativeModel model = _requireModel();
-
     final String prompt = jsonEncode(request.toPromptJson());
 
-    final GenerateContentResponse response;
-    try {
-      response = await model.generateContent(<Content>[
-        Content.text(prompt),
-      ]);
-    } catch (error) {
-      throw AiMatchRepositoryException(
-        'Could not generate a match analysis. Please try again.',
-        cause: error,
-      );
+    // Only count/content-bound validation failures are retried (a string
+    // over its length bound, or a list outside its allowed item count —
+    // including an empty `strengths` list, since Firebase AI Logic's
+    // schema cannot enforce minItems and so cannot prevent the model from
+    // returning zero items). Structural/type/presence failures (wrong
+    // type, missing field, an empty individual string/item) and any
+    // generateContent()/JSON-decode-level failure fail immediately,
+    // without retry, exactly as before this loop was introduced.
+    for (int attempt = 1; attempt <= _maxAttempts; attempt++) {
+      final GenerateContentResponse response;
+      try {
+        response = await model.generateContent(<Content>[
+          Content.text(prompt),
+        ]);
+      } catch (error) {
+        throw AiMatchRepositoryException(
+          'Could not generate a match analysis. Please try again.',
+          cause: error,
+        );
+      }
+
+      final String? text = response.text;
+      if (text == null || text.trim().isEmpty) {
+        throw const AiMatchRepositoryException(
+          'The match analysis response was empty.',
+        );
+      }
+
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(text);
+      } on FormatException catch (error) {
+        throw AiMatchRepositoryException(
+          'The match analysis response was not valid JSON.',
+          cause: error,
+        );
+      }
+
+      if (decoded is! Map<String, Object?>) {
+        throw const AiMatchRepositoryException(
+          'The match analysis response had an unexpected shape.',
+        );
+      }
+
+      try {
+        return AiMatchAnalysis.fromJson(
+          decoded,
+          candidateUid: cleanCandidateUid,
+        );
+      } on AiMatchAnalysisFormatException catch (error) {
+        if (!error.isRetryable) {
+          throw AiMatchRepositoryException(
+            'The match analysis response failed validation: $error',
+            cause: error,
+          );
+        }
+
+        if (attempt >= _maxAttempts) {
+          throw AiMatchRepositoryException(
+            'The match analysis response failed validation after '
+            'multiple attempts: $error',
+            cause: error,
+          );
+        }
+        // Retryable and attempts remain: fall through to the next
+        // iteration for a fresh generateContent() call.
+      }
     }
 
-    final String? text = response.text;
-    if (text == null || text.trim().isEmpty) {
-      throw const AiMatchRepositoryException(
-        'The match analysis response was empty.',
-      );
-    }
-
-    final Object? decoded;
-    try {
-      decoded = jsonDecode(text);
-    } on FormatException catch (error) {
-      throw AiMatchRepositoryException(
-        'The match analysis response was not valid JSON.',
-        cause: error,
-      );
-    }
-
-    if (decoded is! Map<String, Object?>) {
-      throw const AiMatchRepositoryException(
-        'The match analysis response had an unexpected shape.',
-      );
-    }
-
-    try {
-      return AiMatchAnalysis.fromJson(
-        decoded,
-        candidateUid: cleanCandidateUid,
-      );
-    } on AiMatchAnalysisFormatException catch (error) {
-      throw AiMatchRepositoryException(
-        'The match analysis response failed validation: $error',
-        cause: error,
-      );
-    }
+    // Unreachable: the loop above always either returns or throws.
+    throw const AiMatchRepositoryException(
+      'The match analysis could not be generated.',
+    );
   }
 }
