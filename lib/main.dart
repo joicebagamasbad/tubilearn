@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -32,6 +33,18 @@ Future<void> main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ============================================================
+  // APP CHECK
+  // ============================================================
+  //
+  // DEBUG PROVIDER — local development only. Must be swapped to
+  // AndroidProvider.playIntegrity (or equivalent) before any
+  // production/release build.
+
+  await FirebaseAppCheck.instance.activate(
+    providerAndroid: const AndroidDebugProvider(),
   );
 
   // ============================================================
