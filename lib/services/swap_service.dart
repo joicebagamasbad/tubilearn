@@ -1656,34 +1656,63 @@ class SwapService {
       );
     }
 
-    final DateTime updatedAt =
-    DateTime.now();
+    try {
+      await _firestoreSwapRepository.updateStatus(
+        request.id,
+        newStatus: nextStatus.databaseValue,
+      );
+    } on FirestoreSwapRepositoryException catch (error) {
+      // Nothing local has changed yet — clean, retry-safe failure.
+      throw SwapServiceException(error.message);
+    }
+
+    _currentUserService.requireActiveOperation();
+
+    // From here on, the status change DOES exist in Firestore. Every
+    // failure below must communicate that, rather than reusing the
+    // "nothing happened yet" message above.
+    final String reconcileUid = _requireCurrentLocalUser();
+    final FirestoreSwapSnapshot cloud;
+    try {
+      cloud = await _firestoreSwapRepository.getSwapRequestsForUser(
+        reconcileUid,
+      );
+    } on FirestoreSwapRepositoryException {
+      throw const SwapServiceException(
+        'This swap request was updated, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
+    _currentUserService.requireActiveOperation();
+    if (cloud.source != FirestoreSwapSource.server) {
+      throw const SwapServiceException(
+        'This swap request was updated, but could not be confirmed '
+        'locally. Please reload your swap requests to see it.',
+      );
+    }
 
     try {
-      _currentUserService.requireActiveOperation();
-      await _repository.updateStatus(
-        requestId:
-        request.id,
-        status:
-        nextStatus,
-        updatedAt:
-        updatedAt,
+      await _localSwapProjectionRepository.project(
+        viewerUid: reconcileUid,
+        snapshot: cloud,
       );
-    } on SwapRepositoryException catch (_) {
+    } on LocalSwapProjectionException {
       throw const SwapServiceException(
-        'Could not update the swap request. Please try again.',
+        'This swap request was updated, but could not be saved '
+        'locally. Please reload your swap requests to see it.',
       );
     }
 
     _currentUserService.requireActiveOperation();
 
-    request.status =
-        nextStatus;
-
-    request.updatedAt =
-        updatedAt;
-
-    _sortRequests();
+    // Reuses the existing full local-reload mechanism (the same one
+    // initialize() and createRequest use) rather than duplicating
+    // "read SQLite, validate, replace _requests" logic here. This also
+    // fully replaces and re-sorts _requests, so the direct in-place
+    // mutation of `request` and the standalone _sortRequests() call this
+    // block used to do are no longer needed (see report for callers
+    // confirmed not to depend on the old `request` object afterward).
+    await _initializeInternal();
   }
 
   // ============================================================
