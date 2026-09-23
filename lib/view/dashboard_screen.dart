@@ -115,6 +115,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   DashboardSession? get _prioritySession =>
       _snapshot?.prioritySession;
 
+  int get _actionableSwapCount =>
+      _snapshot?.actionableSwapCount ??
+          0;
+
   // ============================================================
   // LIFECYCLE
   // ============================================================
@@ -707,37 +711,93 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
 
-        Container(
-          width: 40,
-          height: 40,
-          decoration:
-          BoxDecoration(
-            color: _surfaceColor,
-            borderRadius:
-            BorderRadius.circular(
-              12,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration:
+              BoxDecoration(
+                color: _surfaceColor,
+                borderRadius:
+                BorderRadius.circular(
+                  12,
+                ),
+                border:
+                Border.all(
+                  color: _borderColor,
+                ),
+              ),
+              child: IconButton(
+                tooltip:
+                'Swap requests',
+                padding:
+                EdgeInsets.zero,
+                onPressed: () async {
+                  await _openRouteAndRefresh(
+                    '/swap-requests',
+                  );
+                },
+                icon: Icon(
+                  Icons.swap_horiz_rounded,
+                  size: 21,
+                  color: _textColor,
+                ),
+              ),
             ),
-            border:
-            Border.all(
-              color: _borderColor,
-            ),
-          ),
-          child: IconButton(
-            tooltip:
-            'Swap requests',
-            padding:
-            EdgeInsets.zero,
-            onPressed: () async {
-              await _openRouteAndRefresh(
-                '/swap-requests',
-              );
-            },
-            icon: Icon(
-              Icons.swap_horiz_rounded,
-              size: 21,
-              color: _textColor,
-            ),
-          ),
+
+            if (_actionableSwapCount > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: IgnorePointer(
+                  child: Container(
+                    padding:
+                    const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    constraints:
+                    const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    decoration:
+                    BoxDecoration(
+                      color: _softPrimaryColor,
+                      borderRadius:
+                      BorderRadius.circular(
+                        20,
+                      ),
+                      border:
+                      Border.all(
+                        color: _surfaceColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    alignment:
+                    Alignment.center,
+                    child: Text(
+                      _actionableSwapCount > 9
+                          ? '9+'
+                          : '$_actionableSwapCount',
+                      textAlign:
+                      TextAlign.center,
+                      style:
+                      AppTextStyles.caption
+                          .copyWith(
+                        color: _primaryColor,
+                        fontWeight:
+                        FontWeight.w800,
+                        fontSize: 10,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
 
         const SizedBox(

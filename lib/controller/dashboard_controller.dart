@@ -46,12 +46,14 @@ class DashboardSnapshot {
   final List<Skill> featuredSkills;
   final SkillMatch? bestSmartMatch;
   final DashboardSession? prioritySession;
+  final int actionableSwapCount;
 
   const DashboardSnapshot({
     required this.currentUser,
     required this.featuredSkills,
     required this.bestSmartMatch,
     required this.prioritySession,
+    required this.actionableSwapCount,
   });
 
   bool get sessionReady =>
@@ -237,6 +239,11 @@ class DashboardController {
       currentUser,
     );
 
+    final int actionableSwapCount =
+    _countActionableSwaps(
+      currentUser,
+    );
+
     return DashboardSnapshot(
       currentUser:
       currentUser,
@@ -246,7 +253,48 @@ class DashboardController {
       bestSmartMatch,
       prioritySession:
       prioritySession,
+      actionableSwapCount:
+      actionableSwapCount,
     );
+  }
+
+  // ============================================================
+  // ACTIONABLE SWAP COUNT
+  // ============================================================
+
+  // The three predicates below are mutually exclusive: canAccept only
+  // ever returns true for status == pending, canSchedule only for
+  // status == accepted, and isScheduledSessionReadyForCompletionFor only
+  // for status == scheduled — and a SwapRequest has exactly one status
+  // at a time, so no request can match more than one predicate and a
+  // single .where() pass cannot double-count.
+  int _countActionableSwaps(
+      User? currentUser,
+      ) {
+    if (currentUser == null) {
+      return 0;
+    }
+
+    final DateTime now =
+    DateTime.now();
+
+    return _swapService.requests
+        .where(
+          (
+          SwapRequest request,
+          ) =>
+      request.canAccept(
+        currentUser.id,
+      ) ||
+          request.canSchedule(
+            currentUser.id,
+          ) ||
+          request.isScheduledSessionReadyForCompletionFor(
+            currentUser.id,
+            now,
+          ),
+    )
+        .length;
   }
 
   // ============================================================
