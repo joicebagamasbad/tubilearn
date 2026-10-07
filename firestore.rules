@@ -455,6 +455,62 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Day 7, undeployed: one shared conversation document per unordered
+    // participant pair, same two-named-party access pattern as
+    // swapRequests above. Per-viewer display fields (name, initials,
+    // city, skills, status) are intentionally never stored here — only
+    // the shared identity (participants, creation time) and messages.
+    match /conversations/{conversationId} {
+      allow list: if signedIn()
+        && request.auth.uid in resource.data.participantUids;
+
+      // createConversationIfMissing reads this doc inside a transaction
+      // before it may exist, so `resource` can be null here. The
+      // resource == null branch allows that not-yet-existing-doc read,
+      // but only when the caller's uid is one of the two UIDs encoded in
+      // conversationId — the same no-'_'-in-a-UID assumption the create
+      // rule below already relies on.
+      allow get: if signedIn()
+        && ((resource == null && request.auth.uid in conversationId.split('_'))
+          || (resource != null && request.auth.uid in resource.data.participantUids));
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['participantUids', 'createdAt'])
+        && request.resource.data.participantUids is list
+        && request.resource.data.participantUids.size() == 2
+        && request.resource.data.participantUids[0]
+          < request.resource.data.participantUids[1]
+        && validCloudUid(request.resource.data.participantUids[0])
+        && validCloudUid(request.resource.data.participantUids[1])
+        && conversationId == request.resource.data.participantUids[0]
+          + '_' + request.resource.data.participantUids[1]
+        && request.auth.uid in request.resource.data.participantUids
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+
+      // Messages are immutable once created: no update or delete path.
+      match /messages/{messageId} {
+        allow get, list: if signedIn()
+          && request.auth.uid in get(
+            /databases/$(database)/documents/conversations/$(conversationId)
+          ).data.participantUids;
+
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(['senderUid', 'text', 'sentAt'])
+          && request.resource.data.senderUid == request.auth.uid
+          && request.auth.uid in get(
+            /databases/$(database)/documents/conversations/$(conversationId)
+          ).data.participantUids
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.sentAt == request.time;
+
+        allow update, delete: if false;
+      }
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
