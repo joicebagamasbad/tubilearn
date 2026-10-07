@@ -12,7 +12,6 @@ import 'create_swap_request_screen.dart';
 enum _PreviousConversationAction {
   cancel,
   restore,
-  startNew,
 }
 
 enum _ProfileMenuAction {
@@ -2237,12 +2236,6 @@ class _UserProfileScreenState
             hiddenConversationId,
           );
           return;
-
-        case _PreviousConversationAction.startNew:
-          await _startNewConversation(
-            snapshot,
-          );
-          return;
       }
     } on UserProfileControllerException catch (error) {
       if (!mounted) {
@@ -2304,45 +2297,6 @@ class _UserProfileScreenState
 
       _showMessage(
         'Conversation could not be restored. Please try again.',
-      );
-    }
-  }
-
-  // ============================================================
-  // START NEW CHAT
-  // ============================================================
-
-  Future<void> _startNewConversation(
-      UserProfileSnapshot snapshot,
-      ) async {
-    try {
-      final String conversationId =
-      await _controller.startNewConversation(
-        snapshot,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      await _openConversationRoute(
-        conversationId,
-      );
-    } on UserProfileControllerException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      _showMessage(
-        error.message,
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      _showMessage(
-        'A new conversation could not be created. Please try again.',
       );
     }
   }
@@ -2430,8 +2384,8 @@ class _UserProfileScreenState
             ],
           ),
           content: Text(
-            'You previously removed your conversation with ${user.name}. '
-                'You can restore that chat and its messages, or start a fresh conversation.',
+            'You previously archived your conversation with ${user.name}. '
+                'Restore it to continue with all of its messages.',
             style:
             AppTextStyles.bodyMuted
                 .copyWith(
@@ -2488,46 +2442,6 @@ class _UserProfileScreenState
               TextButton.styleFrom(
                 foregroundColor:
                 _primaryColor,
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(
-                  _PreviousConversationAction.startNew,
-                );
-              },
-              icon:
-              const Icon(
-                Icons.add_comment_outlined,
-                size: 17,
-              ),
-              label:
-              const Text(
-                'NEW CHAT',
-                style:
-                AppTextStyles.button,
-              ),
-              style:
-              ElevatedButton.styleFrom(
-                backgroundColor:
-                _primaryColor,
-                foregroundColor:
-                _primaryForeground,
-                elevation: 0,
-                minimumSize:
-                const Size(
-                  0,
-                  42,
-                ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    11,
-                  ),
-                ),
               ),
             ),
           ],

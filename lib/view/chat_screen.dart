@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ class _ChatScreenState
 
   bool _isLoading = true;
   bool _isSearchVisible = false;
+  bool _isRefreshingFromRemote = false;
 
   String? _loadError;
 
@@ -119,6 +121,10 @@ class _ChatScreenState
         _isLoading = false;
         _loadError = null;
       });
+
+      unawaited(
+        _backgroundRefreshFromRemote(),
+      );
     } on ChatControllerException catch (error) {
       if (!mounted) {
         return;
@@ -143,10 +149,16 @@ class _ChatScreenState
   }
 
   Future<void> _refreshConversations() async {
+    if (_isRefreshingFromRemote) {
+      return;
+    }
+
+    _isRefreshingFromRemote = true;
+
     try {
       final ChatListSnapshot snapshot =
       await _controller
-          .refreshConversations();
+          .refreshFromRemote();
 
       if (!mounted) {
         return;
@@ -174,6 +186,45 @@ class _ChatScreenState
       _showSnackBar(
         'Messages could not be refreshed. Please try again.',
       );
+    } finally {
+      _isRefreshingFromRemote = false;
+    }
+  }
+
+  // ============================================================
+  // BACKGROUND REFRESH
+  //
+  // Fires once after a successful initial local load. Offline/any
+  // failure is swallowed entirely: the already-shown local list must
+  // never be replaced by an error state just because the cloud sync
+  // could not run.
+  // ============================================================
+
+  Future<void> _backgroundRefreshFromRemote() async {
+    if (!mounted ||
+        _isRefreshingFromRemote) {
+      return;
+    }
+
+    _isRefreshingFromRemote = true;
+
+    try {
+      final ChatListSnapshot snapshot =
+      await _controller
+          .refreshFromRemote();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _conversations =
+            snapshot.conversations;
+      });
+    } catch (_) {
+      // Silently ignored: local data already shown, offline is normal.
+    } finally {
+      _isRefreshingFromRemote = false;
     }
   }
 
@@ -693,48 +744,53 @@ class _ChatScreenState
                     ),
                   ),
 
-                  const SizedBox(
-                    height: 7,
-                  ),
-
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons
-                            .swap_horiz_rounded,
-                        size: 14,
-                        color:
-                        primary,
-                      ),
-
+                  if (!_controller.isRemoteConversation(
+                    conversation,
+                  ))
+                    ...[
                       const SizedBox(
-                        width: 5,
+                        height: 7,
                       ),
 
-                      Expanded(
-                        child: Text(
-                          '${conversation.skillWanted} ↔ ${conversation.skillOffered}',
-                          maxLines: 1,
-                          overflow:
-                          TextOverflow
-                              .ellipsis,
-                          style:
-                          const TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                            FontWeight
-                                .w600,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons
+                                .swap_horiz_rounded,
+                            size: 14,
                             color:
                             primary,
                           ),
-                        ),
+
+                          const SizedBox(
+                            width: 5,
+                          ),
+
+                          Expanded(
+                            child: Text(
+                              '${conversation.skillWanted} ↔ ${conversation.skillOffered}',
+                              maxLines: 1,
+                              overflow:
+                              TextOverflow
+                                  .ellipsis,
+                              style:
+                              const TextStyle(
+                                fontSize: 11,
+                                fontWeight:
+                                FontWeight
+                                    .w600,
+                                color:
+                                primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(
+                        height: 8,
                       ),
                     ],
-                  ),
-
-                  const SizedBox(
-                    height: 8,
-                  ),
 
                   Row(
                     children: [

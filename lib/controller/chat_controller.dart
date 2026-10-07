@@ -1,6 +1,7 @@
 import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/local_chat_projection_repository.dart';
 import '../model/user.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
@@ -371,6 +372,17 @@ class ChatController {
       );
     }
   }
+
+  // ============================================================
+  // REMOTE CONVERSATION
+  // ============================================================
+
+  bool isRemoteConversation(
+      Conversation conversation,
+      ) =>
+      LocalChatProjectionRepository.isRemoteLocalConversationId(
+        conversation.id,
+      );
 
   // ============================================================
   // MESSAGE OWNERSHIP

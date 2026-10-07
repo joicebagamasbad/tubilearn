@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -238,12 +239,15 @@ class _ConversationScreenState
                 conversation,
               ),
 
-              _buildContextBar(
-                conversation
-                    .skillWanted,
-                conversation
-                    .skillOffered,
-              ),
+              if (!_controller.isRemoteConversation(
+                conversation,
+              ))
+                _buildContextBar(
+                  conversation
+                      .skillWanted,
+                  conversation
+                      .skillOffered,
+                ),
 
               Expanded(
                 child:
@@ -776,11 +780,17 @@ class _ConversationScreenState
   Widget _buildMessageList(
       Conversation conversation,
       ) {
-    return ListView.builder(
+    return RefreshIndicator(
+      onRefresh:
+      _refreshFromRemote,
+      child: ListView.builder(
       controller:
       _scrollController,
       physics:
-      const BouncingScrollPhysics(),
+      const AlwaysScrollableScrollPhysics(
+        parent:
+        BouncingScrollPhysics(),
+      ),
       padding:
       const EdgeInsets.fromLTRB(
         16,
@@ -952,6 +962,7 @@ class _ConversationScreenState
           ],
         );
       },
+      ),
     );
   }
 
@@ -1592,6 +1603,83 @@ class _ConversationScreenState
   }
 
   // ============================================================
+  // REFRESH FROM REMOTE
+  // ============================================================
+
+  Future<void> _refreshFromRemote() async {
+    if (_isSending) {
+      return;
+    }
+
+    try {
+      await _controller.refreshFromRemote();
+
+      if (!mounted) {
+        return;
+      }
+
+      final ConversationSnapshot snapshot =
+      _controller.currentConversation(
+        widget.conversationId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final int previousMessageCount =
+          _conversation
+              ?.messages
+              .length ??
+              0;
+
+      final bool wasNearBottom =
+          _isNearBottom();
+
+      setState(() {
+        _conversation =
+            snapshot.conversation;
+
+        _participant =
+            snapshot.participant;
+      });
+
+      if (snapshot.conversation.messages.length >
+          previousMessageCount &&
+          wasNearBottom) {
+        WidgetsBinding.instance
+            .addPostFrameCallback(
+              (_) {
+          if (!mounted) {
+            return;
+          }
+
+          _scrollToBottom(
+            animate: true,
+          );
+        },
+        );
+      }
+    } on ChatControllerException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        error.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        'Conversation could not be refreshed. Please try again.',
+      );
+    }
+  }
+
+  // ============================================================
   // SCROLL
   // ============================================================
 
@@ -1625,6 +1713,22 @@ class _ConversationScreenState
     _scrollController.jumpTo(
       target,
     );
+  }
+
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) {
+      return true;
+    }
+
+    final ScrollPosition position =
+        _scrollController.position;
+
+    const double nearBottomThreshold =
+        80;
+
+    return (position.maxScrollExtent -
+        position.pixels) <=
+        nearBottomThreshold;
   }
 
   // ============================================================
