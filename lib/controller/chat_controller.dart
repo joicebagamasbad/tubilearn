@@ -135,6 +135,27 @@ class ChatController {
   }
 
   // ============================================================
+  // REFRESH FROM REMOTE
+  // ============================================================
+
+  Future<ChatListSnapshot>
+  refreshFromRemote() async {
+    try {
+      await _chatService.refreshFromRemote();
+
+      return _buildChatListSnapshot();
+    } on ChatServiceException catch (error) {
+      throw ChatControllerException(
+        error.message,
+      );
+    } catch (_) {
+      throw const ChatControllerException(
+        'Conversations could not be refreshed from the cloud.',
+      );
+    }
+  }
+
+  // ============================================================
   // CURRENT CHAT LIST
   // ============================================================
 

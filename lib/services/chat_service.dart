@@ -2,6 +2,9 @@ import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/repositories/chat_repository.dart';
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/firestore_chat_repository.dart';
+import '../model/repositories/firestore_profile_repository.dart';
+import '../model/repositories/local_chat_projection_repository.dart';
 import '../model/repositories/local_user_repository.dart';
 import '../model/user.dart';
 import 'current_user_service.dart';
@@ -48,6 +51,15 @@ class ChatService {
   final CurrentUserService _currentUserService =
       CurrentUserService.instance;
 
+  final FirestoreChatRepository _firestoreChatRepository =
+      FirestoreChatRepository.instance;
+
+  final LocalChatProjectionRepository _localChatProjectionRepository =
+      LocalChatProjectionRepository.instance;
+
+  final FirestoreProfileRepository _firestoreProfileRepository =
+      FirestoreProfileRepository.instance;
+
   final List<Conversation> _conversations =
   <Conversation>[];
 
@@ -59,6 +71,8 @@ class ChatService {
   static const int _maxMessageLength = 2000;
 
   Future<void>? _initializingFuture;
+
+  Future<void>? _refreshingFuture;
 
   final Map<String, Future<Conversation>>
   _pendingConversationCreations =
@@ -102,6 +116,12 @@ class ChatService {
     } catch (_) {
       // Pending operation errors are already reported to their callers.
     }
+    try {
+      await _refreshingFuture;
+    } catch (_) {
+      // A failed remote refresh still needs its partial state cleared.
+    }
+    _refreshingFuture = null;
     _conversations.clear();
     _pendingConversationCreations.clear();
     _pendingConversationHides.clear();
@@ -718,6 +738,129 @@ class ChatService {
   }
 
   // ============================================================
+  // REFRESH FROM REMOTE
+  // ============================================================
+
+  Future<void> refreshFromRemote() {
+    final Future<void>? pending = _refreshingFuture;
+
+    if (pending != null) {
+      return pending;
+    }
+
+    final Future<void> refresh = _currentUserService.runForSession<void>(
+      () => _syncFromRemote(drainPending: true),
+    );
+
+    _refreshingFuture = refresh;
+
+    return refresh.whenComplete(() {
+      if (identical(_refreshingFuture, refresh)) {
+        _refreshingFuture = null;
+      }
+    });
+  }
+
+  Future<void> _syncFromRemote({required bool drainPending}) async {
+    _currentUserService.requireActiveOperation();
+    final String uid = _requireCurrentUserId();
+
+    await initialize();
+    _currentUserService.requireActiveOperation();
+
+    final FirestoreChatSnapshot snapshot;
+
+    try {
+      snapshot = await _firestoreChatRepository.getConversationsForUser(uid);
+    } on FirestoreChatRepositoryException catch (error) {
+      throw ChatServiceException(error.message);
+    }
+    _currentUserService.requireActiveOperation();
+
+    if (snapshot.source != FirestoreChatSource.server) {
+      throw const ChatServiceException(
+        'Your conversations could not be refreshed from the cloud right '
+        'now. Please try again.',
+      );
+    }
+
+    final Set<String> otherUids = <String>{};
+
+    for (final FirestoreChatConversationRecord record
+        in snapshot.conversations) {
+      if (!record.participantUids.contains(uid)) {
+        continue;
+      }
+
+      for (final String participantUid in record.participantUids) {
+        if (participantUid != uid) {
+          otherUids.add(participantUid);
+        }
+      }
+    }
+
+    final Set<String> existingLocalUserIds = await _localUserRepository
+        .findExistingUserIds(otherUids);
+    _currentUserService.requireActiveOperation();
+
+    final Map<String, FirestoreProfileData> participantProfiles =
+        <String, FirestoreProfileData>{};
+
+    for (final String otherUid in otherUids) {
+      if (existingLocalUserIds.contains(otherUid)) {
+        continue;
+      }
+
+      final FirestoreProfileLookup lookup;
+
+      try {
+        lookup = await _firestoreProfileRepository.lookup(otherUid);
+      } on FirestoreProfileRepositoryException {
+        // A profile that cannot be fetched (including a permission-denied
+        // read of an incomplete profile) is skipped, not fatal: the whole
+        // sync must not fail just because one participant's profile is
+        // unavailable.
+        _currentUserService.requireActiveOperation();
+        continue;
+      }
+      _currentUserService.requireActiveOperation();
+
+      final FirestoreProfileData? profile = lookup.profile;
+
+      if (profile != null && profile.profileCompleted) {
+        participantProfiles[otherUid] = profile;
+      }
+    }
+
+    try {
+      await _localChatProjectionRepository.project(
+        viewerUid: uid,
+        snapshot: snapshot,
+        participantProfiles: participantProfiles,
+      );
+    } on LocalChatProjectionException catch (error) {
+      throw ChatServiceException(error.message);
+    }
+    _currentUserService.requireActiveOperation();
+
+    if (drainPending) {
+      try {
+        await Future.wait<dynamic>(<Future<dynamic>>[
+          ..._pendingConversationCreations.values,
+          ..._pendingConversationHides.values,
+          ..._pendingMessageSends.values,
+          ..._pendingConversationMetadataWrites.values,
+        ]);
+      } catch (_) {
+        // Pending operation errors are already reported to their callers.
+      }
+      _currentUserService.requireActiveOperation();
+    }
+
+    await _initializeInternal();
+  }
+
+  // ============================================================
   // GET OR CREATE
   // ============================================================
 
@@ -742,6 +885,10 @@ class ChatService {
       skillWanted: skillWanted,
       skillOffered: skillOffered,
     );
+
+    if (!_currentUserService.usesLocalPrototypeSession) {
+      return _getOrCreateRemoteConversation(input);
+    }
 
     final Conversation? existingConversation =
     findConversationByUserId(
@@ -789,6 +936,76 @@ class ChatService {
   }
 
   // ============================================================
+  // GET OR CREATE — REMOTE (SHARED FIRESTORE THREAD)
+  //
+  // Called only once !usesLocalPrototypeSession, i.e. always today.
+  // Never calls _refreshConversationProfile or _createConversationInternal:
+  // those belong to the legacy/prototype owner-scoped-copy model, not the
+  // one-shared-thread-per-pair model.
+  // ============================================================
+
+  Future<Conversation> _getOrCreateRemoteConversation(
+    _ValidatedParticipantInput input,
+  ) async {
+    final String currentUid = _requireCurrentUserId();
+
+    final String canonical = FirestoreChatRepository.canonicalConversationId(
+      currentUid,
+      input.userId,
+    );
+
+    final String localId = LocalChatProjectionRepository.localConversationId(
+      currentUid,
+      canonical,
+    );
+
+    final Conversation? visible = findConversation(localId);
+
+    if (visible != null) {
+      return visible;
+    }
+
+    final List<Conversation> hidden = await _repository
+        .getHiddenConversationsForParticipant(
+      userId: currentUid,
+      participantUserId: input.userId,
+    );
+    _currentUserService.requireActiveOperation();
+
+    for (final Conversation hiddenConversation in hidden) {
+      if (hiddenConversation.id == localId) {
+        throw HiddenConversationException(
+          conversationId: hiddenConversation.id,
+          participantUserId: input.userId,
+        );
+      }
+    }
+
+    try {
+      await _firestoreChatRepository.createConversationIfMissing(
+        currentUid,
+        input.userId,
+      );
+    } on FirestoreChatRepositoryException catch (error) {
+      throw ChatServiceException(error.message);
+    }
+    _currentUserService.requireActiveOperation();
+
+    await _syncFromRemote(drainPending: false);
+
+    final Conversation? created = findConversation(localId);
+
+    if (created == null) {
+      throw const ChatServiceException(
+        'This conversation could not be opened right now. Please try '
+        'again.',
+      );
+    }
+
+    return created;
+  }
+
+  // ============================================================
   // START NEW CONVERSATION
   //
   // Used only after the user explicitly chooses "Start new chat"
@@ -806,6 +1023,13 @@ class ChatService {
     return _currentUserService.runForSession<Conversation>(() async {
     await initialize();
       _currentUserService.requireActiveOperation();
+
+      if (!_currentUserService.usesLocalPrototypeSession) {
+        throw const ChatServiceException(
+          'Starting a separate conversation with the same person is no '
+          'longer supported. Restore your previous chat instead.',
+        );
+      }
 
     final _ValidatedParticipantInput input =
     _validateParticipantInput(
@@ -1644,6 +1868,36 @@ class ChatService {
       throw const ChatServiceException(
         'Chat participant is no longer available.',
       );
+    }
+
+    if (LocalChatProjectionRepository.isRemoteLocalConversationId(
+      conversation.id,
+    )) {
+      final String canonical = FirestoreChatRepository.canonicalConversationId(
+        currentUserId,
+        participantUserId,
+      );
+
+      try {
+        await _firestoreChatRepository.sendMessage(
+          conversationId: canonical,
+          senderUid: currentUserId,
+          text: text,
+        );
+      } on FirestoreChatRepositoryException catch (error) {
+        throw ChatServiceException(error.message);
+      }
+      _currentUserService.requireActiveOperation();
+
+      try {
+        await _syncFromRemote(drainPending: false);
+      } on ChatServiceException {
+        // Best-effort: the message is already in Firestore; do NOT throw
+        // here, throwing would leave the typed text in the box and
+        // invite a duplicate send; it will show on the next refresh.
+      }
+
+      return;
     }
 
     final Message message =
