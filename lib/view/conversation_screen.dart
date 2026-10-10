@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../controller/chat_controller.dart';
+import '../controller/conversation_live_controller.dart';
 import '../model/conversation.dart';
 import '../model/message.dart';
 import '../model/user.dart';
@@ -33,6 +34,8 @@ class _ConversationScreenState
 
   final ChatController _controller =
   ChatController();
+
+  late final ConversationLiveController _liveController;
 
   final TextEditingController
   _messageController =
@@ -107,11 +110,15 @@ class _ConversationScreenState
   void initState() {
     super.initState();
 
+    _liveController = ConversationLiveController();
+
     _initializeConversation();
   }
 
   @override
   void dispose() {
+    _liveController.dispose();
+
     _messageController.dispose();
     _scrollController.dispose();
 
@@ -150,6 +157,18 @@ class _ConversationScreenState
         _isLoading = false;
         _loadError = null;
       });
+
+      if (mounted &&
+          _controller.isRemoteConversation(
+            snapshot.conversation,
+          )) {
+        _liveController.start(
+          conversationId:
+          widget.conversationId,
+          onUpdated:
+          _onLiveUpdate,
+        );
+      }
 
       WidgetsBinding.instance
           .addPostFrameCallback(
@@ -1599,6 +1618,72 @@ class _ConversationScreenState
           _isArchiving = false;
         });
       }
+    }
+  }
+
+  // ============================================================
+  // LIVE UPDATE
+  //
+  // Called from ConversationLiveController.start's onUpdated callback
+  // whenever the service has already projected new remote messages for
+  // this conversation. Reuses the same reload shape as
+  // _refreshFromRemote below, but skips the controller.refreshFromRemote()
+  // call: the live stream already synced and reloaded in-memory state
+  // by the time this fires.
+  // ============================================================
+
+  void _onLiveUpdate() {
+    if (!mounted) {
+      return;
+    }
+
+    final ConversationSnapshot snapshot;
+
+    try {
+      snapshot =
+          _controller.currentConversation(
+            widget.conversationId,
+          );
+    } catch (_) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final int previousMessageCount =
+        _conversation
+            ?.messages
+            .length ??
+            0;
+
+    final bool wasNearBottom =
+        _isNearBottom();
+
+    setState(() {
+      _conversation =
+          snapshot.conversation;
+
+      _participant =
+          snapshot.participant;
+    });
+
+    if (snapshot.conversation.messages.length >
+        previousMessageCount &&
+        wasNearBottom) {
+      WidgetsBinding.instance
+          .addPostFrameCallback(
+            (_) {
+          if (!mounted) {
+            return;
+          }
+
+          _scrollToBottom(
+            animate: true,
+          );
+        },
+      );
     }
   }
 

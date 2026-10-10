@@ -861,6 +861,115 @@ class ChatService {
   }
 
   // ============================================================
+  // WATCH CONVERSATION
+  //
+  // Per-screen realtime updates for ONE already-open remote
+  // conversation. The returned Stream is consumed from a plain
+  // StreamSubscription.listen() callback, which never runs inside a
+  // runForSession Zone — requireActiveOperation() would silently no-op
+  // there (it only checks Zone.current, which is unset outside
+  // runForSession), so this captures its own ActiveUserSession up
+  // front and rechecks it explicitly via requireSameSession before and
+  // after every await, instead of relying on the Zone-based guard.
+  // ============================================================
+
+  Stream<int> watchConversation(String conversationId) async* {
+    final ActiveUserSession session =
+        _currentUserService.captureSession();
+    final String uid = session.uid;
+
+    await initialize();
+    _currentUserService.requireSameSession(session);
+
+    final Conversation? conversation = findConversation(conversationId);
+
+    final String? participantUserId = conversation == null
+        ? null
+        : _cleanOptionalText(conversation.participantUserId);
+
+    if (conversation == null ||
+        !LocalChatProjectionRepository.isRemoteLocalConversationId(
+          conversationId,
+        ) ||
+        participantUserId == null) {
+      return;
+    }
+
+    final String canonical = FirestoreChatRepository.canonicalConversationId(
+      uid,
+      participantUserId,
+    );
+
+    await for (final List<FirestoreChatMessageRecord> messages
+        in _firestoreChatRepository.watchConversationMessages(
+      viewerUid: uid,
+      participantUid: participantUserId,
+    )) {
+      _currentUserService.requireSameSession(session);
+
+      if (messages.isEmpty) {
+        continue;
+      }
+
+      final LocalChatProjectionResult result;
+
+      try {
+        final FirestoreChatSnapshot snapshot = FirestoreChatSnapshot(
+          source: FirestoreChatSource.server,
+          conversations: <FirestoreChatConversationRecord>[
+            FirestoreChatConversationRecord(
+              id: canonical,
+              participantUids: FirestoreChatRepository.sortedParticipantPair(
+                uid,
+                participantUserId,
+              ),
+              // Placeholder only: LocalChatProjectionRepository.project()
+              // never reads createdAt (confirmed: no reference to it
+              // anywhere in that file), so this value is never used.
+              createdAt: messages.first.sentAt,
+              messages: messages,
+            ),
+          ],
+        );
+
+        result = await _localChatProjectionRepository.project(
+          viewerUid: uid,
+          snapshot: snapshot,
+          participantProfiles: const <String, FirestoreProfileData>{},
+        );
+      } on LocalChatProjectionException catch (error) {
+        throw ChatServiceException(error.message);
+      } on FirestoreChatRepositoryException catch (error) {
+        throw ChatServiceException(error.message);
+      }
+      _currentUserService.requireSameSession(session);
+
+      if (result.projectedMessages <= 0) {
+        continue;
+      }
+
+      final Future<void>? pendingSend =
+          _pendingMessageSends[conversationId];
+
+      if (pendingSend != null) {
+        try {
+          await pendingSend;
+        } catch (_) {
+          // Already reported to sendMessage's own caller; the listener
+          // is not itself registered in any pending map, so awaiting
+          // this cannot deadlock.
+        }
+      }
+      _currentUserService.requireSameSession(session);
+
+      await _initializeInternal();
+      _currentUserService.requireSameSession(session);
+
+      yield result.projectedMessages;
+    }
+  }
+
+  // ============================================================
   // GET OR CREATE
   // ============================================================
 

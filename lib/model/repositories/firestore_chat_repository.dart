@@ -283,6 +283,75 @@ class FirestoreChatRepository {
   }
 
   // ============================================================
+  // WATCH CONVERSATION MESSAGES
+  // ============================================================
+
+  /// Streams the newest 100 messages for one conversation, server-
+  /// confirmed snapshots only. `includeMetadataChanges` is true on
+  /// purpose: without it, Firestore suppresses metadata-only updates,
+  /// so the follow-up event that flips a snapshot from cache/pending to
+  /// server-confirmed would never arrive — we need that cache -> server
+  /// flip to be its own event, not silently dropped.
+  Stream<List<FirestoreChatMessageRecord>> watchConversationMessages({
+    required String viewerUid,
+    required String participantUid,
+  }) async* {
+    final String canonicalId = canonicalConversationId(
+      viewerUid,
+      participantUid,
+    );
+
+    final Stream<QuerySnapshot<Map<String, dynamic>>> snapshots = _firestore
+        .collection(_conversationsCollectionPath)
+        .doc(canonicalId)
+        .collection(_messagesSubcollectionPath)
+        .orderBy('sentAt')
+        .limitToLast(100)
+        .snapshots(includeMetadataChanges: true);
+
+    try {
+      await for (final QuerySnapshot<Map<String, dynamic>> snapshot
+          in snapshots) {
+        if (snapshot.metadata.isFromCache ||
+            snapshot.metadata.hasPendingWrites) {
+          // Not server-confirmed yet (this also covers our own
+          // optimistic writes, whose pending serverTimestamp() reads
+          // back as null) — skip; the confirmed follow-up event will
+          // arrive once the server round-trip completes.
+          continue;
+        }
+
+        final List<FirestoreChatMessageRecord> messages;
+
+        try {
+          messages = snapshot.docs
+              .map(
+                (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+                    _parseMessageRecord(doc, canonicalId),
+              )
+              .toList(growable: false);
+        } on FirestoreChatRepositoryException {
+          // A single malformed document must not kill the stream: the
+          // same persistently-malformed data is also exactly what would
+          // make a manual refresh (getConversationsForUser) throw, so
+          // skipping here and waiting for the next event is no worse.
+          continue;
+        }
+
+        yield messages;
+      }
+    } on FirebaseException {
+      throw const FirestoreChatRepositoryException(
+        'Live updates are unavailable right now.',
+      );
+    } catch (_) {
+      throw const FirestoreChatRepositoryException(
+        'Live updates are unavailable right now.',
+      );
+    }
+  }
+
+  // ============================================================
   // CANONICAL CONVERSATION ID
   // ============================================================
 
