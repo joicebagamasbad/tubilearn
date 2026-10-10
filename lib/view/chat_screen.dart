@@ -591,6 +591,11 @@ class _ChatScreenState
         isOpening ||
             isArchiving;
 
+    final int unread =
+        _controller.unreadCountFor(
+          conversation,
+        );
+
     return InkWell(
       borderRadius:
       BorderRadius.circular(
@@ -695,6 +700,75 @@ class _ChatScreenState
                       const SizedBox(
                         width: 8,
                       ),
+
+                      if (!isBusy &&
+                          unread > 0)
+                        ...[
+                          Container(
+                            padding:
+                            const EdgeInsets.symmetric(
+                              horizontal:
+                              6,
+                              vertical:
+                              2,
+                            ),
+                            constraints:
+                            const BoxConstraints(
+                              minWidth:
+                              18,
+                              minHeight:
+                              18,
+                            ),
+                            decoration:
+                            BoxDecoration(
+                              color:
+                              _isDarkMode
+                                  ? primary.withValues(
+                                alpha:
+                                0.16,
+                              )
+                                  : const Color(
+                                0xFFE4F0EF,
+                              ),
+                              borderRadius:
+                              BorderRadius.circular(
+                                20,
+                              ),
+                              border:
+                              Border.all(
+                                color:
+                                _surfaceColor,
+                                width:
+                                1.5,
+                              ),
+                            ),
+                            alignment:
+                            Alignment.center,
+                            child: Text(
+                              unread > 9
+                                  ? '9+'
+                                  : '$unread',
+                              textAlign:
+                              TextAlign.center,
+                              style:
+                              AppTextStyles.caption
+                                  .copyWith(
+                                color:
+                                primary,
+                                fontWeight:
+                                FontWeight.w800,
+                                fontSize:
+                                10,
+                                height:
+                                1,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(
+                            width: 6,
+                          ),
+                        ],
 
                       if (isBusy)
                         const SizedBox(
@@ -819,49 +893,54 @@ class _ChatScreenState
                         width: 8,
                       ),
 
-                      Container(
-                        padding:
-                        const EdgeInsets.symmetric(
-                          horizontal:
-                          8,
-                          vertical:
-                          4,
-                        ),
-                        decoration:
-                        BoxDecoration(
-                          color:
-                          _statusBackground(
-                            conversation
-                                .status,
-                          ),
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            12,
-                          ),
-                        ),
-                        child: Text(
-                          conversation
-                              .status,
-                          style:
-                          TextStyle(
-                            fontSize:
-                            7.5,
-                            fontWeight:
-                            FontWeight
-                                .w700,
-                            color:
-                            _statusColor(
+                      if (!_controller.isRemoteConversation(
+                        conversation,
+                      ))
+                        ...[
+                          Container(
+                            padding:
+                            const EdgeInsets.symmetric(
+                              horizontal:
+                              8,
+                              vertical:
+                              4,
+                            ),
+                            decoration:
+                            BoxDecoration(
+                              color:
+                              _statusBackground(
+                                conversation
+                                    .status,
+                              ),
+                              borderRadius:
+                              BorderRadius
+                                  .circular(
+                                12,
+                              ),
+                            ),
+                            child: Text(
                               conversation
                                   .status,
+                              style:
+                              TextStyle(
+                                fontSize:
+                                7.5,
+                                fontWeight:
+                                FontWeight
+                                    .w700,
+                                color:
+                                _statusColor(
+                                  conversation
+                                      .status,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
 
-                      const SizedBox(
-                        width: 2,
-                      ),
+                          const SizedBox(
+                            width: 2,
+                          ),
+                        ],
 
                       IconButton(
                         tooltip:

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../controller/chat_controller.dart';
 import '../controller/dashboard_controller.dart';
 import '../model/skill.dart';
 import '../model/skill_match.dart';
@@ -25,6 +26,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   final DashboardController _controller =
   DashboardController();
 
+  final ChatController _chatController =
+  ChatController();
+
   final ScrollController _scrollController =
   ScrollController();
 
@@ -37,6 +41,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   String? _loadError;
 
   int _selectedNav = 0;
+
+  int _chatUnreadCount = 0;
+
+  DateTime? _lastChatSyncAt;
+
+  bool _isSyncingChat = false;
 
   // ============================================================
   // THEME
@@ -154,6 +164,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (state ==
         AppLifecycleState.resumed) {
       _refreshDashboardData();
+      _recomputeChatUnread();
+      unawaited(_quietChatSync());
     }
   }
 
@@ -184,6 +196,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       });
 
       _scheduleSessionBoundaryRefresh();
+
+      _recomputeChatUnread();
+      unawaited(_quietChatSync());
     } on DashboardControllerException catch (error) {
       if (!mounted) {
         return;
@@ -323,6 +338,70 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     await _refreshDashboardData();
+
+    _recomputeChatUnread();
+  }
+
+  // ============================================================
+  // CHAT UNREAD
+  // ============================================================
+
+  void _recomputeChatUnread() {
+    if (!mounted) {
+      return;
+    }
+
+    int count;
+
+    try {
+      count = _chatController.totalUnreadCount;
+    } catch (_) {
+      return;
+    }
+
+    if (count == _chatUnreadCount) {
+      return;
+    }
+
+    setState(() {
+      _chatUnreadCount = count;
+    });
+  }
+
+  Future<void> _quietChatSync() async {
+    if (!mounted ||
+        _isSyncingChat) {
+      return;
+    }
+
+    final DateTime? lastSyncAt =
+        _lastChatSyncAt;
+
+    if (lastSyncAt != null &&
+        DateTime.now().difference(
+          lastSyncAt,
+        ) <
+            const Duration(
+              seconds: 60,
+            )) {
+      return;
+    }
+
+    _isSyncingChat = true;
+    _lastChatSyncAt = DateTime.now();
+
+    try {
+      await _chatController.refreshFromRemote();
+    } catch (_) {
+      // Silent: offline is normal, and the Dashboard must never show an
+      // error just because a background chat sync could not run.
+    } finally {
+      _isSyncingChat = false;
+    }
+
+    if (mounted) {
+      _recomputeChatUnread();
+    }
   }
 
   // ============================================================
@@ -2392,7 +2471,112 @@ class _DashboardScreenState extends State<DashboardScreen>
                   mainAxisAlignment:
                   MainAxisAlignment.center,
                   children: [
-                    AnimatedContainer(
+                    index == 3
+                        ? Stack(
+                      clipBehavior:
+                      Clip.none,
+                      children: [
+                        AnimatedContainer(
+                          duration:
+                          const Duration(
+                            milliseconds:
+                            180,
+                          ),
+                          width: 36,
+                          height: 29,
+                          decoration:
+                          BoxDecoration(
+                            color:
+                            selected
+                                ? _softPrimaryColor
+                                : Colors
+                                .transparent,
+                            borderRadius:
+                            BorderRadius.circular(
+                              12,
+                            ),
+                          ),
+                          child: Icon(
+                            selected
+                                ? items[index]
+                            ['selected']
+                            as IconData
+                                : items[index]
+                            ['icon']
+                            as IconData,
+                            size: 20,
+                            color:
+                            selected
+                                ? _primaryColor
+                                : _mutedColor,
+                          ),
+                        ),
+
+                        if (_chatUnreadCount >
+                            0)
+                          Positioned(
+                            top: -4,
+                            right: -6,
+                            child: IgnorePointer(
+                              child: Container(
+                                padding:
+                                const EdgeInsets.symmetric(
+                                  horizontal:
+                                  6,
+                                  vertical:
+                                  2,
+                                ),
+                                constraints:
+                                const BoxConstraints(
+                                  minWidth:
+                                  18,
+                                  minHeight:
+                                  18,
+                                ),
+                                decoration:
+                                BoxDecoration(
+                                  color:
+                                  _softPrimaryColor,
+                                  borderRadius:
+                                  BorderRadius.circular(
+                                    20,
+                                  ),
+                                  border:
+                                  Border.all(
+                                    color:
+                                    _surfaceColor,
+                                    width:
+                                    1.5,
+                                  ),
+                                ),
+                                alignment:
+                                Alignment.center,
+                                child: Text(
+                                  _chatUnreadCount >
+                                      9
+                                      ? '9+'
+                                      : '$_chatUnreadCount',
+                                  textAlign:
+                                  TextAlign.center,
+                                  style:
+                                  AppTextStyles.caption
+                                      .copyWith(
+                                    color:
+                                    _primaryColor,
+                                    fontWeight:
+                                    FontWeight.w800,
+                                    fontSize:
+                                    10,
+                                    height:
+                                    1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
+                        : AnimatedContainer(
                       duration:
                       const Duration(
                         milliseconds:

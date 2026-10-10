@@ -158,6 +158,12 @@ class _ConversationScreenState
         _loadError = null;
       });
 
+      if (mounted) {
+        unawaited(
+          _markRead(),
+        );
+      }
+
       if (mounted &&
           _controller.isRemoteConversation(
             snapshot.conversation,
@@ -1685,6 +1691,26 @@ class _ConversationScreenState
         },
       );
     }
+
+    unawaited(
+      _markRead(),
+    );
+  }
+
+  // ============================================================
+  // MARK READ
+  // ============================================================
+
+  Future<void> _markRead() async {
+    try {
+      await _controller.markConversationRead(
+        widget.conversationId,
+      );
+    } catch (_) {
+      // Best effort: a failed mark-as-read must not surface as an
+      // error — it will simply be retried the next time this screen
+      // loads or receives a live update.
+    }
   }
 
   // ============================================================
@@ -1745,6 +1771,10 @@ class _ConversationScreenState
         },
         );
       }
+
+      unawaited(
+        _markRead(),
+      );
     } on ChatControllerException catch (error) {
       if (!mounted) {
         return;
