@@ -18,6 +18,12 @@ class Conversation {
 
   final List<Message> messages;
 
+  // Newest message sentAt (server time) the owner has seen, per
+  // conversation. Null means nothing has ever been marked read. Mutable
+  // on purpose, like messages, so ChatService can update the in-memory
+  // object in place after a local mark-as-read write.
+  DateTime? lastReadAt;
+
   Conversation({
     required this.id,
     required this.participantUserId,
@@ -28,6 +34,7 @@ class Conversation {
     required this.skillOffered,
     required this.status,
     required this.messages,
+    this.lastReadAt,
   });
 
   bool get hasStableParticipant =>

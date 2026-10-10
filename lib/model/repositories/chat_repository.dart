@@ -519,6 +519,11 @@ class ChatRepository {
             List<Message>.unmodifiable(
               messages,
             ),
+            lastReadAt:
+            _readOptionalDateTimeFromMilliseconds(
+              row,
+              'last_read_at',
+            ),
           ),
         );
       }
@@ -676,6 +681,79 @@ class ChatRepository {
     } catch (_) {
       throw const ChatRepositoryException(
         'Could not save the conversation.',
+      );
+    }
+  }
+
+  // ============================================================
+  // MARK CONVERSATION READ
+  //
+  // Monotonic: last_read_at can only move forward, never backwards, so
+  // an out-of-order write (e.g. a slow background sync landing after a
+  // newer one already marked the conversation read) can never regress
+  // it. Zero affected rows (conversation not found for this owner, or
+  // already read at least this recently) is not an error.
+  // ============================================================
+
+  Future<void> markConversationRead({
+    required String conversationId,
+    required DateTime lastReadAt,
+  }) async {
+    final String ownerUserId = CurrentUserService.instance.requireUserId();
+    final String cleanConversationId =
+    _requireInputText(
+      conversationId,
+      'Conversation ID',
+    );
+
+    final int millis =
+        lastReadAt.millisecondsSinceEpoch;
+
+    if (millis <= 0) {
+      throw const ChatRepositoryException(
+        'Last-read timestamp is invalid.',
+      );
+    }
+
+    try {
+      final Database db =
+      await _appDatabase.database;
+
+      await db.transaction(
+            (
+            Transaction txn,
+            ) async {
+          CurrentUserService.instance.requireActiveOperation();
+
+          await txn.update(
+            'conversations',
+            <String, Object?>{
+              'last_read_at': millis,
+            },
+            where: '''
+              id = ?
+              AND owner_user_id = ?
+              AND (last_read_at IS NULL OR last_read_at < ?)
+            ''',
+            whereArgs: <Object?>[
+              cleanConversationId,
+              ownerUserId,
+              millis,
+            ],
+          );
+        },
+      );
+
+      CurrentUserService.instance.requireActiveOperation();
+    } on ChatRepositoryException {
+      rethrow;
+    } on DatabaseException catch (_) {
+      throw const ChatRepositoryException(
+        'Could not mark the conversation as read.',
+      );
+    } catch (_) {
+      throw const ChatRepositoryException(
+        'Could not mark the conversation as read.',
       );
     }
   }
@@ -1143,6 +1221,60 @@ class ChatRepository {
     }
 
     return value;
+  }
+
+  // ============================================================
+  // OPTIONAL TIMESTAMP
+  //
+  // Unlike message sentAt, 0 is a legitimate stored value here (the v15
+  // backfill sets last_read_at to 0 for a conversation with no
+  // messages), so only negative/malformed values are rejected.
+  // ============================================================
+
+  DateTime? _readOptionalDateTimeFromMilliseconds(
+      Map<String, Object?> row,
+      String key,
+      ) {
+    if (!row.containsKey(
+      key,
+    )) {
+      throw ChatRepositoryException(
+        '$key is missing.',
+      );
+    }
+
+    final Object? value =
+    row[key];
+
+    if (value == null) {
+      return null;
+    }
+
+    if (value is! int) {
+      throw ChatRepositoryException(
+        '$key is invalid.',
+      );
+    }
+
+    if (value < 0) {
+      throw ChatRepositoryException(
+        '$key is invalid.',
+      );
+    }
+
+    final DateTime parsed =
+    DateTime.fromMillisecondsSinceEpoch(
+      value,
+    );
+
+    if (parsed.millisecondsSinceEpoch !=
+        value) {
+      throw ChatRepositoryException(
+        '$key could not be parsed safely.',
+      );
+    }
+
+    return parsed;
   }
 
   // ============================================================

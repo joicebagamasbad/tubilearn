@@ -504,6 +504,8 @@ class ChatService {
         conversation.messages,
         growable: true,
       ),
+      lastReadAt:
+      conversation.lastReadAt,
     );
   }
 
@@ -1631,6 +1633,8 @@ class ChatService {
             current.messages,
             growable: true,
           ),
+          lastReadAt:
+          current.lastReadAt,
         );
 
         try {
@@ -1715,6 +1719,8 @@ class ChatService {
             current.messages,
             growable: true,
           ),
+          lastReadAt:
+          current.lastReadAt,
         );
 
         try {
@@ -2121,6 +2127,130 @@ class ChatService {
     }
 
     return result;
+  }
+
+  // ============================================================
+  // UNREAD
+  // ============================================================
+
+  int unreadCountFor(
+      Conversation conversation,
+      ) {
+    if (!LocalChatProjectionRepository.isRemoteLocalConversationId(
+      conversation.id,
+    )) {
+      return 0;
+    }
+
+    final String uid;
+
+    try {
+      uid = _currentUserService.requireUserId();
+    } on CurrentUserServiceException {
+      // A read-only count may degrade to 0 rather than throw: nothing
+      // mutates state here, and the badge is best-effort display only.
+      return 0;
+    }
+
+    final DateTime? lastReadAt =
+        conversation.lastReadAt;
+
+    int count = 0;
+
+    for (final Message message
+    in conversation.messages) {
+      final String? senderUserId =
+          message.senderUserId;
+
+      if (senderUserId == null ||
+          senderUserId == uid) {
+        continue;
+      }
+
+      if (lastReadAt == null ||
+          message.sentAt.isAfter(
+            lastReadAt,
+          )) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  int get totalUnreadCount {
+    int total = 0;
+
+    for (final Conversation conversation
+    in _conversations) {
+      total +=
+          unreadCountFor(
+            conversation,
+          );
+    }
+
+    return total;
+  }
+
+  Future<void> markConversationRead(
+      String conversationId,
+      ) async {
+    await _currentUserService.runForSession<void>(() async {
+    final Conversation? conversation =
+    findConversation(
+      conversationId,
+    );
+
+    if (conversation == null ||
+        !LocalChatProjectionRepository.isRemoteLocalConversationId(
+          conversation.id,
+        ) ||
+        conversation.messages.isEmpty) {
+      return;
+    }
+
+    // Messages are validated chronological (non-decreasing sentAt) at
+    // load time by _validateLoadedConversations, so the last element is
+    // always the newest.
+    final DateTime newest =
+        conversation.messages.last.sentAt;
+
+    final DateTime? previousLastReadAt =
+        conversation.lastReadAt;
+
+    if (previousLastReadAt != null &&
+        !newest.isAfter(
+          previousLastReadAt,
+        )) {
+      return;
+    }
+
+    try {
+      await _repository.markConversationRead(
+        conversationId:
+        conversationId,
+        lastReadAt:
+        newest,
+      );
+    } on ChatRepositoryException catch (error) {
+      throw ChatServiceException(
+        error.message,
+      );
+    }
+    _currentUserService.requireActiveOperation();
+
+    final Conversation? current =
+    findConversation(
+      conversationId,
+    );
+
+    if (current == null) {
+      return;
+    }
+
+    current.lastReadAt =
+        newest;
+  });
   }
 
   // ============================================================

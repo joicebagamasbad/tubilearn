@@ -385,6 +385,47 @@ class ChatController {
       );
 
   // ============================================================
+  // UNREAD
+  // ============================================================
+
+  int unreadCountFor(
+      Conversation conversation,
+      ) =>
+      _chatService.unreadCountFor(
+        conversation,
+      );
+
+  int get totalUnreadCount =>
+      _chatService.totalUnreadCount;
+
+  Future<void> markConversationRead(
+      String conversationId,
+      ) async {
+    final String cleanConversationId =
+    conversationId.trim();
+
+    if (cleanConversationId.isEmpty) {
+      throw const ChatControllerException(
+        'Conversation ID is required.',
+      );
+    }
+
+    try {
+      await _chatService.markConversationRead(
+        cleanConversationId,
+      );
+    } on ChatServiceException catch (error) {
+      throw ChatControllerException(
+        error.message,
+      );
+    } catch (_) {
+      throw const ChatControllerException(
+        'Conversation could not be marked as read. Please try again.',
+      );
+    }
+  }
+
+  // ============================================================
   // MESSAGE OWNERSHIP
   // ============================================================
 

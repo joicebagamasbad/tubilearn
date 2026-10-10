@@ -12,7 +12,7 @@ AppDatabase._();
 static const String _databaseName =
 'tubilearn.db';
 
-static const int _databaseVersion = 14;
+static const int _databaseVersion = 15;
 
 Database? _database;
 
@@ -167,6 +167,8 @@ db,
 await _createConversationOwnerColumnV13(db);
 
 await _createExploreRemoteUsersTableV14(db);
+
+await _createConversationLastReadColumnV15(db);
 },
 
 // ========================================================
@@ -250,6 +252,10 @@ await _createConversationOwnerColumnV13(db);
 
 if (oldVersion < 14) {
 await _createExploreRemoteUsersTableV14(db);
+}
+
+if (oldVersion < 15) {
+await _createConversationLastReadColumnV15(db);
 }
 },
 );
@@ -2433,6 +2439,41 @@ await db.execute(
       ON explore_remote_users(candidate_uid)
       ''',
 );
+}
+
+// ============================================================
+// VERSION 15 - CONVERSATION LAST READ
+// ============================================================
+
+Future<void> _createConversationLastReadColumnV15(Database db) async {
+  final List<Map<String, Object?>> columns =
+      await db.rawQuery('PRAGMA table_info(conversations)');
+  final bool alreadyHasLastReadAt = columns.any(
+    (Map<String, Object?> column) => column['name'] == 'last_read_at',
+  );
+  if (alreadyHasLastReadAt) {
+    return;
+  }
+  await db.execute('''
+    ALTER TABLE conversations
+    ADD COLUMN last_read_at INTEGER
+  ''');
+  // Backfill once, only for the rows that existed before this column did:
+  // everything already here counts as already read, so it must not show
+  // up as unread the instant this upgrade lands. A re-run can never reach
+  // this point again (the column now exists), so existing non-null values
+  // can never be overwritten by this backfill.
+  await db.execute('''
+    UPDATE conversations
+    SET last_read_at = COALESCE(
+      (
+        SELECT MAX(m.sent_at)
+        FROM messages AS m
+        WHERE m.conversation_id = conversations.id
+      ),
+      0
+    )
+  ''');
 }
 
 // ============================================================

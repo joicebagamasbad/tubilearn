@@ -393,6 +393,10 @@ class LocalChatProjectionRepository {
         'skill_wanted': 'Skill',
         'skill_offered': 'Skill',
         'status': 'New',
+        // A newly projected remote thread starts as nothing read.
+        // Projection never updates this column on an existing row — see
+        // the "never update an existing row" comment above.
+        'last_read_at': null,
       }, conflictAlgorithm: ConflictAlgorithm.abort);
       _requireSameSession(session);
       conversationNewlyInserted = true;
