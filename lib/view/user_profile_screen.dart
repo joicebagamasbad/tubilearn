@@ -62,6 +62,14 @@ class _UserProfileScreenState
       _snapshot?.user ??
           widget.user;
 
+  double get _displayRating =>
+      _snapshot?.displayRating ??
+          widget.user.rating;
+
+  int get _displayReviewCount =>
+      _snapshot?.displayReviewCount ??
+          widget.user.reviewCount;
+
   List<Skill> get _offeredSkills =>
       _snapshot?.offeredSkills ??
           const <Skill>[];
@@ -938,21 +946,21 @@ class _UserProfileScreenState
               Row(
                 children: [
                   Icon(
-                    user.reviewCount > 0
+                    _displayReviewCount > 0
                         ? Icons.star_rounded
                         : Icons.star_border_rounded,
                     size: 17,
                     color:
-                    user.reviewCount > 0
+                    _displayReviewCount > 0
                         ? AppTheme.accent
                         : _mutedColor,
                   ),
                   const SizedBox(
                     width: 4,
                   ),
-                  if (user.reviewCount > 0) ...[
+                  if (_displayReviewCount > 0) ...[
                     Text(
-                      user.rating.toStringAsFixed(
+                      _displayRating.toStringAsFixed(
                         1,
                       ),
                       style:
@@ -968,7 +976,7 @@ class _UserProfileScreenState
                       width: 5,
                     ),
                     Text(
-                      '(${user.reviewCount} reviews)',
+                      '($_displayReviewCount reviews)',
                       style:
                       AppTextStyles.caption
                           .copyWith(
@@ -1510,7 +1518,7 @@ class _UserProfileScreenState
                     width: 4,
                   ),
                   Text(
-                    user.rating.toStringAsFixed(
+                    _displayRating.toStringAsFixed(
                       1,
                     ),
                     style:
@@ -1727,7 +1735,7 @@ class _UserProfileScreenState
                   height: 3,
                 ),
                 Text(
-                  user.reviewCount > 0
+                  _displayReviewCount > 0
                       ? 'This profile has historical rating data, but no individual written reviews are stored on this device yet.'
                       : 'Reviews will appear after completed skill exchanges.',
                   style:

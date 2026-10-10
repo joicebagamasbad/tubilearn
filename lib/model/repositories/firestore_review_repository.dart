@@ -219,6 +219,50 @@ class FirestoreReviewRepository {
   }
 
   // ============================================================
+  // EXISTS
+  // ============================================================
+
+  /// true/false are definitive (server-confirmed); null means the
+  /// server could not be reached and the cache has no opinion either —
+  /// callers must treat that as "unknown", never as "false".
+  Future<bool?> reviewExists({
+    required String swapRequestId,
+    required String reviewerUid,
+  }) async {
+    final String documentId = reviewDocumentId(swapRequestId, reviewerUid);
+    final DocumentReference<Map<String, dynamic>> reference = _firestore
+        .collection(_collectionPath)
+        .doc(documentId);
+
+    try {
+      final DocumentSnapshot<Map<String, dynamic>> snapshot = await reference
+          .get(const GetOptions(source: Source.server));
+      return snapshot.exists;
+    } on FirebaseException catch (error) {
+      if (!_isAvailabilityFailure(error)) {
+        throw const FirestoreReviewRepositoryException(
+          'Your review status could not be checked. Please try again.',
+        );
+      }
+    } catch (_) {
+      throw const FirestoreReviewRepositoryException(
+        'Your review status could not be checked. Please try again.',
+      );
+    }
+
+    try {
+      final DocumentSnapshot<Map<String, dynamic>> cached = await reference
+          .get(const GetOptions(source: Source.cache));
+      if (cached.exists) {
+        return true;
+      }
+    } catch (_) {
+      // Cache uncertainty is represented as unknown (null), never false.
+    }
+    return null;
+  }
+
+  // ============================================================
   // DOCUMENT ID
   // ============================================================
 

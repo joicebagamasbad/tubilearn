@@ -1,10 +1,53 @@
 import '../model/repositories/explore_repository.dart';
+import '../model/repositories/firestore_review_repository.dart';
 import '../model/repositories/review_repository.dart';
 import '../model/review.dart';
 import '../model/swap_request.dart';
+import '../model/user.dart';
 
 import 'current_user_service.dart';
 import 'swap_service.dart';
+
+// ============================================================
+// RECEIVED REVIEW
+// ============================================================
+
+/// One review received by a user, paired with the denormalized
+/// reviewer-name snapshot stored on the Firestore document at
+/// submission time (not the current, possibly-changed, reviewer name).
+class ReceivedReview {
+  final Review review;
+  final String reviewerName;
+
+  const ReceivedReview({
+    required this.review,
+    required this.reviewerName,
+  });
+}
+
+// ============================================================
+// RECEIVED REVIEWS
+// ============================================================
+
+class ReceivedReviews {
+  final List<ReceivedReview> reviews;
+  final double averageRating;
+  final int count;
+  final bool available;
+
+  const ReceivedReviews({
+    required this.reviews,
+    required this.averageRating,
+    required this.count,
+    required this.available,
+  });
+
+  const ReceivedReviews.unavailable()
+      : reviews = const <ReceivedReview>[],
+        averageRating = 0,
+        count = 0,
+        available = false;
+}
 
 class ReviewServiceException implements Exception {
   final String message;
@@ -26,6 +69,9 @@ class ReviewService {
   final ReviewRepository _reviewRepository =
       ReviewRepository.instance;
 
+  final FirestoreReviewRepository _firestoreReviewRepository =
+      FirestoreReviewRepository.instance;
+
   final SwapService _swapService =
       SwapService.instance;
 
@@ -39,7 +85,9 @@ class ReviewService {
   _pendingSubmissions =
   <String, Future<Review>>{};
 
-  int _lastReviewIdMicros = 0;
+  final Map<String, bool>
+  _reviewedCache =
+  <String, bool>{};
 
   Future<void> resetSession() async {
     try {
@@ -48,7 +96,7 @@ class ReviewService {
       // Pending submission errors are reported to their callers.
     }
     _pendingSubmissions.clear();
-    _lastReviewIdMicros = 0;
+    _reviewedCache.clear();
   }
 
   // ============================================================
@@ -67,6 +115,14 @@ class ReviewService {
     final String currentUserId =
     _requireCurrentUserId();
 
+    final bool? cached =
+        _reviewedCache[requestId];
+
+    if (cached != null) {
+      return cached;
+    }
+
+    // Legacy pre-Firestore reviews may still only exist locally.
     try {
       final Review? review =
       await _reviewRepository
@@ -77,7 +133,10 @@ class ReviewService {
         currentUserId,
       );
 
-      return review != null;
+      if (review != null) {
+        _reviewedCache[requestId] = true;
+        return true;
+      }
     } on ReviewRepositoryException catch (error) {
       throw ReviewServiceException(
         error.message,
@@ -86,6 +145,34 @@ class ReviewService {
       throw const ReviewServiceException(
         'Could not check review status.',
       );
+    }
+
+    // This must never throw because of Firestore: a review-status
+    // check backing a swap card button is best-effort, not critical.
+    try {
+      final bool? exists =
+      await _firestoreReviewRepository.reviewExists(
+        swapRequestId:
+        requestId,
+        reviewerUid:
+        currentUserId,
+      );
+
+      if (exists == true) {
+        _reviewedCache[requestId] = true;
+        return true;
+      }
+
+      if (exists == false) {
+        _reviewedCache[requestId] = false;
+        return false;
+      }
+
+      // exists == null: unknown (offline/unreachable) — do not cache,
+      // so the next call tries again instead of being stuck on a guess.
+      return false;
+    } on FirestoreReviewRepositoryException {
+      return false;
     }
   }
 
@@ -278,20 +365,50 @@ class ReviewService {
 
     _currentUserService.requireActiveOperation();
 
-    final DateTime createdAt =
-    DateTime.now();
-
-    final String reviewId =
-    _createReviewId(
-      createdAt,
+    // The reviewer's own display name, denormalized onto the Firestore
+    // review document at submission time — same pattern as
+    // swapRequests.providerName.
+    final User? reviewer =
+    _exploreRepository.findUserById(
+      reviewerUserId,
     );
+
+    final String? reviewerName =
+        reviewer?.name.trim();
+
+    if (reviewerName == null ||
+        reviewerName.isEmpty) {
+      throw const ReviewServiceException(
+        'Your profile is not ready yet. Please try again.',
+      );
+    }
 
     try {
       _currentUserService.requireActiveOperation();
-      final Review review =
-      await _reviewRepository.createReview(
+
+      final String documentId =
+      await _firestoreReviewRepository.createReview(
+        swapRequestId:
+        requestId,
+        reviewerUid:
+        reviewerUserId,
+        revieweeUid:
+        revieweeUserId,
+        reviewerName:
+        reviewerName,
+        rating:
+        rating,
+        comment:
+        comment,
+      );
+
+      _currentUserService.requireActiveOperation();
+
+      _reviewedCache[requestId] = true;
+
+      return Review(
         id:
-        reviewId,
+        documentId,
         swapRequestId:
         requestId,
         reviewerUserId:
@@ -303,20 +420,9 @@ class ReviewService {
         comment:
         comment,
         createdAt:
-        createdAt,
+        DateTime.now(),
       );
-
-      _currentUserService.requireActiveOperation();
-
-      try {
-        await _exploreRepository.refresh();
-      } catch (_) {
-        // The review itself is already safely stored.
-        // The Explore cache can refresh again on the next load.
-      }
-
-      return review;
-    } on ReviewRepositoryException catch (error) {
+    } on FirestoreReviewRepositoryException catch (error) {
       throw ReviewServiceException(
         error.message,
       );
@@ -382,25 +488,107 @@ class ReviewService {
   }
 
   // ============================================================
-  // REVIEW ID
+  // REVIEWS RECEIVED BY A USER
+  //
+  // Reviews of OTHER users are never projected into local SQLite (it
+  // would violate the reviews table's FK to swap_requests/users, since
+  // the viewer's local tables only hold their OWN participant-scoped
+  // rows) — these are held in memory only, for the caller to display.
   // ============================================================
 
-  String _createReviewId(
-      DateTime now,
-      ) {
-    int candidate =
-        now.microsecondsSinceEpoch;
+  Future<ReceivedReviews> loadReviewsReceivedBy(
+      String uid,
+      ) async {
+    return _currentUserService.runForSession<ReceivedReviews>(() async {
+    final String cleanUid =
+    _requireText(
+      uid,
+      'User ID',
+    );
 
-    if (candidate <=
-        _lastReviewIdMicros) {
-      candidate =
-          _lastReviewIdMicros + 1;
+    final FirestoreReviewSnapshot snapshot;
+
+    try {
+      snapshot =
+      await _firestoreReviewRepository.getReviewsReceivedBy(
+        cleanUid,
+      );
+    } on FirestoreReviewRepositoryException {
+      return const ReceivedReviews.unavailable();
+    }
+    _currentUserService.requireActiveOperation();
+
+    if (snapshot.source ==
+        FirestoreReviewSource.unavailable) {
+      return const ReceivedReviews.unavailable();
     }
 
-    _lastReviewIdMicros =
-        candidate;
+    final List<ReceivedReview> reviews =
+    snapshot.reviews
+        .map(
+          (
+          FirestoreReviewRecord record,
+          ) {
+        return ReceivedReview(
+          review:
+          Review(
+            id:
+            record.id,
+            swapRequestId:
+            record.swapRequestId,
+            reviewerUserId:
+            record.reviewerUid,
+            revieweeUserId:
+            record.revieweeUid,
+            rating:
+            record.rating,
+            comment:
+            record.comment,
+            createdAt:
+            record.createdAt.toLocal(),
+          ),
+          reviewerName:
+          record.reviewerName,
+        );
+      },
+    )
+        .toList(
+      growable: false,
+    );
 
-    return 'review_$candidate';
+    final int count =
+        reviews.length;
+
+    final double averageRating =
+        count == 0
+            ? 0
+            : reviews
+            .map(
+              (
+              ReceivedReview item,
+              ) =>
+          item.review.rating,
+        )
+            .reduce(
+              (
+              int a,
+              int b,
+              ) =>
+          a + b,
+        ) /
+            count;
+
+    return ReceivedReviews(
+      reviews:
+      reviews,
+      averageRating:
+      averageRating,
+      count:
+      count,
+      available:
+      true,
+    );
+  });
   }
 
   // ============================================================

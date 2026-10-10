@@ -1,10 +1,10 @@
 import '../model/conversation.dart';
 import '../model/repositories/explore_repository.dart';
-import '../model/repositories/review_repository.dart';
 import '../model/review.dart';
 import '../model/skill.dart';
 import '../model/user.dart';
 import '../services/chat_service.dart';
+import '../services/review_service.dart';
 
 // ============================================================
 // EXCEPTION
@@ -30,21 +30,36 @@ class UserProfileReview {
   final Review review;
   final User? reviewer;
 
+  // The reviewer-name snapshot denormalized onto the remote review
+  // document at submission time — used when the reviewer cannot be
+  // resolved locally (not in this viewer's Explore manifest) but the
+  // remote record still carries their name as it was back then.
+  final String? fallbackReviewerName;
+
   const UserProfileReview({
     required this.review,
     required this.reviewer,
+    this.fallbackReviewerName,
   });
 
   String get reviewerName {
     final String? name =
     reviewer?.name.trim();
 
-    if (name == null ||
-        name.isEmpty) {
-      return 'TubiLearn member';
+    if (name != null &&
+        name.isNotEmpty) {
+      return name;
     }
 
-    return name;
+    final String? fallback =
+        fallbackReviewerName?.trim();
+
+    if (fallback != null &&
+        fallback.isNotEmpty) {
+      return fallback;
+    }
+
+    return 'TubiLearn member';
   }
 }
 
@@ -58,11 +73,20 @@ class UserProfileSnapshot {
   final List<Skill> wantedSkills;
   final List<UserProfileReview> reviews;
 
+  // Computed in memory from whichever reviews source was available —
+  // never a second SQLite/Firestore read. Falls back to
+  // user.rating/user.reviewCount (the legacy local aggregate) only
+  // when the remote reviews fetch itself was unavailable.
+  final double displayRating;
+  final int displayReviewCount;
+
   const UserProfileSnapshot({
     required this.user,
     required this.offeredSkills,
     required this.wantedSkills,
     required this.reviews,
+    required this.displayRating,
+    required this.displayReviewCount,
   });
 }
 
@@ -124,24 +148,42 @@ class UserProfileSwapRequestData {
 }
 
 // ============================================================
+// RECEIVED REVIEWS RESULT (PRIVATE)
+// ============================================================
+
+class _ReceivedReviewsResult {
+  final List<UserProfileReview> reviews;
+  final bool available;
+  final double averageRating;
+  final int count;
+
+  const _ReceivedReviewsResult({
+    required this.reviews,
+    required this.available,
+    required this.averageRating,
+    required this.count,
+  });
+}
+
+// ============================================================
 // CONTROLLER
 // ============================================================
 
 class UserProfileController {
   final ExploreRepository _exploreRepository;
-  final ReviewRepository _reviewRepository;
+  final ReviewService _reviewService;
   final ChatService _chatService;
 
   UserProfileController({
     ExploreRepository? exploreRepository,
-    ReviewRepository? reviewRepository,
+    ReviewService? reviewService,
     ChatService? chatService,
   })  : _exploreRepository =
       exploreRepository ??
           ExploreRepository.instance,
-        _reviewRepository =
-            reviewRepository ??
-                ReviewRepository.instance,
+        _reviewService =
+            reviewService ??
+                ReviewService.instance,
         _chatService =
             chatService ??
                 ChatService.instance;
@@ -170,9 +212,8 @@ class UserProfileController {
         fallbackUser,
       );
 
-      final List<Review> reviews =
-      await _reviewRepository
-          .getReviewsForUser(
+      final _ReceivedReviewsResult reviewsResult =
+      await _loadReceivedReviews(
         user.id,
       );
 
@@ -180,11 +221,15 @@ class UserProfileController {
         user:
         user,
         reviews:
-        reviews,
-      );
-    } on ReviewRepositoryException catch (error) {
-      throw UserProfileControllerException(
-        error.message,
+        reviewsResult.reviews,
+        displayRating:
+        reviewsResult.available
+            ? reviewsResult.averageRating
+            : user.rating,
+        displayReviewCount:
+        reviewsResult.available
+            ? reviewsResult.count
+            : user.reviewCount,
       );
     } on ExploreRepositoryException catch (error) {
       throw UserProfileControllerException(
@@ -212,20 +257,13 @@ class UserProfileController {
         fallbackUser,
       );
 
-      final List<Review> reviews =
-      await _reviewRepository
-          .getReviewsForUser(
+      final _ReceivedReviewsResult reviewsResult =
+      await _loadReceivedReviews(
         user.id,
       );
 
       return List<UserProfileReview>.unmodifiable(
-        _resolveReviews(
-          reviews,
-        ),
-      );
-    } on ReviewRepositoryException catch (error) {
-      throw UserProfileControllerException(
-        error.message,
+        reviewsResult.reviews,
       );
     } on ExploreRepositoryException catch (error) {
       throw UserProfileControllerException(
@@ -257,9 +295,8 @@ class UserProfileController {
         fallbackUser,
       );
 
-      final List<Review> reviews =
-      await _reviewRepository
-          .getReviewsForUser(
+      final _ReceivedReviewsResult reviewsResult =
+      await _loadReceivedReviews(
         user.id,
       );
 
@@ -267,17 +304,82 @@ class UserProfileController {
         user:
         user,
         reviews:
-        reviews,
-      );
-    } on ReviewRepositoryException catch (error) {
-      throw UserProfileControllerException(
-        error.message,
+        reviewsResult.reviews,
+        displayRating:
+        reviewsResult.available
+            ? reviewsResult.averageRating
+            : user.rating,
+        displayReviewCount:
+        reviewsResult.available
+            ? reviewsResult.count
+            : user.reviewCount,
       );
     } catch (_) {
       throw const UserProfileControllerException(
         'Profile could not be refreshed.',
       );
     }
+  }
+
+  // ============================================================
+  // RECEIVED REVIEWS (IN-MEMORY ONLY — NEVER PROJECTED TO SQLITE)
+  //
+  // Reviews of OTHER users are never written to local SQLite: the
+  // local reviews table's foreign keys to swap_requests(id)/users(id)
+  // only hold rows for swaps/users the viewer's OWN device has synced
+  // — a third party's review would violate those FKs. Profile loading
+  // must never throw because of reviews, so any failure here (beyond
+  // what ReviewService.loadReviewsReceivedBy already degrades
+  // gracefully on its own) still resolves to an "unavailable" result.
+  // ============================================================
+
+  Future<_ReceivedReviewsResult> _loadReceivedReviews(
+      String userId,
+      ) async {
+    ReceivedReviews result;
+
+    try {
+      result =
+      await _reviewService.loadReviewsReceivedBy(
+        userId,
+      );
+    } catch (_) {
+      result =
+      const ReceivedReviews.unavailable();
+    }
+
+    final List<UserProfileReview> resolved =
+    result.reviews
+        .map(
+          (
+          ReceivedReview item,
+          ) {
+        return UserProfileReview(
+          review:
+          item.review,
+          reviewer:
+          _exploreRepository.findUserById(
+            item.review.reviewerUserId,
+          ),
+          fallbackReviewerName:
+          item.reviewerName,
+        );
+      },
+    )
+        .toList(
+      growable: false,
+    );
+
+    return _ReceivedReviewsResult(
+      reviews:
+      resolved,
+      available:
+      result.available,
+      averageRating:
+      result.averageRating,
+      count:
+      result.count,
+    );
   }
 
   // ============================================================
@@ -295,11 +397,56 @@ class UserProfileController {
         fallbackUser,
       );
 
+      final List<UserProfileReview> resolvedReviews =
+      reviews
+          .map(
+            (
+            Review review,
+            ) =>
+            UserProfileReview(
+              review:
+              review,
+              reviewer:
+              _exploreRepository.findUserById(
+                review.reviewerUserId,
+              ),
+            ),
+      )
+          .toList(
+        growable: false,
+      );
+
+      final int count =
+          resolvedReviews.length;
+
+      final double averageRating =
+          count == 0
+              ? 0
+              : reviews
+              .map(
+                (
+                Review review,
+                ) =>
+            review.rating,
+          )
+              .reduce(
+                (
+                int a,
+                int b,
+                ) =>
+            a + b,
+          ) /
+              count;
+
       return _buildSnapshot(
         user:
         user,
         reviews:
-        reviews,
+        resolvedReviews,
+        displayRating:
+        averageRating,
+        displayReviewCount:
+        count,
       );
     } catch (_) {
       throw const UserProfileControllerException(
@@ -560,7 +707,9 @@ class UserProfileController {
 
   UserProfileSnapshot _buildSnapshot({
     required User user,
-    required List<Review> reviews,
+    required List<UserProfileReview> reviews,
+    required double displayRating,
+    required int displayReviewCount,
   }) {
     final List<Skill> offeredSkills =
     _resolveSkills(
@@ -576,11 +725,6 @@ class UserProfileController {
       false,
     );
 
-    final List<UserProfileReview> resolvedReviews =
-    _resolveReviews(
-      reviews,
-    );
-
     return UserProfileSnapshot(
       user:
       user,
@@ -594,8 +738,12 @@ class UserProfileController {
       ),
       reviews:
       List<UserProfileReview>.unmodifiable(
-        resolvedReviews,
+        reviews,
       ),
+      displayRating:
+      displayRating,
+      displayReviewCount:
+      displayReviewCount,
     );
   }
 
@@ -664,28 +812,4 @@ class UserProfileController {
     return skills;
   }
 
-  // ============================================================
-  // RESOLVE REVIEWS
-  // ============================================================
-
-  List<UserProfileReview> _resolveReviews(
-      List<Review> reviews,
-      ) {
-    return reviews
-        .map(
-          (
-          Review review,
-          ) =>
-          UserProfileReview(
-            review:
-            review,
-            reviewer:
-            _exploreRepository
-                .findUserById(
-              review.reviewerUserId,
-            ),
-          ),
-    )
-        .toList();
-  }
 }
