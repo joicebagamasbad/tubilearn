@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -31,6 +32,12 @@ class _ProfileScreenState
 
   List<Skill> _wantedSkills =
   <Skill>[];
+
+  double _snapshotRating = 0;
+  int _snapshotReviewCount = 0;
+
+  double? _reviewRating;
+  int? _reviewCount;
 
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -136,6 +143,10 @@ class _ProfileScreenState
         _isRefreshing = false;
         _loadError = null;
       });
+
+      unawaited(
+        _refreshReviewStats(),
+      );
     } on ProfileControllerException catch (error) {
       _setLoadFailure(
         error.message,
@@ -158,6 +169,39 @@ class _ProfileScreenState
 
     _wantedSkills =
         snapshot.wantedSkills;
+
+    _snapshotRating =
+        snapshot.displayRating;
+
+    _snapshotReviewCount =
+        snapshot.displayReviewCount;
+  }
+
+  // ============================================================
+  // REVIEW STATS
+  // ============================================================
+
+  Future<void> _refreshReviewStats() async {
+    ReviewDisplayStats stats;
+
+    try {
+      stats =
+      await _controller.loadReviewStats();
+    } catch (_) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _reviewRating =
+          stats.rating;
+
+      _reviewCount =
+          stats.count;
+    });
   }
 
   void _setLoadFailure(
@@ -175,6 +219,12 @@ class _ProfileScreenState
 
       _wantedSkills =
       <Skill>[];
+
+      _snapshotRating = 0;
+      _snapshotReviewCount = 0;
+
+      _reviewRating = null;
+      _reviewCount = null;
 
       _isLoading = false;
       _isRefreshing = false;
@@ -1329,8 +1379,16 @@ class _ProfileScreenState
   Widget _buildStats(
       User user,
       ) {
+    final double effectiveRating =
+        _reviewRating ??
+            _snapshotRating;
+
+    final int effectiveReviewCount =
+        _reviewCount ??
+            _snapshotReviewCount;
+
     final bool hasReviews =
-        user.reviewCount >
+        effectiveReviewCount >
             0;
 
     return Row(
@@ -1342,14 +1400,14 @@ class _ProfileScreenState
             Icons.star_rounded,
             value:
             hasReviews
-                ? user.rating
+                ? effectiveRating
                 .toStringAsFixed(
               1,
             )
                 : '—',
             label:
             hasReviews
-                ? '${user.reviewCount} reviews'
+                ? '$effectiveReviewCount reviews'
                 : 'No reviews',
           ),
         ),

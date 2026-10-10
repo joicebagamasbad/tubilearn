@@ -5,6 +5,7 @@ import '../model/user_skill.dart';
 import '../services/current_user_service.dart';
 import '../services/profile_service.dart';
 import '../services/profile_image_service.dart';
+import '../services/review_service.dart';
 
 class ProfileControllerException implements Exception {
   final String message;
@@ -21,11 +22,34 @@ class ProfileSnapshot {
   final User user;
   final List<Skill> offeredSkills;
   final List<Skill> wantedSkills;
+  final double displayRating;
+  final int displayReviewCount;
 
   const ProfileSnapshot({
     required this.user,
     required this.offeredSkills,
     required this.wantedSkills,
+    required this.displayRating,
+    required this.displayReviewCount,
+  });
+}
+
+// ============================================================
+// REVIEW DISPLAY STATS
+// ============================================================
+
+/// Result of ProfileController.loadReviewStats(): the Firestore-backed
+/// rating/count when available, otherwise the legacy local fallback.
+/// Never thrown from — callers always get a usable value.
+class ReviewDisplayStats {
+  final double rating;
+  final int count;
+  final bool fromCloud;
+
+  const ReviewDisplayStats({
+    required this.rating,
+    required this.count,
+    required this.fromCloud,
   });
 }
 
@@ -34,12 +58,14 @@ class ProfileController {
   final CurrentUserService _currentUserService;
   final ProfileService _profileService;
   final ProfileImageService _profileImageService;
+  final ReviewService _reviewService;
 
   ProfileController({
     ExploreRepository? repository,
     CurrentUserService? currentUserService,
     ProfileService? profileService,
     ProfileImageService? profileImageService,
+    ReviewService? reviewService,
   })  : _repository =
       repository ??
           ExploreRepository.instance,
@@ -51,7 +77,10 @@ class ProfileController {
                 ProfileService.instance,
         _profileImageService =
             profileImageService ??
-                ProfileImageService.instance;
+                ProfileImageService.instance,
+        _reviewService =
+            reviewService ??
+                ReviewService.instance;
 
   // ============================================================
   // LOAD
@@ -228,7 +257,80 @@ class ProfileController {
       List<Skill>.unmodifiable(
         wantedSkills,
       ),
+      displayRating:
+      user.rating,
+      displayReviewCount:
+      user.reviewCount,
     );
+  }
+
+  // ============================================================
+  // REVIEW STATS
+  // ============================================================
+
+  /// Firestore-backed rating/count for the current user, with the
+  /// legacy local User.rating/reviewCount as a silent fallback on any
+  /// failure (offline, unavailable, etc.) — this must never throw,
+  /// since the own-profile screen calls it right after first paint and
+  /// cannot be allowed to surface a review-related error.
+  Future<ReviewDisplayStats> loadReviewStats() async {
+    final String userId;
+
+    try {
+      userId =
+          _currentUserService.requireUserId();
+    } on CurrentUserServiceException catch (error) {
+      throw ProfileControllerException(
+        error.message,
+      );
+    }
+
+    final User? localUser =
+    _repository.findUserById(
+      userId,
+    );
+
+    final double fallbackRating =
+        localUser?.rating ?? 0;
+
+    final int fallbackCount =
+        localUser?.reviewCount ?? 0;
+
+    try {
+      final ReceivedReviews result =
+      await _reviewService.loadReviewsReceivedBy(
+        userId,
+      );
+
+      if (result.available) {
+        return ReviewDisplayStats(
+          rating:
+          result.averageRating,
+          count:
+          result.count,
+          fromCloud:
+          true,
+        );
+      }
+
+      return ReviewDisplayStats(
+        rating:
+        fallbackRating,
+        count:
+        fallbackCount,
+        fromCloud:
+        false,
+      );
+    } catch (_) {
+      return ReviewDisplayStats(
+        rating:
+        fallbackRating,
+        count:
+        fallbackCount,
+        fromCloud:
+        false,
+      );
+    }
   }
 
   // ============================================================
