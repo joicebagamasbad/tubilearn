@@ -428,29 +428,184 @@ service cloud.firestore {
         && titleKeyDeleteMatchesOwnerChange(resource.data);
     }
 
-    // Day 6, undeployed: first two-named-party (requester + provider)
-    // access pattern in this file. Update is intentionally permissive
-    // about WHICH fields change or WHETHER a status transition is legal —
-    // Firestore Rules cannot easily encode the full swap-request state
-    // machine, and this project does not pretend a rule proves an
-    // invariant it can't actually prove. Full transition-legality
-    // enforcement at the rules level is deferred to Day 9 hardening.
+    // Day 6, undeployed, hardened Day 9: first two-named-party
+    // (requester + provider) access pattern in this file. Create now
+    // validates the exact field shape firestore_swap_repository.dart's
+    // createSwapRequest() writes; update now restricts which fields may
+    // change and enforces the SwapRequestStatus state machine
+    // (swap_request.dart canTransitionTo/canAccept/canDecline/
+    // canCancel/canSchedule/canComplete/canEditSchedule/canReschedule)
+    // plus WHO may drive each transition.
     match /swapRequests/{swapRequestId} {
+      function swapIsRequester(data) {
+        return request.auth.uid == data.requesterUserId;
+      }
+
+      function swapIsProvider(data) {
+        return request.auth.uid == data.providerUserId;
+      }
+
+      function swapIsParticipant(data) {
+        return swapIsRequester(data) || swapIsProvider(data);
+      }
+
+      function validSwapSkillRef(value) {
+        return value == null || (value is string && value.size() > 0);
+      }
+
+      function validSwapMode(value) {
+        return value in ['Online', 'In-person'];
+      }
+
+      // Mirrors app_database.dart's meeting_details CHECK: null, or a
+      // non-empty string of at most 150 characters.
+      function validSwapMeetingDetails(value) {
+        return value == null
+          || (value is string && value.size() > 0 && value.size() <= 150);
+      }
+
+      // Mirrors app_database.dart's note CHECK: null, or a string of at
+      // most 300 characters (empty string allowed, unlike meetingDetails).
+      function validSwapNote(value) {
+        return value == null || (value is string && value.size() <= 300);
+      }
+
+      // ------------------------------------------------------------
+      // STATUS STATE MACHINE
+      //
+      // Encodes SwapRequestStatus.canTransitionTo (swap_request.dart)
+      // plus WHO may drive each transition, per the can* methods on
+      // SwapRequest. prevStatus == nextStatus is allowed ONLY for
+      // 'accepted' -> 'accepted': swap_service.dart's
+      // _updateScheduleInternal always writes status 'accepted' via
+      // updateStatus() even when the swap is already 'accepted' (the
+      // canEditSchedule path), before writing the schedule fields in a
+      // second call. All other same-status writes are denied.
+      // ------------------------------------------------------------
+      function swapStatusTransitionAllowed(data, prevStatus, nextStatus) {
+        return
+          // pending -> accepted/declined: provider only (canAccept/
+          // canDecline).
+          (prevStatus == 'pending'
+            && (nextStatus == 'accepted' || nextStatus == 'declined')
+            && swapIsProvider(data))
+          ||
+          // pending -> cancelled: requester only (canCancel's pending
+          // branch).
+          (prevStatus == 'pending'
+            && nextStatus == 'cancelled'
+            && swapIsRequester(data))
+          ||
+          // accepted -> accepted: either participant (same-status write
+          // from updateSchedule's canEditSchedule path, see above).
+          (prevStatus == 'accepted'
+            && nextStatus == 'accepted'
+            && swapIsParticipant(data))
+          ||
+          // accepted -> scheduled/cancelled: either participant
+          // (canSchedule / canCancel's accepted branch).
+          (prevStatus == 'accepted'
+            && (nextStatus == 'scheduled' || nextStatus == 'cancelled')
+            && swapIsParticipant(data))
+          ||
+          // scheduled -> accepted (reschedule) / completed / cancelled:
+          // either participant (canReschedule / canComplete /
+          // canCancel's scheduled branch).
+          (prevStatus == 'scheduled'
+            && (nextStatus == 'accepted'
+              || nextStatus == 'completed'
+              || nextStatus == 'cancelled')
+            && swapIsParticipant(data));
+      }
+
       allow read: if request.auth != null
         && (resource.data.requesterUserId == request.auth.uid
           || resource.data.providerUserId == request.auth.uid);
 
-      allow create: if request.auth != null
-        && validCloudUid(request.resource.data.requesterUserId)
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'requesterUserId',
+          'providerUserId',
+          'skillToLearnId',
+          'skillToOfferId',
+          'providerName',
+          'providerInitials',
+          'providerCity',
+          'skillToLearn',
+          'skillToOffer',
+          'proposedAt',
+          'mode',
+          'meetingDetails',
+          'note',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'requesterUserId',
+          'providerUserId',
+          'skillToLearnId',
+          'skillToOfferId',
+          'providerName',
+          'providerInitials',
+          'providerCity',
+          'skillToLearn',
+          'skillToOffer',
+          'proposedAt',
+          'mode',
+          'meetingDetails',
+          'note',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && swapRequestId is string
+        && swapRequestId.size() > 0
+        && request.resource.data.requesterUserId == request.auth.uid
         && validCloudUid(request.resource.data.providerUserId)
         && request.resource.data.requesterUserId
           != request.resource.data.providerUserId
-        && (request.auth.uid == request.resource.data.requesterUserId
-          || request.auth.uid == request.resource.data.providerUserId);
+        && validSwapSkillRef(request.resource.data.skillToLearnId)
+        && validSwapSkillRef(request.resource.data.skillToOfferId)
+        && nonEmptyText(request.resource.data.providerName)
+        && request.resource.data.providerName.size() <= 120
+        && nonEmptyText(request.resource.data.providerInitials)
+        && request.resource.data.providerInitials.size() <= 120
+        && nonEmptyText(request.resource.data.providerCity)
+        && request.resource.data.providerCity.size() <= 120
+        && nonEmptyText(request.resource.data.skillToLearn)
+        && request.resource.data.skillToLearn.size() <= 120
+        && nonEmptyText(request.resource.data.skillToOffer)
+        && request.resource.data.skillToOffer.size() <= 120
+        && request.resource.data.proposedAt is timestamp
+        && validSwapMode(request.resource.data.mode)
+        && validSwapMeetingDetails(request.resource.data.meetingDetails)
+        && validSwapNote(request.resource.data.note)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
 
-      allow update: if request.auth != null
-        && (resource.data.requesterUserId == request.auth.uid
-          || resource.data.providerUserId == request.auth.uid);
+      allow update: if signedIn()
+        && swapIsParticipant(resource.data)
+        && !(resource.data.status in ['declined', 'completed', 'cancelled'])
+        && request.resource.data.requesterUserId == resource.data.requesterUserId
+        && request.resource.data.providerUserId == resource.data.providerUserId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'updatedAt',
+          'proposedAt',
+          'mode',
+          'meetingDetails'
+        ])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.proposedAt is timestamp
+        && validSwapMode(request.resource.data.mode)
+        && validSwapMeetingDetails(request.resource.data.meetingDetails)
+        && swapStatusTransitionAllowed(
+          resource.data,
+          resource.data.status,
+          request.resource.data.status
+        );
 
       allow delete: if false;
     }
