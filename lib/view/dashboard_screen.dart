@@ -374,6 +374,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
 
+    if (ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+
     final DateTime? lastSyncAt =
         _lastChatSyncAt;
 
