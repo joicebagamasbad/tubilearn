@@ -16,6 +16,9 @@ class ConversationLiveController {
 
   bool _disposed = false;
 
+  static final Set<ConversationLiveController> _active =
+      <ConversationLiveController>{};
+
   // ============================================================
   // START
   // ============================================================
@@ -41,13 +44,23 @@ class ConversationLiveController {
       onError: (Object _) {
         // Swallowed: manual pull-to-refresh remains available in the
         // conversation screen even if the live listener fails.
+        unawaited(
+          _subscription?.cancel().catchError((_) {}),
+        );
         _subscription = null;
+        _active.remove(this);
       },
       onDone: () {
+        unawaited(
+          _subscription?.cancel().catchError((_) {}),
+        );
         _subscription = null;
+        _active.remove(this);
       },
       cancelOnError: false,
     );
+
+    _active.add(this);
   }
 
   // ============================================================
@@ -55,9 +68,38 @@ class ConversationLiveController {
   // ============================================================
 
   Future<void> stop() async {
+    _active.remove(this);
+
     final StreamSubscription<int>? subscription = _subscription;
     _subscription = null;
     await subscription?.cancel();
+  }
+
+  // ============================================================
+  // STOP ALL
+  // ============================================================
+
+  /// Stops every currently-active live conversation listener. Called
+  /// before FirebaseAuth sign-out so no open listener observes the
+  /// about-to-be-invalidated auth token and raises a permission error.
+  static Future<void> stopAll() async {
+    final List<ConversationLiveController> controllers =
+        _active.toList(growable: false);
+
+    _active.clear();
+
+    await Future.wait<void>(
+      controllers.map(
+        (ConversationLiveController controller) async {
+          try {
+            await controller.stop();
+          } catch (_) {
+            // One controller's failure to stop cleanly must not prevent
+            // the others from being stopped.
+          }
+        },
+      ),
+    );
   }
 
   // ============================================================

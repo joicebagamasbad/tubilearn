@@ -1,5 +1,6 @@
 import '../model/auth_session.dart';
 import '../services/auth_service.dart';
+import 'conversation_live_controller.dart';
 
 class AuthControllerException
     implements Exception {
@@ -212,6 +213,13 @@ class AuthController {
   // ============================================================
 
   Future<void> signOut() async {
+    try {
+      await ConversationLiveController.stopAll();
+    } catch (_) {
+      // Stopping live listeners early is best-effort only; it must
+      // never block or fail logout.
+    }
+
     try {
       await _authService.signOut();
     } on AuthServiceException catch (error) {
