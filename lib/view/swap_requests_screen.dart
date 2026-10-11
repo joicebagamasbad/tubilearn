@@ -1431,207 +1431,33 @@ class _SwapRequestsScreenState
       return;
     }
 
-    int selectedRating = 0;
-
-    final TextEditingController
-    commentController =
-    TextEditingController();
-
-    final bool? shouldSubmit =
-    await showDialog<bool>(
+    final _ReviewDialogResult? result =
+    await showDialog<_ReviewDialogResult>(
       context: context,
       barrierDismissible: false,
       builder: (
           BuildContext dialogContext,
           ) {
-        return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter
-              setDialogState,
-              ) {
-            return AlertDialog(
-              backgroundColor:
-              _surfaceColor,
-              title: Text(
-                'Rate your swap partner',
-                style: TextStyle(
-                  fontWeight:
-                  FontWeight.w800,
-                  color: _textColor,
-                ),
-              ),
-              content:
-              SingleChildScrollView(
-                child: Column(
-                  mainAxisSize:
-                  MainAxisSize.min,
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
-                  children: [
-                    Text(
-                      'How was your completed skill swap?',
-                      style:
-                      TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        color:
-                        _mutedColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 18,
-                    ),
-                    Row(
-                      mainAxisAlignment:
-                      MainAxisAlignment
-                          .center,
-                      children:
-                      List<Widget>
-                          .generate(
-                        5,
-                            (
-                            int index,
-                            ) {
-                          final int
-                          starValue =
-                              index + 1;
-
-                          return IconButton(
-                            onPressed:
-                                () {
-                              setDialogState(
-                                      () {
-                                    selectedRating =
-                                        starValue;
-                                  });
-                            },
-                            icon: Icon(
-                              starValue <=
-                                  selectedRating
-                                  ? Icons
-                                  .star_rounded
-                                  : Icons
-                                  .star_outline_rounded,
-                              size: 34,
-                              color:
-                              starValue <=
-                                  selectedRating
-                                  ? const Color(
-                                0xFFF2A65A,
-                              )
-                                  : _mutedColor,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    if (selectedRating >
-                        0) ...[
-                      const SizedBox(
-                        height: 4,
-                      ),
-                      Center(
-                        child: Text(
-                          '$selectedRating out of 5',
-                          style:
-                          TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                            FontWeight
-                                .w700,
-                            color:
-                            _primaryColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(
-                      height: 18,
-                    ),
-                    Text(
-                      'Comment (optional)',
-                      style:
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight
-                            .w700,
-                        color:
-                        _textColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 7,
-                    ),
-                    TextField(
-                      controller:
-                      commentController,
-                      maxLength: 500,
-                      maxLines: 4,
-                      decoration:
-                      const InputDecoration(
-                        hintText:
-                        'Share what went well about the swap...',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(
-                      dialogContext,
-                      false,
-                    );
-                  },
-                  child:
-                  const Text(
-                    'CANCEL',
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed:
-                  selectedRating <=
-                      0
-                      ? null
-                      : () {
-                    Navigator.pop(
-                      dialogContext,
-                      true,
-                    );
-                  },
-                  child:
-                  const Text(
-                    'SUBMIT REVIEW',
-                  ),
-                ),
-              ],
-            );
-          },
+        return _ReviewDialogContent(
+          surfaceColor: _surfaceColor,
+          textColor: _textColor,
+          primaryColor: _primaryColor,
+          mutedColor: _mutedColor,
         );
       },
     );
 
-    if (shouldSubmit != true) {
-      commentController.dispose();
+    if (result == null) {
       return;
     }
-
-    final String comment =
-    commentController.text.trim();
-
-    commentController.dispose();
 
     await _performAction(
       requestId: request.id,
       action: () =>
           _controller.submitReview(
             requestId: request.id,
-            rating: selectedRating,
-            comment: comment,
+            rating: result.rating,
+            comment: result.comment,
           ),
       successMessage:
       'Review submitted. Thank you!',
@@ -1667,14 +1493,14 @@ class _SwapRequestsScreenState
       return;
     }
 
-    DateTime selectedDate =
+    final DateTime initialDate =
     DateTime(
       request.proposedAt.year,
       request.proposedAt.month,
       request.proposedAt.day,
     );
 
-    TimeOfDay selectedTime =
+    final TimeOfDay initialTime =
     TimeOfDay(
       hour:
       request.proposedAt.hour,
@@ -1688,450 +1514,61 @@ class _SwapRequestsScreenState
       request.mode,
     );
 
-    String selectedMode =
+    final String initialMode =
     previousModeStillSupported
         ? request.mode
         : supportedModes.first;
 
-    final TextEditingController
-    detailsController =
-    TextEditingController(
-      text:
-      previousModeStillSupported
-          ? request.meetingDetails ??
-          ''
-          : '',
-    );
+    final String initialDetailsText =
+    previousModeStillSupported
+        ? request.meetingDetails ??
+        ''
+        : '';
 
-    final bool? shouldSave =
-    await showDialog<bool>(
+    final _EditScheduleResult? result =
+    await showDialog<_EditScheduleResult>(
       context: context,
       barrierDismissible: false,
       builder: (
           BuildContext dialogContext,
           ) {
-        return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter
-              setDialogState,
-              ) {
-            return AlertDialog(
-              backgroundColor:
-              _surfaceColor,
-              title: Text(
-                request.status ==
-                    SwapRequestStatus
-                        .scheduled
-                    ? 'Reschedule session'
-                    : 'Edit schedule',
-                style: TextStyle(
-                  fontWeight:
-                  FontWeight.w800,
-                  color: _textColor,
-                ),
-              ),
-              content:
-              SingleChildScrollView(
-                child: Column(
-                  mainAxisSize:
-                  MainAxisSize.min,
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
-                  children: [
-                    Text(
-                      'Choose a new date, time, mode, and meeting details.',
-                      style:
-                      TextStyle(
-                        fontSize: 12.5,
-                        height: 1.4,
-                        color:
-                        _mutedColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 16,
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child:
-                          OutlinedButton
-                              .icon(
-                            onPressed:
-                                () async {
-                              final DateTime?
-                              result =
-                              await showDatePicker(
-                                context:
-                                dialogContext,
-                                initialDate:
-                                selectedDate.isBefore(
-                                  DateTime.now(),
-                                )
-                                    ? DateTime.now()
-                                    : selectedDate,
-                                firstDate:
-                                DateTime.now(),
-                                lastDate:
-                                DateTime.now()
-                                    .add(
-                                  const Duration(
-                                    days:
-                                    365,
-                                  ),
-                                ),
-                              );
-
-                              if (result ==
-                                  null) {
-                                return;
-                              }
-
-                              setDialogState(
-                                      () {
-                                    selectedDate =
-                                        result;
-                                  });
-                            },
-                            icon:
-                            const Icon(
-                              Icons
-                                  .calendar_today_outlined,
-                              size: 18,
-                            ),
-                            label: Text(
-                              _formatDateOnly(
-                                selectedDate,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 8,
-                        ),
-                        Expanded(
-                          child:
-                          OutlinedButton
-                              .icon(
-                            onPressed:
-                                () async {
-                              final TimeOfDay?
-                              result =
-                              await showTimePicker(
-                                context:
-                                dialogContext,
-                                initialTime:
-                                selectedTime,
-                              );
-
-                              if (result ==
-                                  null) {
-                                return;
-                              }
-
-                              setDialogState(
-                                      () {
-                                    selectedTime =
-                                        result;
-                                  });
-                            },
-                            icon:
-                            const Icon(
-                              Icons
-                                  .schedule_rounded,
-                              size: 18,
-                            ),
-                            label: Text(
-                              selectedTime
-                                  .format(
-                                context,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(
-                      height: 14,
-                    ),
-                    Text(
-                      'Session mode',
-                      style:
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight
-                            .w700,
-                        color:
-                        _textColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    Text(
-                      'Only modes supported by both skills can be selected.',
-                      style:
-                      TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
-                        color:
-                        _mutedColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 9,
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Opacity(
-                            opacity:
-                            supportedModes
-                                .contains(
-                              'Online',
-                            )
-                                ? 1
-                                : 0.48,
-                            child:
-                            ChoiceChip(
-                              label:
-                              const Text(
-                                'Online',
-                              ),
-                              selected:
-                              selectedMode ==
-                                  'Online',
-                              showCheckmark:
-                              false,
-                              onSelected:
-                              supportedModes
-                                  .contains(
-                                'Online',
-                              )
-                                  ? (_) {
-                                if (selectedMode ==
-                                    'Online') {
-                                  return;
-                                }
-
-                                setDialogState(
-                                        () {
-                                      selectedMode =
-                                      'Online';
-
-                                      detailsController
-                                          .clear();
-                                    });
-                              }
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 8,
-                        ),
-                        Expanded(
-                          child: Opacity(
-                            opacity:
-                            supportedModes
-                                .contains(
-                              'In-person',
-                            )
-                                ? 1
-                                : 0.48,
-                            child:
-                            ChoiceChip(
-                              label:
-                              const Text(
-                                'In-person',
-                              ),
-                              selected:
-                              selectedMode ==
-                                  'In-person',
-                              showCheckmark:
-                              false,
-                              onSelected:
-                              supportedModes
-                                  .contains(
-                                'In-person',
-                              )
-                                  ? (_) {
-                                if (selectedMode ==
-                                    'In-person') {
-                                  return;
-                                }
-
-                                setDialogState(
-                                        () {
-                                      selectedMode =
-                                      'In-person';
-
-                                      detailsController
-                                          .clear();
-                                    });
-                              }
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(
-                      height: 14,
-                    ),
-                    Text(
-                      selectedMode ==
-                          'Online'
-                          ? 'Online platform'
-                          : 'Meeting area',
-                      style:
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight
-                            .w700,
-                        color:
-                        _textColor,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 7,
-                    ),
-                    TextField(
-                      controller:
-                      detailsController,
-                      maxLength: 150,
-                      decoration:
-                      InputDecoration(
-                        hintText:
-                        selectedMode ==
-                            'Online'
-                            ? 'Example: Google Meet or Messenger'
-                            : 'Example: DCT campus or public café',
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    Container(
-                      width:
-                      double.infinity,
-                      padding:
-                      const EdgeInsets.all(
-                        10,
-                      ),
-                      decoration:
-                      BoxDecoration(
-                        color:
-                        _softPrimaryColor,
-                        borderRadius:
-                        BorderRadius
-                            .circular(
-                          10,
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
-                        children: [
-                          Icon(
-                            Icons
-                                .schedule_outlined,
-                            size: 16,
-                            color:
-                            _primaryColor,
-                          ),
-                          const SizedBox(
-                            width: 7,
-                          ),
-                          Expanded(
-                            child: Text(
-                              'Confirmed sessions reserve a 1-hour slot. When this schedule is confirmed, TubiLearn checks both participants for overlapping confirmed sessions.',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                11,
-                                height:
-                                1.4,
-                                color:
-                                _textColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(
-                      dialogContext,
-                      false,
-                    );
-                  },
-                  child:
-                  const Text(
-                    'CANCEL',
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final String details =
-                    detailsController
-                        .text
-                        .trim();
-
-                    if (details.isEmpty) {
-                      _showMessage(
-                        selectedMode ==
-                            'Online'
-                            ? 'Please enter an online platform.'
-                            : 'Please enter a meeting area.',
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(
-                      dialogContext,
-                      true,
-                    );
-                  },
-                  child:
-                  const Text(
-                    'SAVE',
-                  ),
-                ),
-              ],
-            );
-          },
+        return _EditScheduleDialogContent(
+          title:
+          request.status ==
+              SwapRequestStatus
+                  .scheduled
+              ? 'Reschedule session'
+              : 'Edit schedule',
+          initialDate: initialDate,
+          initialTime: initialTime,
+          initialMode: initialMode,
+          initialDetailsText:
+          initialDetailsText,
+          supportedModes:
+          supportedModes,
+          surfaceColor: _surfaceColor,
+          textColor: _textColor,
+          primaryColor: _primaryColor,
+          mutedColor: _mutedColor,
+          softPrimaryColor:
+          _softPrimaryColor,
+          formatDate: _formatDateOnly,
+          showMessage: _showMessage,
         );
       },
     );
 
-    if (shouldSave != true) {
-      detailsController.dispose();
+    if (result == null) {
       return;
     }
 
-    final String meetingDetails =
-    detailsController.text.trim();
-
-    detailsController.dispose();
-
     final DateTime proposedAt =
     DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      selectedTime.hour,
-      selectedTime.minute,
+      result.selectedDate.year,
+      result.selectedDate.month,
+      result.selectedDate.day,
+      result.selectedTime.hour,
+      result.selectedTime.minute,
     );
 
     if (!proposedAt.isAfter(
@@ -2149,9 +1586,9 @@ class _SwapRequestsScreenState
           _controller.updateSchedule(
             requestId: request.id,
             proposedAt: proposedAt,
-            mode: selectedMode,
+            mode: result.selectedMode,
             meetingDetails:
-            meetingDetails,
+            result.meetingDetails,
           ),
       successMessage:
       request.status ==
@@ -2340,5 +1777,503 @@ class _SwapRequestsScreenState
     return '${months[value.month - 1]} '
         '${value.day}, ${value.year} • '
         '$displayHour:$minute $period';
+  }
+}
+
+// ============================================================
+// REVIEW DIALOG
+// ============================================================
+
+/// Result of the review dialog: the chosen rating and trimmed comment on
+/// submit, or null (via Navigator.pop with no result) on cancel.
+class _ReviewDialogResult {
+  final int rating;
+  final String comment;
+
+  const _ReviewDialogResult({
+    required this.rating,
+    required this.comment,
+  });
+}
+
+/// Owns the review dialog's rating/comment state in its own State, so the
+/// comment TextEditingController is disposed only after this widget is
+/// actually unmounted (i.e. after the dialog route's exit animation
+/// finishes) rather than right after showDialog's Future resolves.
+///
+/// Colors are passed in from the screen rather than read from
+/// Theme.of(context), since the screen computes its own dark-mode-aware
+/// colors independently of the ambient Theme.
+class _ReviewDialogContent extends StatefulWidget {
+  final Color surfaceColor;
+  final Color textColor;
+  final Color primaryColor;
+  final Color mutedColor;
+
+  const _ReviewDialogContent({
+    required this.surfaceColor,
+    required this.textColor,
+    required this.primaryColor,
+    required this.mutedColor,
+  });
+
+  @override
+  State<_ReviewDialogContent> createState() => _ReviewDialogContentState();
+}
+
+class _ReviewDialogContentState extends State<_ReviewDialogContent> {
+  late final TextEditingController _commentController;
+  int _selectedRating = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _commentController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: widget.surfaceColor,
+      title: Text(
+        'Rate your swap partner',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: widget.textColor,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How was your completed skill swap?',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: widget.mutedColor,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List<Widget>.generate(5, (int index) {
+                final int starValue = index + 1;
+                return IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedRating = starValue;
+                    });
+                  },
+                  icon: Icon(
+                    starValue <= _selectedRating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 34,
+                    color: starValue <= _selectedRating
+                        ? const Color(0xFFF2A65A)
+                        : widget.mutedColor,
+                  ),
+                );
+              }),
+            ),
+            if (_selectedRating > 0) ...[
+              const SizedBox(height: 4),
+              Center(
+                child: Text(
+                  '$_selectedRating out of 5',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: widget.primaryColor,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Text(
+              'Comment (optional)',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: widget.textColor,
+              ),
+            ),
+            const SizedBox(height: 7),
+            TextField(
+              controller: _commentController,
+              maxLength: 500,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'Share what went well about the swap...',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context, null);
+          },
+          child: const Text('CANCEL'),
+        ),
+        ElevatedButton(
+          onPressed: _selectedRating <= 0
+              ? null
+              : () {
+                  Navigator.pop(
+                    context,
+                    _ReviewDialogResult(
+                      rating: _selectedRating,
+                      comment: _commentController.text.trim(),
+                    ),
+                  );
+                },
+          child: const Text('SUBMIT REVIEW'),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// EDIT SCHEDULE DIALOG
+// ============================================================
+
+/// Result of the edit-schedule dialog: the chosen date/time/mode and
+/// trimmed meeting details on save, or null (via Navigator.pop with no
+/// result) on cancel.
+class _EditScheduleResult {
+  final DateTime selectedDate;
+  final TimeOfDay selectedTime;
+  final String selectedMode;
+  final String meetingDetails;
+
+  const _EditScheduleResult({
+    required this.selectedDate,
+    required this.selectedTime,
+    required this.selectedMode,
+    required this.meetingDetails,
+  });
+}
+
+/// Owns the edit-schedule dialog's date/time/mode/details state in its
+/// own State, so the meeting-details TextEditingController is disposed
+/// only after this widget is actually unmounted (i.e. after the dialog
+/// route's exit animation finishes) rather than right after showDialog's
+/// Future resolves.
+///
+/// Colors and the date-formatting/message helpers are passed in from the
+/// screen rather than read from Theme.of(context)/called directly, since
+/// the screen computes its own dark-mode-aware colors independently of
+/// the ambient Theme and owns the SnackBar-showing helper.
+class _EditScheduleDialogContent extends StatefulWidget {
+  final String title;
+  final DateTime initialDate;
+  final TimeOfDay initialTime;
+  final String initialMode;
+  final String initialDetailsText;
+  final List<String> supportedModes;
+  final Color surfaceColor;
+  final Color textColor;
+  final Color primaryColor;
+  final Color mutedColor;
+  final Color softPrimaryColor;
+  final String Function(DateTime) formatDate;
+  final void Function(String) showMessage;
+
+  const _EditScheduleDialogContent({
+    required this.title,
+    required this.initialDate,
+    required this.initialTime,
+    required this.initialMode,
+    required this.initialDetailsText,
+    required this.supportedModes,
+    required this.surfaceColor,
+    required this.textColor,
+    required this.primaryColor,
+    required this.mutedColor,
+    required this.softPrimaryColor,
+    required this.formatDate,
+    required this.showMessage,
+  });
+
+  @override
+  State<_EditScheduleDialogContent> createState() =>
+      _EditScheduleDialogContentState();
+}
+
+class _EditScheduleDialogContentState
+    extends State<_EditScheduleDialogContent> {
+  late final TextEditingController _detailsController;
+  late DateTime _selectedDate;
+  late TimeOfDay _selectedTime;
+  late String _selectedMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _detailsController = TextEditingController(
+      text: widget.initialDetailsText,
+    );
+    _selectedDate = widget.initialDate;
+    _selectedTime = widget.initialTime;
+    _selectedMode = widget.initialMode;
+  }
+
+  @override
+  void dispose() {
+    _detailsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: widget.surfaceColor,
+      title: Text(
+        widget.title,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: widget.textColor,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose a new date, time, mode, and meeting details.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                color: widget.mutedColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final DateTime? result = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate.isBefore(DateTime.now())
+                            ? DateTime.now()
+                            : _selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 365),
+                        ),
+                      );
+
+                      if (result == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _selectedDate = result;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 18,
+                    ),
+                    label: Text(widget.formatDate(_selectedDate)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final TimeOfDay? result = await showTimePicker(
+                        context: context,
+                        initialTime: _selectedTime,
+                      );
+
+                      if (result == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _selectedTime = result;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.schedule_rounded,
+                      size: 18,
+                    ),
+                    label: Text(_selectedTime.format(context)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Session mode',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: widget.textColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Only modes supported by both skills can be selected.',
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: widget.mutedColor,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                Expanded(
+                  child: Opacity(
+                    opacity: widget.supportedModes.contains('Online')
+                        ? 1
+                        : 0.48,
+                    child: ChoiceChip(
+                      label: const Text('Online'),
+                      selected: _selectedMode == 'Online',
+                      showCheckmark: false,
+                      onSelected: widget.supportedModes.contains('Online')
+                          ? (_) {
+                              if (_selectedMode == 'Online') {
+                                return;
+                              }
+
+                              setState(() {
+                                _selectedMode = 'Online';
+                                _detailsController.clear();
+                              });
+                            }
+                          : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Opacity(
+                    opacity: widget.supportedModes.contains('In-person')
+                        ? 1
+                        : 0.48,
+                    child: ChoiceChip(
+                      label: const Text('In-person'),
+                      selected: _selectedMode == 'In-person',
+                      showCheckmark: false,
+                      onSelected: widget.supportedModes.contains('In-person')
+                          ? (_) {
+                              if (_selectedMode == 'In-person') {
+                                return;
+                              }
+
+                              setState(() {
+                                _selectedMode = 'In-person';
+                                _detailsController.clear();
+                              });
+                            }
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _selectedMode == 'Online' ? 'Online platform' : 'Meeting area',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: widget.textColor,
+              ),
+            ),
+            const SizedBox(height: 7),
+            TextField(
+              controller: _detailsController,
+              maxLength: 150,
+              decoration: InputDecoration(
+                hintText: _selectedMode == 'Online'
+                    ? 'Example: Google Meet or Messenger'
+                    : 'Example: DCT campus or public café',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: widget.softPrimaryColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.schedule_outlined,
+                    size: 16,
+                    color: widget.primaryColor,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      'Confirmed sessions reserve a 1-hour slot. When this schedule is confirmed, TubiLearn checks both participants for overlapping confirmed sessions.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.4,
+                        color: widget.textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context, null);
+          },
+          child: const Text('CANCEL'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final String details = _detailsController.text.trim();
+
+            if (details.isEmpty) {
+              widget.showMessage(
+                _selectedMode == 'Online'
+                    ? 'Please enter an online platform.'
+                    : 'Please enter a meeting area.',
+              );
+              return;
+            }
+
+            Navigator.pop(
+              context,
+              _EditScheduleResult(
+                selectedDate: _selectedDate,
+                selectedTime: _selectedTime,
+                selectedMode: _selectedMode,
+                meetingDetails: details,
+              ),
+            );
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    );
   }
 }
