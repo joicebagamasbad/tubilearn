@@ -162,6 +162,8 @@ class AiMatchRepository {
           Content.text(prompt),
         ]).timeout(_requestTimeout);
       } catch (error) {
+        // TEMPORARY diagnostic; remove after confirming.
+        print('AI_MATCH_ERROR: ${error.runtimeType}: $error');
         throw AiMatchRepositoryException(
           'Could not generate a match analysis. Please try again.',
           cause: error,

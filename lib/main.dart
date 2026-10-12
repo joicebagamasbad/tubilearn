@@ -1,5 +1,6 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
@@ -39,13 +40,15 @@ Future<void> main() async {
   // APP CHECK
   // ============================================================
   //
-  // DEBUG PROVIDER — local development only. Must be swapped to
-  // AndroidProvider.playIntegrity (or equivalent) before any
-  // production/release build.
+  // Debug provider only in debug builds; release builds skip App Check
+  // until a real provider (Play Integrity) is configured; AI Logic
+  // enforcement is required only from 2026-11-02.
 
-  await FirebaseAppCheck.instance.activate(
-    providerAndroid: const AndroidDebugProvider(),
-  );
+  if (kDebugMode) {
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: const AndroidDebugProvider(),
+    );
+  }
 
   // ============================================================
   // STARTUP INITIALIZATION
