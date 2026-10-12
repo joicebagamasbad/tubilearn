@@ -125,11 +125,6 @@ class AiMatchRepository {
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
         responseSchema: _responseSchema,
-        // Reduce thinking to cut latency (monitoring showed p95 ~4 min and
-        // ~3K thinking tokens); revert this argument if the model rejects it.
-        thinkingConfig: ThinkingConfig.withThinkingLevel(
-          ThinkingLevel.minimal,
-        ),
       ),
     );
   }
