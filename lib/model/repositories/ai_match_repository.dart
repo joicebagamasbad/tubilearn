@@ -130,10 +130,11 @@ class AiMatchRepository {
   }
 
   static const int _maxAttempts = 3;
+  static const Duration _requestTimeout = Duration(seconds: 25);
 
   /// Generates an [AiMatchAnalysis] for [candidateUid] from a sanitized
-  /// [request]. Not invoked anywhere yet in this batch — no live Gemini
-  /// call is made until a later batch wires a caller to this method.
+  /// [request]. Called from SmartMatchesScreen via AiMatchController and
+  /// AiMatchService.
   Future<AiMatchAnalysis> generateMatchAnalysis({
     required String candidateUid,
     required AiMatchAnalysisRequest request,
@@ -159,7 +160,7 @@ class AiMatchRepository {
       try {
         response = await model.generateContent(<Content>[
           Content.text(prompt),
-        ]);
+        ]).timeout(_requestTimeout);
       } catch (error) {
         throw AiMatchRepositoryException(
           'Could not generate a match analysis. Please try again.',
