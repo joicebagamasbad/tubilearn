@@ -51,10 +51,13 @@ class AuthenticatedSessionController {
         CurrentUserService.instance.configureAuthenticatedUid(session.uid);
         stage = 'cloud profile preparation';
         await ProfileService.instance.prepareCurrentSession();
-        stage = 'cloud My Skills preparation';
-        await MySkillsService.instance.prepareCurrentSession();
+        // Explore must run first so other users exist in the local cache
+        // before My Skills projects shared custom skills (fresh install
+        // failed otherwise).
         stage = 'remote Explore preparation';
         await ExploreService.instance.prepareCurrentSession();
+        stage = 'cloud My Skills preparation';
+        await MySkillsService.instance.prepareCurrentSession();
         stage = 'chat loading';
         await ChatService.instance.initialize();
         stage = 'swap loading';
