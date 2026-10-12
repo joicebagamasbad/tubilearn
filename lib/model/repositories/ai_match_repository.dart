@@ -130,7 +130,7 @@ class AiMatchRepository {
   }
 
   static const int _maxAttempts = 3;
-  static const Duration _requestTimeout = Duration(seconds: 25);
+  static const Duration _requestTimeout = Duration(seconds: 90);
 
   /// Generates an [AiMatchAnalysis] for [candidateUid] from a sanitized
   /// [request]. Called from SmartMatchesScreen via AiMatchController and
@@ -162,8 +162,6 @@ class AiMatchRepository {
           Content.text(prompt),
         ]).timeout(_requestTimeout);
       } catch (error) {
-        // TEMPORARY diagnostic; remove after confirming.
-        print('AI_MATCH_ERROR: ${error.runtimeType}: $error');
         throw AiMatchRepositoryException(
           'Could not generate a match analysis. Please try again.',
           cause: error,
