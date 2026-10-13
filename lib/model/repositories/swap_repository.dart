@@ -685,8 +685,8 @@ class SwapRepository {
 
   /// Recalculates completed_swaps for [userId] alone, in its own
   /// transaction, reusing _recalculateCompletedSwapsForUser's exact
-  /// query. Unlike completeSwap (which recalculates BOTH participants
-  /// atomically alongside its own status flip), this is a standalone,
+  /// query. Unlike a transition that recalculates BOTH participants
+  /// atomically alongside its own status flip, this is a standalone,
   /// narrowly-scoped entry point for a caller that only wants to refresh
   /// one user's own derived counter from whatever is currently in local
   /// swap_requests — it does not touch status and does not assume it is

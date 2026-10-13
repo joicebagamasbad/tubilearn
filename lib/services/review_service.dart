@@ -176,37 +176,6 @@ class ReviewService {
     }
   }
 
-  Future<bool> canReviewSwap(
-      SwapRequest request,
-      ) async {
-    final String currentUserId =
-    _requireCurrentUserId();
-
-    if (request.status !=
-        SwapRequestStatus.completed) {
-      return false;
-    }
-
-    if (!request.hasStableIdentity ||
-        !request.involvesUser(
-          currentUserId,
-        )) {
-      return false;
-    }
-
-    if (_otherParticipantId(
-      request,
-      currentUserId,
-    ) ==
-        null) {
-      return false;
-    }
-
-    return !(await hasReviewedSwap(
-      request.id,
-    ));
-  }
-
   // ============================================================
   // SUBMIT REVIEW
   // ============================================================
