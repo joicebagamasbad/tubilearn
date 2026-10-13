@@ -380,7 +380,7 @@ class _SettingsScreenState
                         ),
                         subtitle:
                         Text(
-                          'Save English as your preferred language.',
+                          'Currently used by the app.',
                           style:
                           TextStyle(
                             color:
@@ -409,7 +409,7 @@ class _SettingsScreenState
                         ),
                         subtitle:
                         Text(
-                          'Save Filipino as your preferred language.',
+                          'Saved for future use. The app is currently shown in English.',
                           style:
                           TextStyle(
                             color:
@@ -1520,7 +1520,7 @@ class _SettingsScreenState
               subtitle:
               _isSavingLanguage
                   ? 'Saving preference...'
-                  : '${_languageLabel()} • preference only',
+                  : '${_languageLabel()} • app is English only for now',
               isBusy:
               _isSavingLanguage,
               onTap:
@@ -1705,7 +1705,7 @@ class _SettingsScreenState
               title:
               'About TubiLearn',
               subtitle:
-              'Skill exchange with partial cloud sync',
+              'Skill exchange with cloud sync',
               onTap:
               _showAboutDialog,
             ),
