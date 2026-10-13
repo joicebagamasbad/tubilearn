@@ -99,6 +99,12 @@ class SwapService {
     } catch (_) {
       // Pending operation errors are already reported to their callers.
     }
+    try {
+      await _refreshingFuture;
+    } catch (_) {
+      // A failed remote refresh still needs its partial state cleared.
+    }
+    _refreshingFuture = null;
     _requests.clear();
     _pendingCreations.clear();
     _pendingStatusChanges.clear();
