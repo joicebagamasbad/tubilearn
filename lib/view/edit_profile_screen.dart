@@ -45,6 +45,25 @@ class _EditProfileScreenState
   final TextEditingController _teachingStyleController =
   TextEditingController();
 
+  static const List<String> _availabilityDaysOptions = <String>[
+    'Weekdays',
+    'Weekends',
+    'Every day',
+    'Custom',
+  ];
+
+  static const List<String> _availabilityTimeOptions = <String>[
+    'Mornings',
+    'Afternoons',
+    'Evenings',
+    'Anytime',
+  ];
+
+  String _availabilityDays = 'Weekdays';
+  String? _availabilityTime;
+  String _customAvailabilityDaysText = '';
+  int _availabilityLoadGeneration = 0;
+
   User? _currentUser;
 
   bool _isLoading = true;
@@ -209,6 +228,12 @@ class _EditProfileScreenState
 
     _availabilityController.text =
         user.availability;
+
+    _parseAvailability(
+      user.availability,
+    );
+
+    _availabilityLoadGeneration++;
 
     _languageController.text =
         user.language;
@@ -1129,18 +1154,7 @@ class _EditProfileScreenState
                 12,
               ),
 
-              _buildTextField(
-                controller:
-                _availabilityController,
-                label:
-                'Availability',
-                hint:
-                'Example: Weekends, 2 PM–6 PM',
-                icon:
-                Icons.schedule_rounded,
-                maxLength:
-                120,
-              ),
+              _buildAvailabilityField(),
 
               const SizedBox(
                 height:
@@ -1411,6 +1425,553 @@ class _EditProfileScreenState
           ),
         ],
       ),
+    );
+  }
+
+  // ============================================================
+  // AVAILABILITY
+  // ============================================================
+
+  /// Parses [rawValue] into the days/time pickers only when it exactly
+  /// matches one of two recognized shapes this screen itself writes:
+  /// the composed '{days} • {time}' shape (canonical days, canonical
+  /// time), or a bare canonical days value with no time part. Any other
+  /// value — legacy free text such as 'Weekday evenings' or 'Not set'
+  /// — is never guessed at: Days is set to 'Custom', the whole string
+  /// goes into the custom days field, and Time is left unselected.
+  void _parseAvailability(
+      String rawValue,
+      ) {
+    final String trimmed =
+        rawValue.trim();
+
+    final int separatorIndex =
+        trimmed.indexOf(
+          ' • ',
+        );
+
+    if (separatorIndex != -1) {
+      final String daysPart =
+      trimmed
+          .substring(
+        0,
+        separatorIndex,
+      )
+          .trim();
+
+      final String timePart =
+      trimmed
+          .substring(
+        separatorIndex + 3,
+      )
+          .trim();
+
+      if (_availabilityDaysOptions.contains(
+        daysPart,
+      ) &&
+          daysPart != 'Custom' &&
+          _availabilityTimeOptions.contains(
+            timePart,
+          )) {
+        _availabilityDays =
+            daysPart;
+
+        _availabilityTime =
+            timePart;
+
+        _customAvailabilityDaysText =
+            '';
+
+        return;
+      }
+    } else if (_availabilityDaysOptions.contains(
+      trimmed,
+    ) &&
+        trimmed != 'Custom') {
+      _availabilityDays =
+          trimmed;
+
+      _availabilityTime =
+          null;
+
+      _customAvailabilityDaysText =
+          '';
+
+      return;
+    }
+
+    _availabilityDays =
+        'Custom';
+
+    _availabilityTime =
+        null;
+
+    _customAvailabilityDaysText =
+        trimmed;
+  }
+
+  String _composeAvailability() {
+    final String daysPart =
+    _availabilityDays == 'Custom'
+        ? _customAvailabilityDaysText.trim()
+        : _availabilityDays;
+
+    final String? timePart =
+        _availabilityTime;
+
+    if (timePart == null ||
+        timePart.isEmpty) {
+      return daysPart;
+    }
+
+    if (daysPart.isEmpty) {
+      return timePart;
+    }
+
+    return '$daysPart • $timePart';
+  }
+
+  Widget _buildAvailabilityField() {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        _buildAvailabilityDaysDropdown(),
+
+        if (_availabilityDays ==
+            'Custom') ...[
+          const SizedBox(
+            height: 14,
+          ),
+
+          _buildCustomAvailabilityDaysField(),
+        ],
+
+        const SizedBox(
+          height: 14,
+        ),
+
+        _buildAvailabilityTimeDropdown(),
+      ],
+    );
+  }
+
+  Widget _buildAvailabilityDaysDropdown() {
+    return DropdownButtonFormField<String>(
+      key:
+      ValueKey(
+        'availability-days-$_availabilityDays',
+      ),
+      initialValue:
+      _availabilityDays,
+      isExpanded:
+      true,
+      style:
+      TextStyle(
+        color:
+        _textColor,
+        fontWeight:
+        FontWeight.w500,
+      ),
+      dropdownColor:
+      _surfaceColor,
+      decoration:
+      InputDecoration(
+        labelText:
+        'Availability days',
+        floatingLabelBehavior:
+        FloatingLabelBehavior.always,
+        labelStyle:
+        TextStyle(
+          color:
+          _primaryColor,
+          fontWeight:
+          FontWeight.w600,
+        ),
+        prefixIcon:
+        Icon(
+          Icons.calendar_month_outlined,
+          color:
+          _primaryColor,
+          size:
+          20,
+        ),
+        filled:
+        true,
+        fillColor:
+        _surfaceColor,
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+            width:
+            1.2,
+          ),
+        ),
+        disabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
+            width:
+            2,
+          ),
+        ),
+      ),
+      items:
+      _availabilityDaysOptions
+          .map(
+            (
+            String value,
+            ) {
+          return DropdownMenuItem<String>(
+            value:
+            value,
+            child: Text(
+              value,
+              overflow:
+              TextOverflow.ellipsis,
+            ),
+          );
+        },
+      )
+          .toList(),
+      onChanged:
+      _isBusy
+          ? null
+          : (
+          String? value,
+          ) {
+        if (value ==
+            null ||
+            !mounted) {
+          return;
+        }
+
+        setState(() {
+          _availabilityDays =
+              value;
+
+          if (value != 'Custom') {
+            _customAvailabilityDaysText =
+                '';
+          }
+
+          _availabilityController.text =
+              _composeAvailability();
+        });
+      },
+    );
+  }
+
+  Widget _buildCustomAvailabilityDaysField() {
+    return TextFormField(
+      key:
+      ValueKey(
+        'availability-custom-days-$_availabilityLoadGeneration',
+      ),
+      initialValue:
+      _customAvailabilityDaysText,
+      enabled:
+      !_isBusy,
+      maxLength:
+      60,
+      cursorColor:
+      _primaryColor,
+      style:
+      TextStyle(
+        color:
+        _textColor,
+        fontWeight:
+        FontWeight.w500,
+      ),
+      textCapitalization:
+      TextCapitalization.words,
+      decoration:
+      InputDecoration(
+        labelText:
+        'Custom days',
+        hintText:
+        'Example: Monday, Wednesday',
+        floatingLabelBehavior:
+        FloatingLabelBehavior.always,
+        labelStyle:
+        TextStyle(
+          color:
+          _primaryColor,
+          fontWeight:
+          FontWeight.w600,
+        ),
+        hintStyle:
+        TextStyle(
+          color:
+          _mutedColor,
+        ),
+        prefixIcon:
+        Icon(
+          Icons.edit_calendar_outlined,
+          color:
+          _primaryColor,
+          size:
+          20,
+        ),
+        filled:
+        true,
+        fillColor:
+        _surfaceColor,
+        counterStyle:
+        AppTextStyles.caption.copyWith(
+          color:
+          _mutedColor,
+        ),
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+            width:
+            1.2,
+          ),
+        ),
+        disabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
+            width:
+            2,
+          ),
+        ),
+      ),
+      onChanged: (
+          String value,
+          ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _customAvailabilityDaysText =
+              value;
+
+          _availabilityController.text =
+              _composeAvailability();
+        });
+      },
+    );
+  }
+
+  Widget _buildAvailabilityTimeDropdown() {
+    return DropdownButtonFormField<String>(
+      key:
+      ValueKey(
+        'availability-time-${_availabilityTime ?? "none"}',
+      ),
+      initialValue:
+      _availabilityTime,
+      isExpanded:
+      true,
+      hint:
+      Text(
+        'Select time',
+        style:
+        TextStyle(
+          color:
+          _mutedColor,
+        ),
+      ),
+      style:
+      TextStyle(
+        color:
+        _textColor,
+        fontWeight:
+        FontWeight.w500,
+      ),
+      dropdownColor:
+      _surfaceColor,
+      decoration:
+      InputDecoration(
+        labelText:
+        'Availability time',
+        floatingLabelBehavior:
+        FloatingLabelBehavior.always,
+        labelStyle:
+        TextStyle(
+          color:
+          _primaryColor,
+          fontWeight:
+          FontWeight.w600,
+        ),
+        prefixIcon:
+        Icon(
+          Icons.schedule_rounded,
+          color:
+          _primaryColor,
+          size:
+          20,
+        ),
+        filled:
+        true,
+        fillColor:
+        _surfaceColor,
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+            width:
+            1.2,
+          ),
+        ),
+        disabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
+            width:
+            2,
+          ),
+        ),
+      ),
+      items:
+      _availabilityTimeOptions
+          .map(
+            (
+            String value,
+            ) {
+          return DropdownMenuItem<String>(
+            value:
+            value,
+            child: Text(
+              value,
+              overflow:
+              TextOverflow.ellipsis,
+            ),
+          );
+        },
+      )
+          .toList(),
+      onChanged:
+      _isBusy
+          ? null
+          : (
+          String? value,
+          ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _availabilityTime =
+              value;
+
+          _availabilityController.text =
+              _composeAvailability();
+        });
+      },
     );
   }
 
