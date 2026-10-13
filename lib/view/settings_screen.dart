@@ -795,7 +795,7 @@ class _SettingsScreenState
       children:
       <Widget>[
         _dialogParagraph(
-          'TubiLearn uses cloud sync for your profile, My Skills, and Explore data. Some features still store data only on this device.',
+          'TubiLearn uses cloud sync for your profile, My Skills, Explore, chats, swap requests, and reviews. Some features still store data only on this device.',
         ),
         _dialogPoint(
           icon:
@@ -811,7 +811,7 @@ class _SettingsScreenState
           title:
           'Swaps and sessions',
           text:
-          'Swap requests and scheduled-session information are stored in the local app database.',
+          'Swap requests and scheduled-session information are backed by cloud sync.',
         ),
         _dialogPoint(
           icon:
@@ -819,7 +819,7 @@ class _SettingsScreenState
           title:
           'Messages',
           text:
-          'Prototype conversations and messages remain on this device unless the app data is removed.',
+          'Conversations and messages are backed by cloud sync.',
         ),
         _dialogPoint(
           icon:
@@ -827,7 +827,7 @@ class _SettingsScreenState
           title:
           'Partial cloud sync',
           text:
-          'Chats, swaps and sessions, reviews, app preferences, and profile photos are not included in cloud sync.',
+          'App preferences and profile photos are not included in cloud sync.',
         ),
       ],
     );
@@ -885,7 +885,7 @@ class _SettingsScreenState
       children:
       <Widget>[
         _dialogParagraph(
-          'Your Firebase account is your TubiLearn identity. Profile, My Skills, and Explore data use cloud sync, while some features remain on this device.',
+          'Your Firebase account is your TubiLearn identity. Profile, My Skills, Explore, chats, swap requests, and reviews use cloud sync, while some features remain on this device.',
         ),
         _dialogPoint(
           icon:
@@ -893,7 +893,7 @@ class _SettingsScreenState
           title:
           'Cloud-backed data',
           text:
-          'Your profile, offered skills, learning interests, and Explore candidate data are connected to your signed-in account.',
+          'Your profile, offered skills, learning interests, Explore candidate data, chats, swap requests, and reviews are connected to your signed-in account.',
         ),
         _dialogPoint(
           icon:
@@ -901,7 +901,7 @@ class _SettingsScreenState
           title:
           'Stored on this device',
           text:
-          'Chats, swaps and sessions, reviews, app preferences, and profile photos remain local to this device.',
+          'App preferences and profile photos remain local to this device.',
         ),
         _dialogPoint(
           icon:
@@ -967,7 +967,7 @@ class _SettingsScreenState
       children:
       <Widget>[
         _dialogParagraph(
-          'TubiLearn uses cloud services for authentication, profiles, skills, and Explore. Chats, swaps, reviews, app preferences, and profile photos remain on this device.',
+          'TubiLearn uses cloud services for authentication, profiles, skills, Explore, chats, swap requests, and reviews. App preferences and profile photos remain on this device.',
         ),
         _dialogPoint(
           icon:
@@ -975,7 +975,7 @@ class _SettingsScreenState
           title:
           'Local-only data',
           text:
-          'Chats, swaps, reviews, app preferences, and profile photos remain in this app installation unless they are changed or removed.',
+          'App preferences and profile photos remain in this app installation unless they are changed or removed.',
         ),
         _dialogPoint(
           icon:
@@ -983,7 +983,7 @@ class _SettingsScreenState
           title:
           'Account and cloud data',
           text:
-          'Firebase Authentication identifies your account, and cloud sync supports your profile, My Skills, and Explore data.',
+          'Firebase Authentication identifies your account, and cloud sync supports your profile, My Skills, Explore, chats, swap requests, and reviews.',
         ),
         _dialogPoint(
           icon:
@@ -991,7 +991,7 @@ class _SettingsScreenState
           title:
           'What stays local',
           text:
-          'Chats, swaps, reviews, app preferences, and profile photos are not included in cloud sync.',
+          'App preferences and profile photos are not included in cloud sync.',
         ),
       ],
     );
@@ -1722,7 +1722,7 @@ class _SettingsScreenState
           title:
           'Data availability',
           text:
-          'Your account, profile, My Skills, and Explore data use cloud services. Chats, swaps and sessions, reviews, app preferences, and profile photos remain on this device.',
+          'Your account, profile, My Skills, Explore, chats, swap requests, and reviews use cloud services. App preferences and profile photos remain on this device.',
         ),
 
         const SizedBox(
