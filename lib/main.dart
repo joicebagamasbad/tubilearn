@@ -139,6 +139,37 @@ class TubiLearnApp extends StatelessWidget {
             const VideoCallScreen(),
           },
 
+          builder: (
+              BuildContext context,
+              Widget? child,
+              ) {
+            final double systemTextScale =
+            MediaQuery.textScalerOf(
+              context,
+            ).scale(
+              1.0,
+            );
+
+            final double clampedTextScale =
+            (systemTextScale * 1.1).clamp(
+              1.0,
+              1.25,
+            );
+
+            return MediaQuery(
+              data:
+              MediaQuery.of(
+                context,
+              ).copyWith(
+                textScaler:
+                TextScaler.linear(
+                  clampedTextScale,
+                ),
+              ),
+              child: child!,
+            );
+          },
+
           onGenerateRoute: (
               RouteSettings settings,
               ) {

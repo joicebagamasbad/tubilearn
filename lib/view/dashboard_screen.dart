@@ -2410,7 +2410,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
 
     return Container(
-      height: 76,
+      constraints:
+      const BoxConstraints(
+        minHeight: 76,
+      ),
       decoration:
       BoxDecoration(
         color:
@@ -2624,6 +2627,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                       items[index]
                       ['label']
                       as String,
+                      maxLines: 1,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      textAlign:
+                      TextAlign.center,
                       style:
                       AppTextStyles.navLabel
                           .copyWith(
