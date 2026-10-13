@@ -1639,16 +1639,6 @@ class _SettingsScreenState
 
             _divider(),
 
-            _actionTile(
-              icon: Icons.logout_rounded,
-              title: 'Log out',
-              subtitle: _isSigningOut ? 'Signing out...' : 'Return to login',
-              isBusy: _isSigningOut,
-              onTap: _isSigningOut ? null : _signOut,
-            ),
-
-            _divider(),
-
             ListTile(
               contentPadding:
               const EdgeInsets.symmetric(
@@ -1659,7 +1649,7 @@ class _SettingsScreenState
               ),
               leading:
               _settingsIcon(
-                Icons.cloud_off_outlined,
+                Icons.cloud_done_outlined,
               ),
               title:
               Text(
@@ -1674,7 +1664,7 @@ class _SettingsScreenState
               ),
               subtitle:
               Text(
-                'Profile, My Skills, and Explore use cloud sync',
+                'Profile, My Skills, Explore, Chat, Swap Requests, and Reviews use cloud sync',
                 style:
                 TextStyle(
                   color:
@@ -1686,9 +1676,9 @@ class _SettingsScreenState
               trailing:
               _buildStatusBadge(
                 label:
-                'PARTIAL',
+                'ACTIVE',
                 positive:
-                false,
+                true,
               ),
             ),
           ],
@@ -1733,6 +1723,23 @@ class _SettingsScreenState
           'Data availability',
           text:
           'Your account, profile, My Skills, and Explore data use cloud services. Chats, swaps and sessions, reviews, app preferences, and profile photos remain on this device.',
+        ),
+
+        const SizedBox(
+          height: 24,
+        ),
+
+        _settingsCard(
+          children:
+          <Widget>[
+            _actionTile(
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              subtitle: _isSigningOut ? 'Signing out...' : 'Return to login',
+              isBusy: _isSigningOut,
+              onTap: _isSigningOut ? null : _signOut,
+            ),
+          ],
         ),
       ],
     );

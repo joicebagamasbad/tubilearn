@@ -162,6 +162,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
                 'KEEP EDITING',
                 style: TextStyle(
                   color: _primaryColor,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -371,7 +372,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
           child: Text(
             'Share what you can teach with the community.',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               height: 1.4,
               color: _mutedColor,
             ),
@@ -394,7 +395,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: FontWeight.w700,
         color: _textColor,
       ),
@@ -413,7 +414,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
       textCapitalization:
       TextCapitalization.words,
       style: TextStyle(
-        fontSize: 12,
+        fontSize: 14,
         color: _textColor,
       ),
       onChanged: (
@@ -430,7 +431,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
         'e.g. Digital Illustration',
         counterText: '',
         hintStyle: TextStyle(
-          fontSize: 11,
+          fontSize: 13,
           color: _mutedColor,
         ),
         prefixIcon: Icon(
@@ -491,7 +492,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
       hint: Text(
         'Select category',
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 13,
           color: _mutedColor,
         ),
       ),
@@ -555,7 +556,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
               overflow:
               TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 color: _textColor,
               ),
             ),
@@ -592,14 +593,14 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
           textCapitalization:
           TextCapitalization.sentences,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             color: _textColor,
           ),
           decoration: InputDecoration(
             hintText:
             'Tell others what they can learn from you...',
             hintStyle: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               color: _mutedColor,
             ),
             counterText: '',
@@ -665,7 +666,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
           child: Text(
             '${_descriptionController.text.length}/200',
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 11,
               color: _mutedColor,
             ),
           ),
@@ -744,7 +745,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
                   child: Text(
                     level,
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight:
                       isSelected
                           ? FontWeight
@@ -802,7 +803,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
               child: Text(
                 _availability,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   color: _textColor,
                 ),
               ),
@@ -894,7 +895,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
                     title: Text(
                       option,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight:
                         isSelected
                             ? FontWeight
@@ -983,7 +984,7 @@ class _AddSkillScreenState extends State<AddSkillScreen> {
             : const Text(
           'ADD SKILL',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 13,
             fontWeight:
             FontWeight.w800,
             letterSpacing: 0.4,

@@ -185,6 +185,7 @@ class _AddWantedSkillScreenState
                     .copyWith(
                   color:
                   _primaryColor,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -423,6 +424,7 @@ class _AddWantedSkillScreenState
                       .copyWith(
                     color:
                     _mutedColor,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -451,7 +453,7 @@ class _AddWantedSkillScreenState
       text,
       style:
       TextStyle(
-        fontSize: 12,
+        fontSize: 13,
         fontWeight:
         FontWeight.w700,
         color:
@@ -476,6 +478,7 @@ class _AddWantedSkillScreenState
       TextCapitalization.words,
       style:
       TextStyle(
+        fontSize: 14,
         color:
         _textColor,
       ),
@@ -496,6 +499,7 @@ class _AddWantedSkillScreenState
         '',
         hintStyle:
         TextStyle(
+          fontSize: 13,
           color:
           _mutedColor,
         ),
@@ -644,6 +648,7 @@ class _AddWantedSkillScreenState
         'Select category',
         style:
         TextStyle(
+          fontSize: 13,
           color:
           _mutedColor,
         ),
@@ -665,6 +670,7 @@ class _AddWantedSkillScreenState
                     .ellipsis,
                 style:
                 TextStyle(
+                  fontSize: 13,
                   color:
                   _textColor,
                 ),
@@ -707,6 +713,7 @@ class _AddWantedSkillScreenState
               .sentences,
           style:
           TextStyle(
+            fontSize: 14,
             color:
             _textColor,
           ),
@@ -718,6 +725,7 @@ class _AddWantedSkillScreenState
             '',
             hintStyle:
             TextStyle(
+              fontSize: 13,
               color:
               _mutedColor,
             ),
@@ -808,6 +816,7 @@ class _AddWantedSkillScreenState
                 .copyWith(
               color:
               _mutedColor,
+              fontSize: 11,
             ),
           ),
         ),
@@ -899,7 +908,7 @@ class _AddWantedSkillScreenState
                     style:
                     TextStyle(
                       fontSize:
-                      9,
+                      11,
                       fontWeight:
                       selected
                           ? FontWeight
@@ -979,7 +988,7 @@ class _AddWantedSkillScreenState
                 style:
                 TextStyle(
                   fontSize:
-                  12,
+                  13,
                   color:
                   _textColor,
                 ),
@@ -1067,9 +1076,10 @@ class _AddWantedSkillScreenState
                 Text(
                   'Choose availability',
                   style:
-                  AppTextStyles
-                      .cardTitle
-                      .copyWith(
+                  TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                    FontWeight.w800,
                     color:
                     _textColor,
                   ),
@@ -1093,6 +1103,7 @@ class _AddWantedSkillScreenState
                         option,
                         style:
                         TextStyle(
+                          fontSize: 13,
                           color:
                           _textColor,
                         ),
@@ -1178,7 +1189,10 @@ class _AddWantedSkillScreenState
               ? 'ADDING...'
               : 'ADD LEARNING INTEREST',
           style:
-          AppTextStyles.button,
+          AppTextStyles.button.copyWith(
+            fontSize: 13,
+            letterSpacing: 0.4,
+          ),
         ),
         style:
         ElevatedButton.styleFrom(
