@@ -1147,17 +1147,18 @@ class _EditProfileScreenState
                 14,
               ),
 
-              _buildTextField(
+              _buildDropdownField(
                 controller:
                 _languageController,
                 label:
                 'Language',
-                hint:
-                'Example: English, Filipino',
                 icon:
                 Icons.language_rounded,
-                maxLength:
-                120,
+                options: const <String>[
+                  'English',
+                  'Filipino',
+                  'English / Filipino',
+                ],
               ),
 
               const SizedBox(
@@ -1165,17 +1166,18 @@ class _EditProfileScreenState
                 14,
               ),
 
-              _buildTextField(
+              _buildDropdownField(
                 controller:
                 _preferredModeController,
                 label:
                 'Preferred mode',
-                hint:
-                'Example: Online or in person',
                 icon:
                 Icons.devices_rounded,
-                maxLength:
-                120,
+                options: const <String>[
+                  'Online',
+                  'In-person',
+                  'Both',
+                ],
               ),
 
               const SizedBox(
@@ -1600,6 +1602,173 @@ class _EditProfileScreenState
         }
 
         setState(() {});
+      },
+    );
+  }
+
+  // ============================================================
+  // DROPDOWN FIELD
+  // ============================================================
+
+  Widget _buildDropdownField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required List<String> options,
+  }) {
+    final String currentValue =
+        controller.text.trim();
+
+    final List<String> items =
+    <String>[
+      if (currentValue.isNotEmpty &&
+          !options.contains(
+            currentValue,
+          ))
+        currentValue,
+      ...options,
+    ];
+
+    final String? selectedValue =
+    items.contains(
+      currentValue,
+    )
+        ? currentValue
+        : null;
+
+    return DropdownButtonFormField<String>(
+      key:
+      ValueKey(
+        '$label-$currentValue',
+      ),
+      initialValue:
+      selectedValue,
+      isExpanded:
+      true,
+      style:
+      TextStyle(
+        color:
+        _textColor,
+        fontWeight:
+        FontWeight.w500,
+      ),
+      dropdownColor:
+      _surfaceColor,
+      decoration:
+      InputDecoration(
+        labelText:
+        label,
+        floatingLabelBehavior:
+        FloatingLabelBehavior.always,
+        labelStyle:
+        TextStyle(
+          color:
+          _primaryColor,
+          fontWeight:
+          FontWeight.w600,
+        ),
+        prefixIcon:
+        Icon(
+          icon,
+          color:
+          _primaryColor,
+          size:
+          20,
+        ),
+        filled:
+        true,
+        fillColor:
+        _surfaceColor,
+        border:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+            width:
+            1.2,
+          ),
+        ),
+        disabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _borderColor,
+          ),
+        ),
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+          BorderSide(
+            color:
+            _primaryColor,
+            width:
+            2,
+          ),
+        ),
+      ),
+      items:
+      items
+          .map(
+            (
+            String value,
+            ) {
+          return DropdownMenuItem<String>(
+            value:
+            value,
+            child: Text(
+              value,
+              overflow:
+              TextOverflow.ellipsis,
+            ),
+          );
+        },
+      )
+          .toList(),
+      onChanged:
+      _isBusy
+          ? null
+          : (
+          String? value,
+          ) {
+        if (value ==
+            null) {
+          return;
+        }
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          controller.text =
+              value;
+        });
       },
     );
   }
