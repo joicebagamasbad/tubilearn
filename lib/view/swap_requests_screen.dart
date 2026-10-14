@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/swap_requests_controller.dart';
 import '../model/swap_request.dart';
+import '../model/user.dart';
 import '../theme/app_theme.dart';
 import 'widgets/swap_request_card.dart';
 
@@ -659,6 +660,7 @@ class _SwapRequestsScreenState
       onEditSchedule: () {
         _editSchedule(
           request,
+          managed.otherUser,
         );
       },
       onConfirmSchedule: () {
@@ -1470,6 +1472,7 @@ class _SwapRequestsScreenState
 
   Future<void> _editSchedule(
       SwapRequest request,
+      User? otherUser,
       ) async {
     if (_isProcessing(
       request.id,
@@ -1539,6 +1542,7 @@ class _SwapRequestsScreenState
                   .scheduled
               ? 'Reschedule session'
               : 'Edit schedule',
+          otherUser: otherUser,
           initialDate: initialDate,
           initialTime: initialTime,
           initialMode: initialMode,
@@ -1977,6 +1981,7 @@ class _EditScheduleResult {
 /// the ambient Theme and owns the SnackBar-showing helper.
 class _EditScheduleDialogContent extends StatefulWidget {
   final String title;
+  final User? otherUser;
   final DateTime initialDate;
   final TimeOfDay initialTime;
   final String initialMode;
@@ -1992,6 +1997,7 @@ class _EditScheduleDialogContent extends StatefulWidget {
 
   const _EditScheduleDialogContent({
     required this.title,
+    required this.otherUser,
     required this.initialDate,
     required this.initialTime,
     required this.initialMode,
@@ -2035,6 +2041,90 @@ class _EditScheduleDialogContentState
     super.dispose();
   }
 
+  Widget _buildOtherPartyPreferencesCard() {
+    final User? otherUser = widget.otherUser;
+
+    if (otherUser == null) {
+      return const SizedBox.shrink();
+    }
+
+    final String availability = otherUser.availability.trim();
+    final String preferredMode = otherUser.preferredMode.trim();
+
+    final bool showAvailability =
+        availability.isNotEmpty && availability != 'Not set';
+    final bool showMode =
+        preferredMode.isNotEmpty && preferredMode != 'Not set';
+
+    if (!showAvailability && !showMode) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: widget.softPrimaryColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: widget.primaryColor.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.person_outline_rounded,
+              size: 16,
+              color: widget.primaryColor,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${otherUser.name} prefers',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: widget.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  if (showAvailability)
+                    Text(
+                      'Availability: $availability',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: widget.mutedColor,
+                      ),
+                    ),
+                  if (showMode)
+                    Text(
+                      'Mode: $preferredMode',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: widget.mutedColor,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -2051,6 +2141,7 @@ class _EditScheduleDialogContentState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildOtherPartyPreferencesCard(),
             Text(
               'Choose a new date, time, mode, and meeting details.',
               style: TextStyle(

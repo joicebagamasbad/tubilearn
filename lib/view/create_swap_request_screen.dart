@@ -641,6 +641,8 @@ class _CreateSwapRequestScreenState
             height: 10,
           ),
 
+          _buildOtherPartyPreferencesCard(),
+
           Row(
             children: [
               Expanded(
@@ -1048,6 +1050,88 @@ class _CreateSwapRequestScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOtherPartyPreferencesCard() {
+    final User? provider = _resolvedProvider;
+
+    if (provider == null) {
+      return const SizedBox.shrink();
+    }
+
+    final String availability = provider.availability.trim();
+    final String preferredMode = provider.preferredMode.trim();
+
+    final bool showAvailability =
+        availability.isNotEmpty && availability != 'Not set';
+    final bool showMode =
+        preferredMode.isNotEmpty && preferredMode != 'Not set';
+
+    if (!showAvailability && !showMode) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _highlightBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _highlightBorder,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.person_outline_rounded,
+              size: 17,
+              color: _primaryColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${provider.name} prefers',
+                    style: AppTextStyles.secondary.copyWith(
+                      color: _textColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  if (showAvailability)
+                    Text(
+                      'Availability: $availability',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: _mutedColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  if (showMode)
+                    Text(
+                      'Mode: $preferredMode',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: _mutedColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
