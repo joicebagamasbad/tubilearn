@@ -12,7 +12,7 @@ import 'theme/app_theme.dart';
 
 import 'services/app_settings_service.dart';
 
-import 'view/auth_gate.dart';
+import 'view/onboarding_screen.dart';
 import 'view/add_skill_screen.dart';
 import 'view/my_skills_screen.dart';
 import 'view/explore_screen.dart';
@@ -95,7 +95,7 @@ class TubiLearnApp extends StatelessWidget {
               .themeMode,
 
           home:
-          const AuthGate(),
+          const OnboardingGate(),
 
           routes: {
             '/add-skill': (

@@ -28,16 +28,20 @@ class AppSettings {
 
   final AppThemePreference theme;
 
+  final bool onboardingSeen;
+
   const AppSettings({
     required this.notificationsEnabled,
     required this.language,
     required this.theme,
+    this.onboardingSeen = false,
   });
 
   AppSettings copyWith({
     bool? notificationsEnabled,
     AppLanguagePreference? language,
     AppThemePreference? theme,
+    bool? onboardingSeen,
   }) {
     return AppSettings(
       notificationsEnabled:
@@ -49,6 +53,9 @@ class AppSettings {
       theme:
       theme ??
           this.theme,
+      onboardingSeen:
+      onboardingSeen ??
+          this.onboardingSeen,
     );
   }
 }

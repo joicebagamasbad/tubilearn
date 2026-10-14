@@ -30,6 +30,9 @@ class AppSettingsRepository {
   static const String _themeKey =
       'theme';
 
+  static const String _onboardingSeenKey =
+      'onboarding_seen';
+
   static const AppSettings _defaults =
   AppSettings(
     notificationsEnabled:
@@ -38,6 +41,8 @@ class AppSettingsRepository {
     AppLanguagePreference.english,
     theme:
     AppThemePreference.system,
+    onboardingSeen:
+    false,
   );
 
   // ============================================================
@@ -105,6 +110,12 @@ class AppSettingsRepository {
         _parseTheme(
           values[_themeKey],
         ),
+        onboardingSeen:
+        _parseBoolean(
+          values[_onboardingSeenKey],
+          fallback:
+          _defaults.onboardingSeen,
+        ),
       );
     } on DatabaseException {
       throw const AppSettingsRepositoryException(
@@ -129,6 +140,25 @@ class AppSettingsRepository {
       _notificationsKey,
       value:
       enabled
+          ? '1'
+          : '0',
+    );
+
+    return loadSettings();
+  }
+
+  // ============================================================
+  // SAVE ONBOARDING SEEN
+  // ============================================================
+
+  Future<AppSettings> setOnboardingSeen(
+      bool seen,
+      ) async {
+    await _saveSetting(
+      key:
+      _onboardingSeenKey,
+      value:
+      seen
           ? '1'
           : '0',
     );

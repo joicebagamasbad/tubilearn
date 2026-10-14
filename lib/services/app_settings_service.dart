@@ -21,6 +21,8 @@ class AppSettingsService
     AppLanguagePreference.english,
     theme:
     AppThemePreference.system,
+    onboardingSeen:
+    false,
   );
 
   bool _isInitialized = false;
@@ -44,6 +46,9 @@ class AppSettingsService
 
   AppThemePreference get theme =>
       _settings.theme;
+
+  bool get onboardingSeen =>
+      _settings.onboardingSeen;
 
   ThemeMode get themeMode {
     switch (_settings.theme) {
@@ -120,6 +125,33 @@ class AppSettingsService
       notifyListeners();
 
       rethrow;
+    }
+  }
+
+  // ============================================================
+  // ONBOARDING
+  // ============================================================
+
+  Future<void> markOnboardingSeen() async {
+    _settings =
+        _settings.copyWith(
+          onboardingSeen:
+          true,
+        );
+
+    notifyListeners();
+
+    try {
+      _settings =
+      await _repository.setOnboardingSeen(
+        true,
+      );
+
+      notifyListeners();
+    } catch (_) {
+      // Persistence failure must not throw to the UI; the optimistic
+      // in-memory state above already keeps onboarding from
+      // re-showing for the rest of this session.
     }
   }
 
