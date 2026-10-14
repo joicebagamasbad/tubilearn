@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/my_skills_controller.dart';
 import '../model/managed_skill.dart';
 import '../theme/app_theme.dart';
+import 'widgets/availability_picker.dart';
 
 class EditWantedSkillScreen
     extends StatefulWidget {
@@ -84,16 +85,6 @@ class _EditWantedSkillScreenState
     'Language',
     'Education',
     'Lifestyle',
-  ];
-
-  static const List<String>
-  _availabilityOptions = <String>[
-    'Weekdays',
-    'Weekends',
-    'Mornings',
-    'Afternoons',
-    'Evenings',
-    'Flexible',
   ];
 
   bool get _hasUnsavedChanges {
@@ -1124,220 +1115,22 @@ class _EditWantedSkillScreenState
   // ============================================================
 
   Widget _buildAvailabilitySelector() {
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(
-        13,
-      ),
-      onTap:
-      _saving
-          ? null
-          : _showAvailabilitySheet,
-      child:
-      Container(
-        height:
-        50,
-        padding:
-        const EdgeInsets.symmetric(
-          horizontal: 14,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          _surfaceColor,
-          borderRadius:
-          BorderRadius.circular(
-            13,
-          ),
-          border:
-          Border.all(
-            color:
-            _borderColor,
-          ),
-        ),
-        child:
-        Row(
-          children: [
-            const Icon(
-              Icons
-                  .calendar_month_outlined,
-              color:
-              AppTheme.primary,
-              size:
-              20,
-            ),
-
-            const SizedBox(
-              width: 10,
-            ),
-
-            Expanded(
-              child:
-              Text(
-                _availability,
-                style:
-                TextStyle(
-                  fontSize:
-                  12,
-                  color:
-                  _textColor,
-                ),
-              ),
-            ),
-
-            Icon(
-              Icons
-                  .keyboard_arrow_down_rounded,
-              color:
-              _mutedColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void>
-  _showAvailabilitySheet() async {
-    final List<String> options =
-    <String>[
-      ..._availabilityOptions,
-    ];
-
-    if (!options.contains(
-      _availability,
-    )) {
-      options.add(
-        _availability,
-      );
-    }
-
-    final String? selected =
-    await showModalBottomSheet<String>(
-      context:
-      context,
-      backgroundColor:
-      _surfaceColor,
-      shape:
-      const RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.vertical(
-          top:
-          Radius.circular(
-            22,
-          ),
-        ),
-      ),
-      builder: (
-          BuildContext sheetContext,
+    return AvailabilityPicker(
+      initialValue: _availability,
+      enabled: !_saving,
+      surfaceColor: _surfaceColor,
+      textColor: _textColor,
+      primaryColor: AppTheme.primary,
+      mutedColor: _mutedColor,
+      borderColor: _borderColor,
+      onChanged: (
+          String value,
           ) {
-        return SafeArea(
-          child:
-          Padding(
-            padding:
-            const EdgeInsets.fromLTRB(
-              20,
-              16,
-              20,
-              24,
-            ),
-            child:
-            Column(
-              mainAxisSize:
-              MainAxisSize.min,
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child:
-                  Container(
-                    width:
-                    40,
-                    height:
-                    4,
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      _borderColor,
-                      borderRadius:
-                      BorderRadius.circular(
-                        10,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(
-                  height: 18,
-                ),
-
-                Text(
-                  'Choose availability',
-                  style:
-                  AppTextStyles
-                      .cardTitle
-                      .copyWith(
-                    color:
-                    _textColor,
-                  ),
-                ),
-
-                const SizedBox(
-                  height: 8,
-                ),
-
-                ...options.map(
-                      (
-                      String option,
-                      ) {
-                    return ListTile(
-                      contentPadding:
-                      EdgeInsets.zero,
-                      title:
-                      Text(
-                        option,
-                        style:
-                        TextStyle(
-                          color:
-                          _textColor,
-                        ),
-                      ),
-                      trailing:
-                      _availability ==
-                          option
-                          ? const Icon(
-                        Icons
-                            .check_circle_rounded,
-                        color:
-                        AppTheme.primary,
-                      )
-                          : null,
-                      onTap:
-                          () {
-                        Navigator.pop(
-                          sheetContext,
-                          option,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
+        setState(() {
+          _availability = value;
+        });
       },
     );
-
-    if (!mounted ||
-        selected == null) {
-      return;
-    }
-
-    setState(() {
-      _availability =
-          selected;
-    });
   }
 
   // ============================================================

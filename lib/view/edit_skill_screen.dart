@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/my_skills_controller.dart';
 import '../model/managed_skill.dart';
+import 'widgets/availability_picker.dart';
 
 class EditSkillScreen extends StatefulWidget {
   final ManagedSkill managedSkill;
@@ -1164,221 +1165,22 @@ class _EditSkillScreenState
   // ============================================================
 
   Widget _buildAvailabilityField() {
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(
-        12,
-      ),
-      onTap:
-      _saving
-          ? null
-          : _showAvailabilitySheet,
-      child:
-      Container(
-        height:
-        50,
-        padding:
-        const EdgeInsets.symmetric(
-          horizontal: 14,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          _surfaceColor,
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-          border:
-          Border.all(
-            color:
-            _borderColor,
-          ),
-        ),
-        child:
-        Row(
-          children: [
-            Icon(
-              Icons
-                  .calendar_month_outlined,
-              size:
-              18,
-              color:
-              _primaryColor,
-            ),
-
-            const SizedBox(
-              width: 12,
-            ),
-
-            Expanded(
-              child:
-              Text(
-                _availability,
-                style:
-                TextStyle(
-                  fontSize:
-                  11,
-                  fontWeight:
-                  FontWeight.w500,
-                  color:
-                  _textColor,
-                ),
-              ),
-            ),
-
-            Icon(
-              Icons
-                  .chevron_right_rounded,
-              size:
-              20,
-              color:
-              _mutedColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void>
-  _showAvailabilitySheet() async {
-    final String? selected =
-    await showModalBottomSheet<String>(
-      context:
-      context,
-      backgroundColor:
-      Colors.transparent,
-      builder: (
-          BuildContext sheetContext,
+    return AvailabilityPicker(
+      initialValue: _availability,
+      enabled: !_saving,
+      surfaceColor: _surfaceColor,
+      textColor: _textColor,
+      primaryColor: _primaryColor,
+      mutedColor: _mutedColor,
+      borderColor: _borderColor,
+      onChanged: (
+          String value,
           ) {
-        return Container(
-          padding:
-          const EdgeInsets.fromLTRB(
-            20,
-            12,
-            20,
-            28,
-          ),
-          decoration:
-          BoxDecoration(
-            color:
-            _surfaceColor,
-            borderRadius:
-            const BorderRadius.vertical(
-              top:
-              Radius.circular(
-                24,
-              ),
-            ),
-          ),
-          child:
-          Column(
-            mainAxisSize:
-            MainAxisSize.min,
-            children: [
-              Container(
-                width:
-                40,
-                height:
-                4,
-                decoration:
-                BoxDecoration(
-                  color:
-                  _borderColor,
-                  borderRadius:
-                  BorderRadius.circular(
-                    20,
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 18,
-              ),
-
-              Align(
-                alignment:
-                Alignment.centerLeft,
-                child:
-                Text(
-                  'Choose availability',
-                  style:
-                  TextStyle(
-                    fontSize:
-                    15,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    _textColor,
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 12,
-              ),
-
-              ..._availabilityOptions.map(
-                    (
-                    String option,
-                    ) {
-                  final bool isSelected =
-                      _availability ==
-                          option;
-
-                  return ListTile(
-                    contentPadding:
-                    EdgeInsets.zero,
-                    title:
-                    Text(
-                      option,
-                      style:
-                      TextStyle(
-                        fontSize:
-                        12,
-                        fontWeight:
-                        isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color:
-                        _textColor,
-                      ),
-                    ),
-                    trailing:
-                    isSelected
-                        ? Icon(
-                      Icons
-                          .check_circle_rounded,
-                      color:
-                      _primaryColor,
-                    )
-                        : null,
-                    onTap:
-                        () {
-                      Navigator.pop(
-                        sheetContext,
-                        option,
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
-        );
+        setState(() {
+          _availability = value;
+        });
       },
     );
-
-    if (!mounted ||
-        selected == null) {
-      return;
-    }
-
-    setState(() {
-      _availability =
-          selected;
-    });
   }
 
   // ============================================================
