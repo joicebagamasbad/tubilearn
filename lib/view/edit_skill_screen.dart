@@ -53,15 +53,6 @@ class _EditSkillScreenState
     'Lifestyle',
   ];
 
-  final List<String> _availabilityOptions = [
-    'Weekdays',
-    'Weekends',
-    'Mornings',
-    'Afternoons',
-    'Evenings',
-    'Flexible',
-  ];
-
   bool get _isDarkMode =>
       Theme.of(context).brightness ==
           Brightness.dark;
@@ -189,15 +180,6 @@ class _EditSkillScreenState
       _categories.insert(
         0,
         _category,
-      );
-    }
-
-    if (!_availabilityOptions.contains(
-      _availability,
-    )) {
-      _availabilityOptions.insert(
-        0,
-        _availability,
       );
     }
   }
