@@ -5,6 +5,7 @@ import '../controller/authenticated_session_controller.dart';
 import '../model/auth_session.dart';
 import 'dashboard_video_session_shell.dart';
 import 'login_screen.dart';
+import 'profile_setup_screen.dart';
 import 'splash_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -22,6 +23,7 @@ class _AuthGateState extends State<AuthGate> {
       _controller.authStateChanges;
   String? _pendingUid;
   Future<void>? _preparation;
+  String? _setupHandledForUid;
 
   Future<void> _prepare(AuthSession? session) {
     final String? uid = session?.uid;
@@ -44,6 +46,15 @@ class _AuthGateState extends State<AuthGate> {
       _pendingUid = session?.uid;
       _preparation = _sessionController.prepare(session);
     });
+  }
+
+  bool _shouldShowProfileSetup(AuthSession session) {
+    try {
+      return _sessionController.needsProfileSetup &&
+          _setupHandledForUid != session.uid;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _signOutAfterFailure(BuildContext context) async {
@@ -115,9 +126,22 @@ class _AuthGateState extends State<AuthGate> {
                 initialMessage: 'Could not restore your session. Please sign in.',
               );
             }
-            return session == null
-                ? const LoginScreen()
-                : DashboardVideoSessionShell(key: ValueKey<String>(session.uid));
+            if (session == null) {
+              return const LoginScreen();
+            }
+
+            if (_shouldShowProfileSetup(session)) {
+              return ProfileSetupScreen(
+                key: ValueKey<String>(session.uid),
+                onDone: () {
+                  setState(() {
+                    _setupHandledForUid = session.uid;
+                  });
+                },
+              );
+            }
+
+            return DashboardVideoSessionShell(key: ValueKey<String>(session.uid));
           },
         );
       },

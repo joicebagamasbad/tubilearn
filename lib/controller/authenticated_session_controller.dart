@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../model/auth_session.dart';
 import '../model/repositories/explore_repository.dart';
 import '../model/repositories/local_user_repository.dart';
+import '../model/user.dart';
 import '../services/chat_service.dart';
 import '../services/current_user_service.dart';
 import '../services/explore_service.dart';
@@ -15,7 +16,11 @@ class AuthenticatedSessionController {
   final LocalUserRepository _localUsers = LocalUserRepository();
   Future<void> _transition = Future<void>.value();
   String? _preparedUid;
+  User? _preparedUser;
   int _latestRequest = 0;
+
+  bool get needsProfileSetup =>
+      _preparedUser != null && !_preparedUser!.profileCompleted;
 
   Future<void> prepare(AuthSession? session) {
     final String? requestedUid = session?.uid.trim();
@@ -50,7 +55,8 @@ class AuthenticatedSessionController {
         stage = 'current-user configuration';
         CurrentUserService.instance.configureAuthenticatedUid(session.uid);
         stage = 'cloud profile preparation';
-        await ProfileService.instance.prepareCurrentSession();
+        final User preparedUser =
+            await ProfileService.instance.prepareCurrentSession();
         // Explore must run first so other users exist in the local cache
         // before My Skills projects shared custom skills (fresh install
         // failed otherwise).
@@ -64,6 +70,7 @@ class AuthenticatedSessionController {
         await SwapService.instance.initialize();
         if (request != _latestRequest) return;
         _preparedUid = session.uid.trim();
+        _preparedUser = preparedUser;
       } catch (error, stackTrace) {
         if (kDebugMode) {
           debugPrint(
@@ -81,6 +88,7 @@ class AuthenticatedSessionController {
   Future<void> _clearActiveSession() async {
     CurrentUserService.instance.clearSession();
     _preparedUid = null;
+    _preparedUser = null;
     await ReviewService.instance.resetSession();
     await ChatService.instance.resetSession();
     await SwapService.instance.resetSession();
