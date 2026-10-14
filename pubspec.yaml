@@ -30,6 +30,7 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -38,3 +39,10 @@ flutter:
     - assets/images/
     - assets/images/mascot/
     - assets/images/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/icons/tubilearn_icon.png"
+  adaptive_icon_background: "assets/images/icons/tubilearn_icon_background.png"
+  adaptive_icon_foreground: "assets/images/icons/tubilearn_icon_foreground.png"
