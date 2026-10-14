@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/my_skills_controller.dart';
 import '../theme/app_theme.dart';
+import 'widgets/availability_picker.dart';
 
 class AddWantedSkillScreen extends StatefulWidget {
   const AddWantedSkillScreen({
@@ -43,16 +44,6 @@ class _AddWantedSkillScreenState
     'Language',
     'Education',
     'Lifestyle',
-  ];
-
-  static const List<String> _availabilityOptions =
-  <String>[
-    'Weekdays',
-    'Weekends',
-    'Mornings',
-    'Afternoons',
-    'Evenings',
-    'Flexible',
   ];
 
   bool get _isDarkMode =>
@@ -353,7 +344,7 @@ class _AddWantedSkillScreenState
                   height: 8,
                 ),
 
-                _buildAvailabilitySelector(),
+                _buildAvailabilityField(),
 
                 const SizedBox(
                   height: 28,
@@ -937,220 +928,31 @@ class _AddWantedSkillScreenState
   // AVAILABILITY
   // ============================================================
 
-  Widget _buildAvailabilitySelector() {
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(
-        13,
-      ),
-      onTap:
-      _saving
-          ? null
-          : _showAvailabilitySheet,
-      child:
-      Container(
-        height:
-        50,
-        padding:
-        const EdgeInsets
-            .symmetric(
-          horizontal:
-          14,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          _surfaceColor,
-          borderRadius:
-          BorderRadius.circular(
-            13,
-          ),
-          border:
-          Border.all(
-            color:
-            _borderColor,
-          ),
-        ),
-        child:
-        Row(
-          children: [
-            Icon(
-              Icons
-                  .calendar_month_outlined,
-              color:
-              _primaryColor,
-              size:
-              20,
-            ),
-
-            const SizedBox(
-              width:
-              10,
-            ),
-
-            Expanded(
-              child:
-              Text(
-                _availability,
-                style:
-                TextStyle(
-                  fontSize:
-                  13,
-                  color:
-                  _textColor,
-                ),
-              ),
-            ),
-
-            Icon(
-              Icons
-                  .keyboard_arrow_down_rounded,
-              color:
-              _mutedColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void>
-  _showAvailabilitySheet() async {
-    final String? selected =
-    await showModalBottomSheet<
-        String>(
-      context:
-      context,
-      backgroundColor:
+  Widget _buildAvailabilityField() {
+    return AvailabilityPicker(
+      initialValue:
+      _availability,
+      enabled:
+      !_saving,
+      surfaceColor:
       _surfaceColor,
-      shape:
-      const RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.vertical(
-          top:
-          Radius.circular(
-            22,
-          ),
-        ),
-      ),
-      builder: (
-          BuildContext sheetContext,
+      textColor:
+      _textColor,
+      primaryColor:
+      _primaryColor,
+      mutedColor:
+      _mutedColor,
+      borderColor:
+      _borderColor,
+      onChanged: (
+          String value,
           ) {
-        return SafeArea(
-          child:
-          Padding(
-            padding:
-            const EdgeInsets
-                .fromLTRB(
-              20,
-              16,
-              20,
-              24,
-            ),
-            child:
-            Column(
-              mainAxisSize:
-              MainAxisSize.min,
-              crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
-              children: [
-                Center(
-                  child:
-                  Container(
-                    width:
-                    40,
-                    height:
-                    4,
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      _borderColor,
-                      borderRadius:
-                      BorderRadius
-                          .circular(
-                        10,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(
-                  height:
-                  18,
-                ),
-
-                Text(
-                  'Choose availability',
-                  style:
-                  TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                    FontWeight.w800,
-                    color:
-                    _textColor,
-                  ),
-                ),
-
-                const SizedBox(
-                  height:
-                  8,
-                ),
-
-                ..._availabilityOptions
-                    .map(
-                      (
-                      String option,
-                      ) {
-                    return ListTile(
-                      contentPadding:
-                      EdgeInsets.zero,
-                      title:
-                      Text(
-                        option,
-                        style:
-                        TextStyle(
-                          fontSize: 13,
-                          color:
-                          _textColor,
-                        ),
-                      ),
-                      trailing:
-                      _availability ==
-                          option
-                          ? Icon(
-                        Icons
-                            .check_circle_rounded,
-                        color:
-                        _primaryColor,
-                      )
-                          : null,
-                      onTap:
-                          () {
-                        Navigator.pop(
-                          sheetContext,
-                          option,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
+        setState(() {
+          _availability =
+              value;
+        });
       },
     );
-
-    if (!mounted ||
-        selected == null) {
-      return;
-    }
-
-    setState(() {
-      _availability =
-          selected;
-    });
   }
 
   // ============================================================
