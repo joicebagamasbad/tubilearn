@@ -353,12 +353,72 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     required VoidCallback? onSkip,
     required List<Widget> extraContent,
   }) {
+    final Widget header = Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Step ${_step + 1} of $_stepCount',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.secondary.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: (_step + 1) / _stepCount,
+              color: colorScheme.primary,
+              backgroundColor: colorScheme.outlineVariant,
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: showSkip
+                ? TextButton(
+                    onPressed: onSkip,
+                    child: const Text('Skip'),
+                  )
+                : const SizedBox(height: 40),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        Expanded(
+          child: _buildScrollBody(
+            colorScheme: colorScheme,
+            asset: asset,
+            title: title,
+            subtitle: subtitle,
+            extraContent: extraContent,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScrollBody({
+    required ColorScheme colorScheme,
+    required String asset,
+    required String title,
+    required String subtitle,
+    required List<Widget> extraContent,
+  }) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final double side = math
             .min(
               constraints.maxWidth - 56,
-              constraints.maxHeight * 0.32,
+              constraints.maxHeight * 0.38,
             )
             .clamp(120.0, 260.0);
 
@@ -368,39 +428,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             vertical: 12,
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            constraints: BoxConstraints(
+              minHeight: math.max(0.0, constraints.maxHeight - 24),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Step ${_step + 1} of $_stepCount',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.secondary.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: (_step + 1) / _stepCount,
-                    color: colorScheme.primary,
-                    backgroundColor: colorScheme.outlineVariant,
-                    minHeight: 6,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: showSkip
-                      ? TextButton(
-                          onPressed: onSkip,
-                          child: const Text('Skip'),
-                        )
-                      : const SizedBox(height: 40),
-                ),
                 Center(
                   child: SizedBox(
                     width: side,

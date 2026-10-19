@@ -59,7 +59,7 @@ class _EditProfileScreenState
     'Anytime',
   ];
 
-  String _availabilityDays = 'Weekdays';
+  String? _availabilityDays;
   String? _availabilityTime;
   String _customAvailabilityDaysText = '';
   int _availabilityLoadGeneration = 0;
@@ -443,7 +443,9 @@ class _EditProfileScreenState
         bio:
         _bioController.text,
         availability:
-        _availabilityController.text,
+        _availabilityController.text.trim().isEmpty
+            ? 'Not set'
+            : _availabilityController.text,
         language:
         _languageController.text,
         preferredMode:
@@ -1436,7 +1438,7 @@ class _EditProfileScreenState
   /// matches one of two recognized shapes this screen itself writes:
   /// the composed '{days} • {time}' shape (canonical days, canonical
   /// time), or a bare canonical days value with no time part. Any other
-  /// value — legacy free text such as 'Weekday evenings' or 'Not set'
+  /// value — legacy free text such as 'Weekday evenings'
   /// — is never guessed at: Days is set to 'Custom', the whole string
   /// goes into the custom days field, and Time is left unselected.
   void _parseAvailability(
@@ -1444,6 +1446,22 @@ class _EditProfileScreenState
       ) {
     final String trimmed =
         rawValue.trim();
+
+    // Nothing chosen yet (new profile, or the 'Not set' placeholder):
+    // leave both dropdowns unselected rather than guessing 'Custom'.
+    if (trimmed.isEmpty ||
+        trimmed == 'Not set') {
+      _availabilityDays =
+          null;
+
+      _availabilityTime =
+          null;
+
+      _customAvailabilityDaysText =
+          '';
+
+      return;
+    }
 
     final int separatorIndex =
         trimmed.indexOf(
@@ -1514,7 +1532,7 @@ class _EditProfileScreenState
     final String daysPart =
     _availabilityDays == 'Custom'
         ? _customAvailabilityDaysText.trim()
-        : _availabilityDays;
+        : (_availabilityDays ?? '');
 
     final String? timePart =
         _availabilityTime;
@@ -1566,6 +1584,15 @@ class _EditProfileScreenState
       _availabilityDays,
       isExpanded:
       true,
+      hint:
+      Text(
+        'Select days',
+        style:
+        TextStyle(
+          color:
+          _mutedColor,
+        ),
+      ),
       style:
       TextStyle(
         color:

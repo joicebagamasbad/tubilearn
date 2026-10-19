@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/auth_controller.dart';
 import '../model/auth_session.dart';
+import 'widgets/terms_agreement.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +20,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _busy = false;
   bool _hidePassword = true;
   bool _hideConfirmation = true;
+  bool _acceptedTerms = false;
   String? _error;
 
   @override
@@ -147,9 +149,16 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
+                  TermsAgreementRow(
+                    value: _acceptedTerms,
+                    enabled: !_busy,
+                    onChanged: (bool value) =>
+                        setState(() => _acceptedTerms = value),
+                  ),
+                  const SizedBox(height: 8),
                   ElevatedButton(
-                    onPressed: _busy
+                    onPressed: _busy || !_acceptedTerms
                         ? null
                         : () => _authenticate(() => _controller.signUp(
                               displayName: _name.text,
@@ -173,6 +182,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     icon: const Icon(Icons.account_circle_outlined),
                     label: const Text('Continue with Google'),
                   ),
+                  const SizedBox(height: 8),
+                  const TermsNotice(),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _busy ? null : () => Navigator.of(context).pop(),

@@ -4,6 +4,7 @@ import '../controller/auth_controller.dart';
 import '../model/auth_session.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
+import 'widgets/terms_agreement.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? initialMessage;
@@ -151,6 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: const Icon(Icons.account_circle_outlined),
                     label: const Text('Continue with Google'),
                   ),
+                  const SizedBox(height: 8),
+                  const TermsNotice(),
                   const SizedBox(height: 18),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

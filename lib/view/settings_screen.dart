@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/auth_controller.dart';
 import '../controller/settings_controller.dart';
 import '../model/app_settings.dart';
+import 'legal_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -958,42 +959,21 @@ class _SettingsScreenState
     );
   }
 
-  void _showPrivacyDialog() {
-    _showInformationDialog(
-      icon:
-      Icons.privacy_tip_outlined,
-      title:
-      'Privacy',
-      children:
-      <Widget>[
-        _dialogParagraph(
-          'TubiLearn uses cloud services for authentication, profiles, skills, Explore, chats, swap requests, and reviews. App preferences and profile photos remain on this device.',
-        ),
-        _dialogPoint(
-          icon:
-          Icons.storage_rounded,
-          title:
-          'Local-only data',
-          text:
-          'App preferences and profile photos remain in this app installation unless they are changed or removed.',
-        ),
-        _dialogPoint(
-          icon:
-          Icons.cloud_off_rounded,
-          title:
-          'Account and cloud data',
-          text:
-          'Firebase Authentication identifies your account, and cloud sync supports your profile, My Skills, Explore, chats, swap requests, and reviews.',
-        ),
-        _dialogPoint(
-          icon:
-          Icons.policy_outlined,
-          title:
-          'What stays local',
-          text:
-          'App preferences and profile photos are not included in cloud sync.',
-        ),
-      ],
+  void _openLegal(
+      LegalDocument document,
+      ) {
+    Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<void>(
+        builder: (
+            BuildContext context,
+            ) =>
+            LegalScreen(
+              document:
+              document,
+            ),
+      ),
     );
   }
 
@@ -1593,13 +1573,30 @@ class _SettingsScreenState
 
             _actionTile(
               icon:
+              Icons.description_outlined,
+              title:
+              'Terms of Use',
+              subtitle:
+              'Rules for using TubiLearn',
+              onTap:
+              () => _openLegal(
+                LegalDocument.terms,
+              ),
+            ),
+
+            _divider(),
+
+            _actionTile(
+              icon:
               Icons.privacy_tip_outlined,
               title:
-              'Privacy',
+              'Privacy Policy',
               subtitle:
               'How TubiLearn handles your data',
               onTap:
-              _showPrivacyDialog,
+              () => _openLegal(
+                LegalDocument.privacy,
+              ),
             ),
           ],
         ),
